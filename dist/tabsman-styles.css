@@ -1,0 +1,78 @@
+/* group容器 */
+.plugin-tabsman-tabs{
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+/* 面板条目 */
+.plugin-tabsman-panel-item.orca-fav-item-item {
+    grid-template-columns: 0 auto 1fr auto;
+
+    /* 面板折叠按钮 */
+    &>.plugin-tabsman-panel-collapse-icon {
+        background-color:transparent !important;
+        margin-right:0;
+    }
+}
+
+/* tab条目 */
+.plugin-tabsman-tab-item.orca-fav-item-item {
+    grid-template-columns: auto auto 1fr auto;
+
+    /* tab固定按钮pin */
+    &>.plugin-tabsman-tab-pin{
+        width: 22px;
+        aspect-ratio: 1;
+        text-align: center;
+        line-height: 22px;
+    }
+
+    /* active tab */
+    &.active-tab-item{
+        border: 1px solid var(--orca-color-primary-5);
+    }
+}
+
+.plugin-tabsman-tab-title, .plugin-tabsman-panel-title{
+    font-family: var(--orca-fontfamily-code);
+}
+
+/* tab关闭按钮、新建tab按钮、pin按钮 */
+.plugin-tabsman-tab-close, .plugin-tabsman-panel-new-tab, .plugin-tabsman-tab-pin{
+    opacity: .15;
+    transition: opacity .2s ease-in-out;
+    &:hover{
+        opacity: 1;
+        font-weight: var(--orca-fontweight-xl);
+    }
+}
+
+/* 成功pin住的按钮 */
+.plugin-tabsman-tab-pin.ti-pinned-filled{
+    opacity: 1;
+    color: var(--orca-color-primary-5);
+}
+
+/* 未pin的非hover隐藏 */
+.plugin-tabsman-tab-item:not(:hover) .plugin-tabsman-tab-pin.ti-pinned{
+    opacity:0.05 !important;
+}
+
+
+/* ——————————————————————————侧边选项栏激活样式———————————————————————————————— */
+/* tabsman-option点击会注入.plugin-tabsman-selected */
+/* 注入后，对于非插件option，全都恢复非选中样式 */
+.orca-sidebar-tab-options.plugin-tabsman-selected
+>.orca-segmented-item:not(.plugin-tabsman-tab-option){
+  background-color: transparent !important;
+  box-shadow:none !important;
+}
+
+/* 如果option没有选中，则hidden掉tabs，并display其他 */
+.orca-sidebar-tab-options:not(.plugin-tabsman-selected)~.orca-sidebar-tabs .orca-hideable:first-child{
+    display:none;
+}
+.orca-sidebar-tab-options.plugin-tabsman-selected~.orca-sidebar-tabs .orca-hideable:not(:first-child){
+    display:none;
+}

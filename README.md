@@ -1,6 +1,6 @@
 # orca-tabsman-plugin
 
-tabsman（**tabs man**ager）：用于在右侧栏为每个面板构建标签页列表。
+tabsman（**tabs man**ager -> 管理器）：用于在右侧栏为每个面板构建标签页列表。
 
 ## 用法介绍
 

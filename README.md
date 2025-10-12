@@ -25,7 +25,7 @@ tabsman（**tabs man**ager）：用于在右侧栏为每个面板构建标签页
 
 ### 四、插件命令
 
-- 前往下一个/上一个tab，自行设置快捷键
+- 前往下一个/上一个tab，自行设置快捷键。可以试试 `alt [` 和 `alt ]` 蛮顺手的。
 
   <img width="500" height="166" alt="image" src="https://github.com/user-attachments/assets/5b963a5e-658a-4ff5-8bf0-f9d5d4eb24f4" />
 

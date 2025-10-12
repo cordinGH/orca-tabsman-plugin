@@ -1,3 +1,10 @@
+/* 干掉顶部栏后退按钮 */
+.orca-button.orca-headbar-back{
+    pointer-events: none;
+    color: var(--orca-color-text-1) !important;
+    opacity:.2 !important;
+}
+
 /* group容器 */
 .plugin-tabsman-tabs{
     display: flex;

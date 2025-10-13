@@ -23,6 +23,16 @@
  * 
  */
 
+// 导入持久化模块
+import { addPinnedTabData, removePinnedTabData, restorePinnedTabs } from './tabsman-pinned-persistence.js';
+
+// 创建持久化命名空间
+const Persistence = {
+    addPinnedTabData,
+    removePinnedTabData,
+    restorePinnedTabs
+};
+
 /**
  * 历史记录长度约束配置
  */
@@ -538,6 +548,9 @@ async function switchTab(tabId) {
         // 如果目标标签页和活跃标签页的当前块ID相同，后续不会触发goTo跳转，也就不会重置标志位，因此这里手动重置
         if (activeTab.currentBlockId === tab.currentBlockId) {
             isInternalNavigation = false;
+            
+            // 由于没有执行goTo跳转，UI不会自动更新，需要手动刷新
+            if (renderTabsCallback) renderTabsCallback();
         }
     }
     
@@ -553,7 +566,7 @@ async function switchTab(tabId) {
         fillCurrentAccess();
     }
 
-    console.log(`已切换到标签页 ${tab.id} （名称：${tab.name}）`);
+    console.log(`已切换到标签页 ${tab.id} （名称：${tab.name}）`);    
     return true;
 }
 
@@ -586,6 +599,12 @@ async function deleteTab(tabId) {
     const wasActiveTab = activeTabs[tabPanelId] === tab;
     if (wasActiveTab && tabIdSet.size === 1) {
         // 如果删除的是活跃标签页，且当前仅剩一个标签页，则直接关闭面板        
+        
+        // 如果是置顶标签页，从持久化数据中移除
+        if (tab.isPinned) {
+            Persistence.removePinnedTabData(tabId);
+        }
+        
         // 调用原始函数关闭面板
         orca.nav.close(tabPanelId);
 
@@ -602,6 +621,11 @@ async function deleteTab(tabId) {
         
         return true;
     } else if(wasActiveTab){
+        // 如果是置顶标签页，从持久化数据中移除
+        if (tab.isPinned) {
+            Persistence.removePinnedTabData(tabId);
+        }
+        
         // 清理标签页数据
         delete tabs[tabId];
         tabIdSet.delete(tabId);
@@ -612,6 +636,11 @@ async function deleteTab(tabId) {
         const remainingTabIds = Array.from(tabIdSet);
         await switchTab(remainingTabIds[0]);
     } else {
+        // 如果是置顶标签页，从持久化数据中移除
+        if (tab.isPinned) {
+            Persistence.removePinnedTabData(tabId);
+        }
+        
         // 清理标签页数据
         delete tabs[tabId];
         tabIdSet.delete(tabId);
@@ -654,6 +683,9 @@ function pinTab(tabId) {
     // 更新排序缓存
     updateSortedTabsCache(tab.panelId);
     
+    // 添加到持久化模块所需pinTabsData
+    Persistence.addPinnedTabData(tab);
+    
     // 通知UI更新
     if (renderTabsCallback) renderTabsCallback();
     
@@ -685,6 +717,9 @@ function unpinTab(tabId) {
     
     // 更新排序缓存
     updateSortedTabsCache(tab.panelId);
+    
+    // 移除对应数据
+    Persistence.removePinnedTabData(tabId);
     
     // 通知UI更新
     if (renderTabsCallback) renderTabsCallback();
@@ -961,6 +996,23 @@ async function start(callback = null) {
     console.log('  switchToPreviousTab() - 切换到上一个标签页');
     console.log('  navigateTabBack(tab) - 标签页后退');
     console.log('  navigateTabForward(tab) - 标签页前进');
+    
+    // 恢复置顶标签页
+    try {
+        const pinnedTabsData = await orca.plugins.getData('tabsman', 'pinned-tabs-data');
+        if (pinnedTabsData) {
+            // 直接传递解析后的数据
+            await Persistence.restorePinnedTabs(JSON.parse(pinnedTabsData), getAllTabs(), getTabIdSetByPanelId());
+            
+            // 恢复完成后，更新当前面板的排序缓存（恢复的标签页都在当前面板）
+            updateSortedTabsCache(orca.state.activePanel);
+            
+            // 统一通知UI更新
+            if (renderTabsCallback) renderTabsCallback();
+        }
+    } catch (error) {
+        console.error('恢复置顶标签页失败:', error);
+    }
 }
 
 /**

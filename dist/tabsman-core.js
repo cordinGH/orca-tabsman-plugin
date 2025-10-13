@@ -1006,9 +1006,6 @@ async function start(callback = null) {
             
             // 恢复完成后，更新当前面板的排序缓存（恢复的标签页都在当前面板）
             updateSortedTabsCache(orca.state.activePanel);
-            
-            // 统一通知UI更新
-            if (renderTabsCallback) renderTabsCallback();
         }
     } catch (error) {
         console.error('恢复置顶标签页失败:', error);

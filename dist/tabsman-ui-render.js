@@ -251,9 +251,6 @@ async function startTabsRender() {
             return false;
         }
         
-        // 立即更新一次所有标签页
-        await renderTabsByPanel();
-        
         return true;
         
     } catch (error) {

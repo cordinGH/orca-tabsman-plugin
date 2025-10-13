@@ -118,6 +118,9 @@ async function load(name) {
         }
     }
     
+    // 插件启动完成后，主动触发一次渲染通知
+    await renderTabsByPanel();
+    
     console.log(`${pluginName} 已加载`);
 }
 

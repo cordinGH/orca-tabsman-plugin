@@ -376,7 +376,7 @@ async function navigateTabBack(tab) {
     
     // 检查是否可以后退
     if (tab.backStack.length <= 1) {
-        orca.notify("info", "当前标签页历史已到开头，无法后退");
+        orca.notify("info", "[tabsman] 当前标签页历史已到开头，无法后退");
         isInternalNavigation = false;
         return false;
     }
@@ -412,7 +412,7 @@ async function navigateTabForward(tab) {
     
     // 检查是否可以前进
     if (tab.forwardStack.length === 0) {
-        orca.notify("info", "当前标签页历史已到末尾，无法前进");
+        orca.notify("info", "[tabsman] 当前标签页历史已到末尾，无法前进");
         isInternalNavigation = false;
         return false;
     }
@@ -588,7 +588,7 @@ async function deleteTab(tabId) {
     // 检查是否只有一个标签页，如果是则不允许删除
     const totalTabsCount = Object.keys(tabs).length;
     if (totalTabsCount <= 1) {
-        orca.notify("warn", "系统中只有一个标签页，无法删除");
+        orca.notify("warn", "[tabsman] 系统中只有一个标签页，无法删除");
         return false;
     }
 
@@ -735,27 +735,23 @@ function unpinTab(tabId) {
  */
 async function switchToNextTab() {
     const activePanelId = orca.state.activePanel;
-    if (!activePanelId) {
-        orca.notify("warn", "没有活跃面板");
-        return false;
-    }
     
     const panelTabs = getOneSortedTabs(activePanelId);
     if (panelTabs.length <= 1) {
-        orca.notify("info", "当前面板只有一个标签页");
+        orca.notify("info", "[tabsman] 当前面板只有一个标签页");
         return false;
     }
     
     const activeTab = activeTabs[activePanelId];
     if (!activeTab) {
-        orca.notify("warn", "无法获取当前活跃标签页");
+        orca.notify("warn", "[tabsman] 无法获取当前活跃标签页");
         return false;
     }
     
     // 找到当前标签页在列表中的位置
     const currentIndex = panelTabs.findIndex(tab => tab.id === activeTab.id);
     if (currentIndex === -1) {
-        orca.notify("warn", "当前标签页不在列表中");
+        orca.notify("warn", "[tabsman] 当前标签页不在列表中");
         return false;
     }
     
@@ -773,27 +769,23 @@ async function switchToNextTab() {
  */
 async function switchToPreviousTab() {
     const activePanelId = orca.state.activePanel;
-    if (!activePanelId) {
-        orca.notify("warn", "没有活跃面板");
-        return false;
-    }
     
     const panelTabs = getOneSortedTabs(activePanelId);
     if (panelTabs.length <= 1) {
-        orca.notify("info", "当前面板只有一个标签页");
+        orca.notify("info", "[tabsman] 当前面板只有一个标签页");
         return false;
     }
     
     const activeTab = activeTabs[activePanelId];
     if (!activeTab) {
-        orca.notify("warn", "无法获取当前活跃标签页");
+        orca.notify("warn", "[tabsman] 无法获取当前活跃标签页");
         return false;
     }
     
     // 找到当前标签页在列表中的位置
     const currentIndex = panelTabs.findIndex(tab => tab.id === activeTab.id);
     if (currentIndex === -1) {
-        orca.notify("warn", "当前标签页不在列表中");
+        orca.notify("warn", "[tabsman] 当前标签页不在列表中");
         return false;
     }
     
@@ -848,7 +840,12 @@ function setupCommandInterception() {
     orca.commands.registerBeforeCommand('core.goForward', beforeCommandHooks.goForward);
     
     // 3. 拦截 core.closePanel 命令（关闭当前面板）
-    beforeCommandHooks.closePanel = () => {        
+    beforeCommandHooks.closePanel = () => {       
+        if (tabIdSetByPanelId.size === 1) {
+            orca.notify("info", "[tabsman] 当前仅剩一个面板，无法关闭关闭面板");
+            return false;
+        }
+        
         const activePanelId = orca.state.activePanel;
         // 清理当前面板的标签页数据
         const tabIdSet = tabIdSetByPanelId.get(activePanelId);
@@ -957,7 +954,7 @@ async function start(callback = null) {
         async () => {
             const success = await switchToNextTab();
             if (success) {
-                orca.notify("success", "已切换到下一个标签页");
+                orca.notify("success", "[tabsman] 已切换到下一个标签页");
             }
         },
         'Go to next tab'
@@ -968,7 +965,7 @@ async function start(callback = null) {
         async () => {
             const success = await switchToPreviousTab();
             if (success) {
-                orca.notify("success", "已切换到上一个标签页");
+                orca.notify("success", "[tabsman] 已切换到上一个标签页");
             }
         },
         'Go to previous tab'

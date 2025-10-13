@@ -1,6 +1,7 @@
 // Orca Tabsman Plugin - 插件入口
 // 负责启动核心功能和UI注入
 
+
 import { start, destroy } from './tabsman-core.js';
 import { injectTabsmanContainers, cleanupTabsmanContainers } from './tabsman-ui-container.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
@@ -46,9 +47,9 @@ function handleCtrlClick(event) {
     // 创建后台标签页
     try {
         window.createTab(parseInt(refId), false);
-        orca.notify("success", `已在后台创建新标签页 (引用ID: ${refId})`);
+        orca.notify("success", `[tabsman] 已在后台创建新标签页 (引用ID: ${refId})`);
     } catch (error) {
-        orca.notify("error", "创建标签页失败");
+        orca.notify("error", "[tabsman] 创建标签页失败");
     } finally {
         // 延迟重置标志，防止快速连续点击
         setTimeout(() => {
@@ -96,7 +97,7 @@ async function load(name) {
                 onClick: () => {
                     close();
                     window.createTab(blockId, false);
-                    orca.notify("success", "已在后台创建新标签页");
+                    orca.notify("success", "[tabsman] 已在后台创建新标签页");
                 }
             });
         }

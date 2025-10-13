@@ -11,6 +11,19 @@ let pluginName;
 // 防重复执行标志，代表正在创建标签页
 let isCreatingTab = false;
 
+// 更新活跃面板样式的辅助函数
+function updateActivePanelStyle() {
+    // 移除所有活跃样式
+    const allActivePanels = document.querySelectorAll('.plugin-tabsman-panel-group.active-panel');
+    allActivePanels.forEach(panel => panel.classList.remove('active-panel'));
+    
+    // 为当前活跃面板添加样式
+    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-panel-id="${orca.state.activePanel}"]`);
+    if (activePanelGroup) {
+        activePanelGroup.classList.add('active-panel');
+    }
+}
+
 
 // Ctrl+单击事件监听器
 function handleCtrlClick(event) {
@@ -121,6 +134,23 @@ async function load(name) {
     
     // 插件启动完成后，主动触发一次渲染通知
     await renderTabsByPanel();
+
+    // 对于orca.state.activePanel 的面板group，注入 .active-panel    
+    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-panel-id="${orca.state.activePanel}"]`);
+    if (activePanelGroup) {
+        activePanelGroup.classList.add('active-panel');
+    }
+
+    // 包装 switchFocusTo 函数，使得每次切换面板都会变更.active-panel元素
+    const originalSwitchFocusTo = orca.nav.switchFocusTo;
+    orca.nav.switchFocusTo = function(panelId) {
+        originalSwitchFocusTo.call(this, panelId);
+        updateActivePanelStyle();
+    };
+    
+    // 为面板切换命令注册 after hooks
+    orca.commands.registerAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
+    orca.commands.registerAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
     
     console.log(`${pluginName} 已加载`);
 }
@@ -134,6 +164,10 @@ async function unload() {
     
     // 注销事件监听器
     document.removeEventListener('click', handleCtrlClick, true);
+    
+    // 注销面板切换命令的 after hooks
+    orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
+    orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
     
     // 清理注入的样式
     orca.themes.removeCSSResources(pluginName);

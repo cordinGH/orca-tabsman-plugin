@@ -5,6 +5,7 @@
 import { start, destroy } from './tabsman-core.js';
 import { injectTabsmanContainers, cleanupTabsmanContainers } from './tabsman-ui-container.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
+import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 
 let pluginName;
 
@@ -72,7 +73,11 @@ function handleCtrlClick(event) {
 }
 
 
-// 插件加载
+/**
+ * 插件加载
+ * @param {string} name - 插件名称
+ * @returns {Promise<void>} 返回Promise
+ */
 async function load(name) {
     pluginName = name;
     console.log(`=== ${pluginName} 加载中 ===`);
@@ -98,6 +103,9 @@ async function load(name) {
     
     // 启动标签页系统，传递UI更新回调
     await start(renderTabsByPanel);
+    
+    // 启动最近关闭标签页模块
+    await startRecentlyClosed(renderTabsByPanel);
     
     // 注册右键菜单命令（依赖window.createTab）
     orca.blockMenuCommands.registerBlockMenuCommand("tabsman.createTabInBackground", {
@@ -155,7 +163,10 @@ async function load(name) {
     console.log(`${pluginName} 已加载`);
 }
 
-// 插件卸载
+/**
+ * 插件卸载
+ * @returns {Promise<void>} 返回Promise
+ */
 async function unload() {
     console.log(`=== ${pluginName} 卸载中 ===`);
     
@@ -177,6 +188,9 @@ async function unload() {
     
     // 清理注入的容器
     cleanupTabsmanContainers();
+    
+    // 停止最近关闭标签页模块
+    await stopRecentlyClosed();
     
     // 清理标签页系统
     destroy();

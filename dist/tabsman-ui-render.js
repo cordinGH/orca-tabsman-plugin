@@ -209,9 +209,9 @@ async function renderTabsByPanel() {
                         e.stopPropagation();
                         // 根据当前置顶状态切换
                         if (tab.isPinned) {
-                            Tabsman.actions.unpinTab(tab.id);
+                            await Tabsman.actions.unpinTab(tab.id);
                         } else {
-                            Tabsman.actions.pinTab(tab.id);
+                            await Tabsman.actions.pinTab(tab.id);
                         }
                     } else if (e.target === tabItem.closeBtn) {
                         e.stopPropagation();

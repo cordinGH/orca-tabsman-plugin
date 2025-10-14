@@ -24,13 +24,13 @@
  */
 
 // 导入持久化模块
-import { addPinnedTabData, removePinnedTabData, restorePinnedTabs } from './tabsman-pinned-persistence.js';
+import { addAndSaveTabData, removeAndSaveTabData, restoreTabs } from './tabsman-persistence.js';
 
 // 创建持久化命名空间
 const Persistence = {
-    addPinnedTabData,
-    removePinnedTabData,
-    restorePinnedTabs
+    addAndSaveTabData,
+    removeAndSaveTabData,
+    restoreTabs
 };
 
 /**
@@ -65,7 +65,7 @@ let activeTabs = {};
 /** @type {Map<string, Set<string>>} 按面板ID分组的标签页ID集合索引 */
 let tabIdSetByPanelId = new Map();
 
-/** @type {Map<string, Array<Object>>} 按面板ID分组的已排序标签页列表缓存 */
+/** @type {Map<string, Array<Object>>} 按面板ID分组的已排序标签页列表缓存，用于渲染 */
 let sortedTabsByPanelId = new Map();
 
 /** @type {number} 全局pin顺序计数器 */
@@ -256,8 +256,7 @@ function createTabObject(currentBlockId = null, panelId, icon = 'ti ti-cube', na
 
         // Pin功能相关属性
         isPinned: false,        // 是否置顶
-        pinnedAt: null,         // 置顶时间
-        pinOrder: 0,            // 置顶顺序（0表示未置顶，数字越小越靠前）
+        pinOrder: 0,            // 置顶顺序（0表示未置顶，数字越大越靠顶部）
 
         // 新设计：使用双栈结构管理历史记录
         backStack: [],    // 后退栈：当前项 + 可以后退的历史
@@ -595,15 +594,18 @@ async function deleteTab(tabId) {
     const tabPanelId = tab.panelId;
     const tabIdSet = tabIdSetByPanelId.get(tabPanelId);
 
-    // 如果即将删除的是活跃标签页，且当前仅剩一个标签页，则直接关闭面板
+    // 如果是置顶标签页，从持久化数据中移除
+    if (tab.isPinned) {
+        await Persistence.removeAndSaveTabData(tabId, "pinned");
+    }
+    
+    // 保存删除的标签页到持久化模块，该函数在处理"recently-closed"时，会调用回调函数通知recently-closed模块更新数据
+    await Persistence.addAndSaveTabData(tab, "recently-closed");
+
+    // 如果即将删除的是活跃标签页，且当前仅剩一个标签页，则直接关闭面板，否则切换到其他标签页
     const wasActiveTab = activeTabs[tabPanelId] === tab;
     if (wasActiveTab && tabIdSet.size === 1) {
         // 如果删除的是活跃标签页，且当前仅剩一个标签页，则直接关闭面板        
-        
-        // 如果是置顶标签页，从持久化数据中移除
-        if (tab.isPinned) {
-            Persistence.removePinnedTabData(tabId);
-        }
         
         // 调用原始函数关闭面板
         orca.nav.close(tabPanelId);
@@ -621,11 +623,6 @@ async function deleteTab(tabId) {
         
         return true;
     } else if(wasActiveTab){
-        // 如果是置顶标签页，从持久化数据中移除
-        if (tab.isPinned) {
-            Persistence.removePinnedTabData(tabId);
-        }
-        
         // 清理标签页数据
         delete tabs[tabId];
         tabIdSet.delete(tabId);
@@ -636,11 +633,6 @@ async function deleteTab(tabId) {
         const remainingTabIds = Array.from(tabIdSet);
         await switchTab(remainingTabIds[0]);
     } else {
-        // 如果是置顶标签页，从持久化数据中移除
-        if (tab.isPinned) {
-            Persistence.removePinnedTabData(tabId);
-        }
-        
         // 清理标签页数据
         delete tabs[tabId];
         tabIdSet.delete(tabId);
@@ -661,9 +653,9 @@ async function deleteTab(tabId) {
 /**
  * 置顶标签页
  * @param {string} tabId - 标签页ID
- * @returns {boolean} 返回是否成功
+ * @returns {Promise<boolean>} 返回是否成功
  */
-function pinTab(tabId) {
+async function pinTab(tabId) {
     const tab = tabs[tabId];
     if (!tab) {
         console.warn(`尝试置顶不存在的标签页: ${tabId}`);
@@ -677,14 +669,13 @@ function pinTab(tabId) {
     
     // 设置置顶状态
     tab.isPinned = true;
-    tab.pinnedAt = new Date();
     tab.pinOrder = ++globalPinCounter;
     
     // 更新排序缓存
     updateSortedTabsCache(tab.panelId);
     
     // 添加到持久化模块所需pinTabsData
-    Persistence.addPinnedTabData(tab);
+    await Persistence.addAndSaveTabData(tab, "pinned");
     
     // 通知UI更新
     if (renderTabsCallback) renderTabsCallback();
@@ -696,9 +687,9 @@ function pinTab(tabId) {
 /**
  * 取消置顶标签页
  * @param {string} tabId - 标签页ID
- * @returns {boolean} 返回是否成功
+ * @returns {Promise<boolean>} 返回是否成功
  */
-function unpinTab(tabId) {
+async function unpinTab(tabId) {
     const tab = tabs[tabId];
     if (!tab) {
         console.warn(`尝试取消置顶不存在的标签页: ${tabId}`);
@@ -712,14 +703,13 @@ function unpinTab(tabId) {
     
     // 取消置顶状态
     tab.isPinned = false;
-    tab.pinnedAt = null;
     tab.pinOrder = 0;
     
     // 更新排序缓存
     updateSortedTabsCache(tab.panelId);
     
     // 移除对应数据
-    Persistence.removePinnedTabData(tabId);
+    await Persistence.removeAndSaveTabData(tabId, "pinned");
     
     // 通知UI更新
     if (renderTabsCallback) renderTabsCallback();
@@ -998,10 +988,10 @@ async function start(callback = null) {
     try {
         const pinnedTabsData = await orca.plugins.getData('tabsman', 'pinned-tabs-data');
         if (pinnedTabsData) {
-            // 直接传递解析后的数据
-            await Persistence.restorePinnedTabs(JSON.parse(pinnedTabsData), getAllTabs(), getTabIdSetByPanelId());
-            
-            // 恢复完成后，更新当前面板的排序缓存（恢复的标签页都在当前面板）
+            // 直接传递解析后的数据恢复置顶标签页，并更新core中的pinOrder起始值
+            globalPinCounter = await Persistence.restoreTabs(JSON.parse(pinnedTabsData), "pinned", getAllTabs(), getTabIdSetByPanelId());
+            console.log(`恢复置顶标签页完成，共恢复 ${globalPinCounter} 个标签页`);
+            // 更新当前面板的排序缓存
             updateSortedTabsCache(orca.state.activePanel);
         }
     } catch (error) {
@@ -1198,5 +1188,7 @@ export {
     switchTab,
     // Pin功能函数
     pinTab,
-    unpinTab
+    unpinTab,
+    // 排序缓存函数
+    updateSortedTabsCache
 };

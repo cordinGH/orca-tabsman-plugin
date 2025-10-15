@@ -47,11 +47,12 @@ const HISTORY_CONFIG = {
 let renderTabsCallback = null;
 
 // 保存原始API函数的全局变量
-/** @type {Function|null} 原始的 orca.nav.closeAllBut 函数 */
 /** @type {Function|null} 原始的 orca.nav.addTo 函数 */
 let originalAddTo = null;
 /** @type {Function|null} 原始的 orca.nav.openInLastPanel 函数 */
 let originalOpenInLastPanel = null;
+/** @type {Function|null} 原始的 orca.nav.goTo 函数 */
+let originalGoTo = null;
 
 // ==================== 全局数据存储 ====================
 
@@ -65,6 +66,7 @@ let activeTabs = {};
 /** @type {Map<string, Set<string>>} 按面板ID分组的标签页ID集合索引 */
 let tabIdSetByPanelId = new Map();
 
+// array存储是为了方便直接根据tabIdSet来转换出tab对象。
 /** @type {Map<string, Array<Object>>} 按面板ID分组的已排序标签页列表缓存，用于渲染 */
 let sortedTabsByPanelId = new Map();
 
@@ -305,9 +307,15 @@ function setupSubscription() {
     const { subscribe } = window.Valtio;
     
     // 监听全局历史变化，触发导航处理
+    let lastHistoryLength = orca.state.panelBackHistory.length;
     const backHistoryUnsubscribe = subscribe(orca.state.panelBackHistory, () => {
-        console.log("⭐️触发全局历史更新")
-        handleHistoryChange();
+        const currentLength = orca.state.panelBackHistory.length;
+        // 不处理历史记录被删除的情况（虎鲸1.41版本关闭面板会删除该面板的历史记录）
+        if (currentLength >= lastHistoryLength) {
+        // console.log(`⭐️触发全局历史更新 - 上次长度: ${lastHistoryLength}, 本次长度: ${currentLength}`);
+            handleHistoryChange();
+            lastHistoryLength = currentLength;
+        }
     });
     
     return [backHistoryUnsubscribe];
@@ -352,7 +360,7 @@ function handleHistoryChange() {
     if (isInternalNavigation) {
         console.log("本次为内部导航操作，不会产生新的访问记录,无需填充")
         isInternalNavigation = false;
-        // 异步更新属性，不阻塞
+        // 异步更新属性（内部会刷新渲染），不阻塞
         updateTabProperties();
         return;
     }
@@ -360,7 +368,7 @@ function handleHistoryChange() {
     // 立即填充当前访问记录到当前标签页的历史栈
     fillCurrentAccess();
     
-    // 异步更新标签页属性，不阻塞历史记录填充
+    // 异步更新标签页属性（内部会刷新渲染），不阻塞历史记录填充
     updateTabProperties();
 }
 
@@ -594,13 +602,13 @@ async function deleteTab(tabId) {
     const tabPanelId = tab.panelId;
     const tabIdSet = tabIdSetByPanelId.get(tabPanelId);
 
-    // 如果是置顶标签页，从持久化数据中移除
+    // 【持久化处理】保存删除的标签页到持久化模块，该函数在处理"recently-closed"时，会调用回调函数通知recently-closed模块更新数据
+    await Persistence.addAndSaveTabData(tab, "recently-closed");
+    // 【持久化处理】如果是置顶标签页，从持久化数据中移除
     if (tab.isPinned) {
         await Persistence.removeAndSaveTabData(tabId, "pinned");
     }
-    
-    // 保存删除的标签页到持久化模块，该函数在处理"recently-closed"时，会调用回调函数通知recently-closed模块更新数据
-    await Persistence.addAndSaveTabData(tab, "recently-closed");
+
 
     // 如果即将删除的是活跃标签页，且当前仅剩一个标签页，则直接关闭面板，否则切换到其他标签页
     const wasActiveTab = activeTabs[tabPanelId] === tab;
@@ -610,34 +618,31 @@ async function deleteTab(tabId) {
         // 调用原始函数关闭面板
         orca.nav.close(tabPanelId);
 
-        // 清理标签页数据
+        // 清理标签页数据和排序缓存
         delete tabs[tabId];
         tabIdSetByPanelId.delete(tabPanelId);
         delete activeTabs[tabPanelId];
-        
-        // 清理排序缓存
         sortedTabsByPanelId.delete(tabPanelId);
 
         // ui更新主要依赖全局历史的变更，而关闭面板不会触发变更，因此需要手动通知UI更新
+        // - 虎鲸1.41版本关闭面板已经会触发历史变更了，会导致orca对应面板的历史记录被清除。对此我在订阅函数里限制了历史变短时 **不做处理**。
+        //   - 因为历史变短说明面板被关闭，而两个关闭命令已经被拦截下来了并执行了tab数据清理和ui刷新，所以完全没什么可处理的。
+        // - 可以试着包装一下nav，这样可以放置一些插件拦截close
         if (renderTabsCallback) renderTabsCallback();
         
         return true;
     } else if(wasActiveTab){
-        // 清理标签页数据
+        // 清理标签页数据和更新排序缓存
         delete tabs[tabId];
         tabIdSet.delete(tabId);
-        
-        // 更新排序缓存
         updateSortedTabsCache(tabPanelId);
         
         const remainingTabIds = Array.from(tabIdSet);
         await switchTab(remainingTabIds[0]);
     } else {
-        // 清理标签页数据
+        // 清理标签页数据和更新排序缓存
         delete tabs[tabId];
         tabIdSet.delete(tabId);
-        
-        // 更新排序缓存
         updateSortedTabsCache(tabPanelId);
         
         if (renderTabsCallback) renderTabsCallback();
@@ -799,7 +804,7 @@ let beforeCommandHooks = {};
  * 拦截Orca的核心导航命令和面板创建API和关闭API
  */
 function setupCommandInterception() {
-    console.log('开始设置命令拦截器...');
+    // console.log('开始设置命令拦截器...');
     
     // 1. 拦截后退命令
     beforeCommandHooks.goBack = (cmdId, ...args) => {
@@ -829,7 +834,28 @@ function setupCommandInterception() {
     };
     orca.commands.registerBeforeCommand('core.goForward', beforeCommandHooks.goForward);
     
-    // 3. 拦截 core.closePanel 命令（关闭当前面板）
+    // 3. 包装 orca.nav.goTo 以支持 Ctrl+点击创建后台标签页
+    originalGoTo = orca.nav.goTo;
+    orca.nav.goTo = async function(view, viewArgs, panelId) {        
+        // 处理 Ctrl+Click，且没有按下shift：创建后台标签页
+        if (window.event && window.event.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
+            // 根据视图类型确定目标内容ID
+            const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
+            try {
+                await createTab(targetBlockId, false);
+                orca.notify("success", "[tabsman] 已创建后台标签页");
+            } catch (error) {
+                console.error('创建后台标签页失败:', error);
+                orca.notify("error", "创建后台标签页失败");
+            }
+            return;
+        }
+        
+        // 所有其他情况都执行原函数
+        return originalGoTo.call(this, view, viewArgs, panelId);
+    };
+    
+    // 4. 拦截 core.closePanel 命令（关闭当前面板）
     beforeCommandHooks.closePanel = () => {       
         if (tabIdSetByPanelId.size === 1) {
             orca.notify("info", "[tabsman] 当前仅剩一个面板，无法关闭关闭面板");
@@ -853,7 +879,7 @@ function setupCommandInterception() {
     };
     orca.commands.registerBeforeCommand('core.closePanel', beforeCommandHooks.closePanel);
     
-    // 4. 拦截 core.closeOtherPanels 命令（关闭除当前面板外的所有面板）
+    // 5. 拦截 core.closeOtherPanels 命令（关闭除当前面板外的所有面板）
     beforeCommandHooks.closeOtherPanels = () => {
         const activePanelId = orca.state.activePanel;
         
@@ -877,7 +903,7 @@ function setupCommandInterception() {
     };
     orca.commands.registerBeforeCommand('core.closeOtherPanels', beforeCommandHooks.closeOtherPanels);
     
-    // 5. 包装 addTo API（同步函数，返回面板ID）
+    // 6. 包装 addTo API（同步函数，返回面板ID）
     orca.nav.addTo = async function(id, dir, src) {
         // 调用原始函数
         const newPanelId = originalAddTo.call(this, id, dir, src);
@@ -891,6 +917,19 @@ function setupCommandInterception() {
     
     // 7. 包装 openInLastPanel API（同步函数，返回void）
     orca.nav.openInLastPanel = async function(view, viewArgs) {
+        // 处理 Ctrl+Shift+Click：创建前台标签页
+        if (window.event && window.event.ctrlKey && window.event.shiftKey && window.event.button === 0) {
+            try {
+                const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
+                await createTab(targetBlockId, true);
+                orca.notify("success", "[tabsman] 已创建前台标签页");
+            } catch (error) {
+                console.error('创建前台标签页失败:', error);
+                orca.notify("error", "创建前台标签页失败");
+            }
+            return;
+        }
+        
         // 调用原始函数
         originalOpenInLastPanel.call(this, view, viewArgs);
         console.log('✅ 面板创建API执行完成: openInLastPanel');
@@ -899,7 +938,7 @@ function setupCommandInterception() {
         if (!tabIdSetByPanelId.has(orca.state.activePanel)) await createTabForNewPanel();
     };
 
-    console.log('✅ 命令拦截器设置完成: 拦截了 core.goBack, core.goForward, core.closePanel, core.closeOtherPanels 命令，包装了 orca.nav.addTo, orca.nav.openInLastPanel API');
+    // console.log('✅ 命令拦截器设置完成: 拦截了 core.goBack, core.goForward, core.closePanel, core.closeOtherPanels 命令，包装了 orca.nav.addTo, orca.nav.openInLastPanel API');
 }
 
 // ==================== 初始化和清理 ====================
@@ -908,7 +947,7 @@ function setupCommandInterception() {
  * 初始化历史订阅、命令拦截和当前面板的标签页
  */
 async function start(callback = null) {
-    console.log('\n=== 新标签页管理器启动 ===');
+    // console.log('\n=== tabsman管理器启动 ===');
     
     // 设置UI渲染回调函数
     renderTabsCallback = callback;
@@ -916,7 +955,7 @@ async function start(callback = null) {
     // 保存原始API函数
     originalAddTo = orca.nav.addTo;
     originalOpenInLastPanel = orca.nav.openInLastPanel;
-    console.log('✅ 原始API函数已保存');
+    // console.log('✅ 原始API函数已保存');
     
     // 为启动时的所有面板创建初始标签页
     try {
@@ -1020,6 +1059,12 @@ function destroy() {
     tabIdSetByPanelId.clear();
     sortedTabsByPanelId.clear();  // 清理排序缓存
     isInternalNavigation = false;
+    
+    // 恢复原始API函数
+    if (originalGoTo) {
+        orca.nav.goTo = originalGoTo;
+        originalGoTo = null;
+    }
     
     // 清理原始API函数
     originalAddTo = null;

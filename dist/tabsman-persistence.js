@@ -70,8 +70,8 @@ function addPinnedTabData(tab) {
  * @param {Object} tab - 标签页对象
  */
 function addRecentlyClosedTabData(tab) {
-    if (recentlyClosedTabData.length >= CONFIG.MAX_RECENTLY_CLOSED_TABS) recentlyClosedTabData.shift();
-    recentlyClosedTabData.push({
+    if (recentlyClosedTabData.length >= CONFIG.MAX_RECENTLY_CLOSED_TABS) recentlyClosedTabData.pop();
+    recentlyClosedTabData.unshift({
         id: tab.id,
         name: tab.name,
         createdAt: tab.createdAt,

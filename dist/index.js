@@ -3,7 +3,6 @@
 
 
 import { start, destroy } from './tabsman-core.js';
-import { injectTabsmanContainers, cleanupTabsmanContainers } from './tabsman-ui-container.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 
@@ -95,9 +94,6 @@ async function load(name) {
     // 注入样式文件
     orca.themes.injectCSSResource(`${pluginName}/dist/tabsman-styles.css`, pluginName);
     
-    // 注入标签页管理器容器
-    await injectTabsmanContainers();
-    
     // 启动标签页渲染
     await startTabsRender();
     
@@ -183,11 +179,8 @@ async function unload() {
     // 清理注入的样式
     orca.themes.removeCSSResources(pluginName);
     
-    // 停止标签页渲染
+    // 停止标签页渲染（包含容器清理）
     stopTabsRender();
-    
-    // 清理注入的容器
-    cleanupTabsmanContainers();
     
     // 停止最近关闭标签页模块
     await stopRecentlyClosed();

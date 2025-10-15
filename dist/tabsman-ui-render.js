@@ -14,6 +14,7 @@ import {
     pinTab,
     unpinTab
 } from './tabsman-core.js';
+import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.js';
 
 const Tabsman = {
     // 数据访问层
@@ -45,15 +46,6 @@ let tabsmanTabsEle = null;
 function getTabsmanTabsEle() {
     return tabsmanTabsEle;
 }
-
-/**
- * 清理tabsman标签页容器引用
- * @returns {void}
- */
-function clearTabsmanTabsEle() {
-    tabsmanTabsEle = null;
-}
-
 
 /**
  * 创建单个标签页的DOM元素
@@ -250,10 +242,17 @@ async function renderTabsByPanel() {
  */
 async function startTabsRender() {
     try {
-        // 等待标签页容器加载并存储到全局变量
-        tabsmanTabsEle = document.querySelector('.plugin-tabsman-tabs');
+        // 确保容器存在，如果不存在则创建
+        const result = await injectTabsmanShell();
+        if (!result) {
+            console.error('tabsmanUI外壳注入失败');
+            return false;
+        }
+        
+        // 直接获取标签页容器元素
+        tabsmanTabsEle = result.tabsmanTabsEl;
         if (!tabsmanTabsEle) {
-            console.error('未找到tabsman标签页容器');
+            console.error('未找到tabsmanTabsEle');
             return false;
         }
 
@@ -270,8 +269,8 @@ async function startTabsRender() {
  * @returns {void}
  */
 function stopTabsRender() {
-    // 清理标签页容器引用
-    clearTabsmanTabsEle();
+    // 清理注入的外壳（包含所有渲染元素）
+    cleanupTabsmanShell();
 }
 
 // 导出模块接口

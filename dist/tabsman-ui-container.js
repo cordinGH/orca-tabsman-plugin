@@ -1,8 +1,6 @@
-// Orca Tabsman Plugin - UI容器模块
-// 负责创建和注入标签页管理器的UI容器到Orca侧边栏中
-
-let hideableContainer = null;
-let tabOption = null;
+// Orca Tabsman Plugin - UI外壳模块
+// 负责创建和注入标签页管理器的UI外壳到Orca侧边栏中
+let tabsmanShell = null;
 
 // 全局缓存对象，存储waitForElement处理过的元素
 const elementCache = new Map();
@@ -75,87 +73,98 @@ function injectHideableContainer(targetElement) {
     // 注入到.orca-sidebar-tabs
     targetElement.insertBefore(hideableContainer, targetElement.firstChild);
     
-    return hideableContainer;
+    // 返回带有子元素引用的对象，链式调用
+    return {
+        element: hideableContainer,
+        tabsmanContainer: {
+            element: tabsmanContainer,
+            tabsmanTabs: {
+                element: tabsmanTabs
+            }
+        }
+    };
 }
 
 
-/**
- * 为.orca-sidebar-tab-options注入新item  
- * @param {Element} targetElement - 目标容器元素
- * @returns {Element} 返回注入在.orca-sidebar-tab-options中的DOM元素
- */
-function injectTabOption(targetElement) {
-    const tabOption = document.createElement('div');
-    tabOption.className = 'orca-segmented-item plugin-tabsman-tab-option';
-    tabOption.textContent = 'Tabs';
-    
-    // 注入到.orca-sidebar-tab-options
-    targetElement.appendChild(tabOption);
-    
-    return tabOption;
-}
 
 
 /**
- * 注入标签页管理器容器，包括创建和注入基本UI容器
- * @returns {Promise<boolean>} 返回注入是否成功
+ * 注入标签页管理器外壳，包括创建和注入基本UI外壳
+ * @returns {Promise<Object|null>} 返回外壳对象或null
  */
-async function injectTabsmanContainers() {
+async function injectTabsmanShell() {
     try {
         // 先等待所有需要的元素
-        const sidebarTabs = await waitForElement('.orca-sidebar-tabs');
-        const sidebarTabOptions = await waitForElement('.orca-sidebar-tab-options');
+        const sidebarTabsEl = await waitForElement('.orca-sidebar-tabs');
+        const sidebarTabOptionsEl = await waitForElement('.orca-sidebar-tab-options');
         
-        if (!sidebarTabs) {
+        if (!sidebarTabsEl) {
             console.error('未找到 .orca-sidebar-tabs 元素');
             return false;
         }
         
-        if (!sidebarTabOptions) {
+        if (!sidebarTabOptionsEl) {
             console.error('未找到 .orca-sidebar-tab-options 元素');
             return false;
         }
         
-        // 注入侧边栏内容容器和tab-option
-        hideableContainer = injectHideableContainer(sidebarTabs);
-        tabOption = injectTabOption(sidebarTabOptions);
-        console.log('tabsman容器注入成功');
+        // 注入侧边栏内容外壳和tab-option
+        const hideableContainer = injectHideableContainer(sidebarTabsEl);
+        const tabOptionEl = document.createElement('div');
+        tabOptionEl.className = 'orca-segmented-item plugin-tabsman-tab-option';
+        tabOptionEl.textContent = 'Tabs';
+        sidebarTabOptionsEl.appendChild(tabOptionEl);
 
         // 监听点击tab-option事件
-        sidebarTabOptions.addEventListener('click', (e) => {
-            if (e.target === tabOption) {
-                sidebarTabOptions.classList.add('plugin-tabsman-selected');
-                tabOption.classList.add('orca-selected');
+        sidebarTabOptionsEl.addEventListener('click', (e) => {
+            if (e.target === tabOptionEl) {
+                sidebarTabOptionsEl.classList.add('plugin-tabsman-selected');
+                tabOptionEl.classList.add('orca-selected');
             } else {
-                sidebarTabOptions.classList.remove('plugin-tabsman-selected');
-                tabOption.classList.remove('orca-selected');
+                sidebarTabOptionsEl.classList.remove('plugin-tabsman-selected');
+                tabOptionEl.classList.remove('orca-selected');
             }
         });
         
-        return true;
+        // 保存完整的外壳对象（支持链式调用）到全局变量并返回
+        tabsmanShell = {
+            tabOptionEl: tabOptionEl,
+            hideableContainerEl: hideableContainer.element,
+            tabsmanContainerEl: hideableContainer.tabsmanContainer.element,
+            tabsmanTabsEl: hideableContainer.tabsmanContainer.tabsmanTabs.element,
+        };
         
     } catch (error) {
-        console.error('容器注入失败:', error);
-        return false;
+        console.error('外壳注入失败:', error);
     }
+    
+    return tabsmanShell;
 }
 
 
 /**
- * 清理所有注入的标签页管理器容器
+ * 清理所有注入的标签页管理器外壳
  * @returns {void}
  */
-function cleanupTabsmanContainers() {
+function cleanupTabsmanShell() {
+    if (!tabsmanShell) return;
+    
+    // 提取元素引用
+    const hideableContainerEl = tabsmanShell.hideableContainerEl;
+    const tabOptionEl = tabsmanShell.tabOptionEl;
+    
     // 清理容器外壳
-    if (hideableContainer && hideableContainer.parentNode) {
-        hideableContainer.parentNode.removeChild(hideableContainer);
-        hideableContainer = null;
+    if (hideableContainerEl?.parentNode) {
+        hideableContainerEl.parentNode.removeChild(hideableContainerEl);
     }
+    
     // 清理tab-option
-    if (tabOption && tabOption.parentNode) {
-        tabOption.parentNode.removeChild(tabOption);
-        tabOption = null;
+    if (tabOptionEl?.parentNode) {
+        tabOptionEl.parentNode.removeChild(tabOptionEl);
     }
+    
+    // 清理全局变量
+    tabsmanShell = null;
     
     // 清理元素缓存
     elementCache.clear();
@@ -163,6 +172,6 @@ function cleanupTabsmanContainers() {
 
 // 导出模块接口
 export {
-    injectTabsmanContainers,
-    cleanupTabsmanContainers
+    injectTabsmanShell,
+    cleanupTabsmanShell
 };

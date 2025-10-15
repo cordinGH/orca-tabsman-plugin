@@ -510,11 +510,13 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
     
     console.log(`标签页对象创建成功: （ID: ${tab.id}），(名称：${tab.name})`);
 
-    // 初始化标签页历史，如果需要切换，则切换到新标签页
-    if (needSwitch) await switchTab(tab.id);
-    
-    // 通知UI渲染
-    if (renderTabsCallback) renderTabsCallback();
+    // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
+    if (needSwitch) {
+        await switchTab(tab.id);
+    } else {
+        // 通知UI渲染
+        if (renderTabsCallback) renderTabsCallback();
+    }
 
     return tab;
 }

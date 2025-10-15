@@ -1237,5 +1237,7 @@ export {
     pinTab,
     unpinTab,
     // 排序缓存函数
-    updateSortedTabsCache
+    updateSortedTabsCache,
+    // 标签页信息生成函数
+    generateTabNameAndIcon
 };

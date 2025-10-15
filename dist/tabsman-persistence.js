@@ -298,10 +298,6 @@ async function restoreTabs(tabsData, tabType, tabs = null, tabIdSetByPanelId = n
     return processedTabsData.length;
 }
 
-// function refreshRecentlyClosedTabs() {
-
-
-
 export {
     addAndSaveTabData,
     removeAndSaveTabData,

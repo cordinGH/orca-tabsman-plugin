@@ -59,6 +59,7 @@ async function startRecentlyClosed(renderTabsByPanel) {
                     style: { padding: '10px', textAlign: 'center', color: '#666' }
                 }, "暂无最近关闭的标签页") :
                 createElement(Menu, {},
+                    // 这里通过 recentlyClosedTabs.map 生成元素数组，作为 Menu 的子元素
                     recentlyClosedTabs.map(tab =>
                         createElement(MenuText, {
                             key: tab.id,

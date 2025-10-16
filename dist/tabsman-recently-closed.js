@@ -1,24 +1,12 @@
 const { createElement } = window.React;
-const { Button, ContextMenu, Menu, MenuText } = orca.components;
+const { Button, HoverContextMenu, ContextMenu, Menu, MenuText } = orca.components;
 
 // 导入核心模块
-import { getAllTabs, getTabIdSetByPanelId, updateSortedTabsCache } from './tabsman-core.js';
-
+import * as TabsmanCore from './tabsman-core.js';
 
 // 导入持久化模块
-import { setRecentlyClosedTabsCallback, restoreTabs, removeAndSaveTabData } from './tabsman-persistence.js';
+import * as TabsmanPersistence from './tabsman-persistence.js';
 
-let recentlyClosedTabs = [];
-
-// 设置最近关闭标签页数据更新回调
-setRecentlyClosedTabsCallback((newRecentlyClosedTabs) => {
-    // 直接赋值最新的最近关闭标签页数据
-    recentlyClosedTabs.length = 0; // 清空数组
-    recentlyClosedTabs.push(...newRecentlyClosedTabs); // 添加新数据
-});
-
-// 导出recentlyClosedTabs数组，供其他模块使用
-export { recentlyClosedTabs };
 
 /**
  * 停止最近关闭标签页模块
@@ -27,7 +15,6 @@ export { recentlyClosedTabs };
 async function stopRecentlyClosed() {
     // 注销顶部栏按钮
     orca.headbar.unregisterHeadbarButton('tabsman.recently-closed');
-    
     console.log('最近关闭标签页模块已停止');
 }
 
@@ -37,92 +24,95 @@ async function stopRecentlyClosed() {
  * @returns {Promise<void>} 返回Promise
  */
 async function startRecentlyClosed(renderTabsByPanel) {
-    // 加载最近关闭的标签页数据
+
+    // 加载最近关闭和收藏块的数据
     try {
-        const recentlyClosedTabsData = await orca.plugins.getData('tabsman', 'recently-closed-tabs-data');
-        if (recentlyClosedTabsData) {
-            // 使用持久化模块的restoreTabs函数来加载数据
-            // restoreTabs会通过回调自动更新recentlyClosedTabs数组
-            await restoreTabs(JSON.parse(recentlyClosedTabsData), "recently-closed");
-        }
-    } catch (error) {
-        console.warn('加载最近关闭标签页数据失败:', error);
-    }
+        const jsonClosedTabsData = await orca.plugins.getData('tabsman', 'recently-closed-tabs-data');
+        // 使用持久化模块的restoreTabs函数来恢复标签页对象数组
+        if (jsonClosedTabsData) await TabsmanPersistence.restoreTabs(JSON.parse(jsonClosedTabsData), "recently-closed");
+    } catch (error) {console.warn('加载最近关闭或收藏块数据失败:', error);}
+
     
     // 注册顶部栏按钮
     orca.headbar.registerHeadbarButton("tabsman.recently-closed", () => createElement(
-        ContextMenu, 
+        ContextMenu,
         {
-            menu: (close) => (recentlyClosedTabs.length === 0 ?
-                createElement("div", {
-                    className: 'plugin-tabsman-empty-state',
-                    style: { 
-                        padding: '10px', 
-                        textAlign: 'center', 
-                        color: '#666' 
-                    }
-                }, "暂无最近关闭的标签页") :
-                // 有item时包裹一层menu容器，好看一些
-                createElement(Menu, {},
-                    // 这里通过 recentlyClosedTabs.map 生成元素数组，作为 createElement 的第三个参数传递给 Menu 组件
-                    recentlyClosedTabs.map(tab =>
-                        createElement(MenuText, {
-                            key: tab.id,
-                            title: tab.name,
-                            preIcon: tab.currentIcon || 'ti ti-cube',
-                            className: 'plugin-tabsman-recently-closed-tab-item',
-                            style: {
-                                fontFamily: 'var(--orca-fontfamily-code)',
-                                textOverflow: 'ellipsis',
-                                overflow: 'hidden',
-                                whiteSpace: 'nowrap',
-                                maxWidth: '20em'
-                            },
-                            onClick: async () => {
-                                // 恢复关闭的标签页到core的数据结构里
-                                const currentPanelId = orca.state.activePanel;
-                                
-                                // 更新标签页的面板ID
-                                tab.panelId = currentPanelId;
-                                
-                                // 直接注入到核心数据结构
-                                // 判断 tab.id 是否已经存在于核心数据结构，如果已存在则弹通知并返回
-                                if (getAllTabs()[tab.id]) {
-                                    orca.notify("warn", "该标签页已被恢复");
-                                    return;
+            children: (open) => createElement(
+                Button, {variant: "plain", onClick: open},
+                createElement("i", {className: "ti ti-stack-pop orca-headbar-icon"})
+            ),
+            menu: (close) => [
+                // 收藏的块列表
+                createElement(MenuText,
+                    { title: "收藏的块列表",preIcon: "ti ti-star" },
+                    createElement(Menu, {}, TabsmanPersistence.getFavoriteBlockArray().length === 0 ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无收藏的块列表") :
+                        TabsmanPersistence.getFavoriteBlockArray().map(block =>
+                            createElement(MenuText, {
+                                key: block.id,
+                                title: block.title,
+                                preIcon: block.icon || 'ti ti-cube',
+                                className: 'plugin-tabsman-favorite-block-item',
+                                className: 'plugin-tabsman-item-item',
+                                style: {
+                                    fontFamily: 'var(--orca-fontfamily-code)',
+                                    textOverflow: 'ellipsis',
+                                    overflow: 'hidden',
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '20em'
+                                },
+                                onClick: async () => {
+                                    // 恢复收藏的块到core的数据结构里
+                                    const currentPanelId = orca.state.activePanel;
+                                    await TabsmanCore.createTab(block.id, false, currentPanelId);
                                 }
-                                getAllTabs()[tab.id] = tab;
-                                
-                                // 确保面板ID集合存在并添加标签页
-                                if (!getTabIdSetByPanelId().has(currentPanelId)) {
-                                    getTabIdSetByPanelId().set(currentPanelId, new Set());
+                            })
+                        )
+                    )),
+                createElement(MenuText,
+                    { title: "关闭的标签页", preIcon: "ti ti-progress-x" },
+                    createElement(Menu, {}, TabsmanPersistence.getTabArray("recently-closed").length === 0 ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无关闭的标签页") :
+                        TabsmanPersistence.getTabArray("recently-closed").map(tab =>
+                            createElement(MenuText, {
+                                key: tab.id,
+                                title: tab.name,
+                                preIcon: tab.currentIcon || 'ti ti-cube',
+                                className: 'plugin-tabsman-recently-closed-tab-item',
+                                style: {
+                                    fontFamily: 'var(--orca-fontfamily-code)',
+                                    textOverflow: 'ellipsis',
+                                    overflow: 'hidden',
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '20em'
+                                },
+                                onClick: async () => {
+                                    // 恢复关闭的标签页到core的数据结构里
+                                    const currentPanelId = orca.state.activePanel;
+                                    
+                                    // 判断 tab.id 是否已经存在于core数据结构，如果已存在则弹通知并返回
+                                    if (TabsmanCore.getAllTabs()[tab.id]) {
+                                        orca.notify("warn", "该标签页已被恢复");
+                                        return;
+                                    }
+                                    
+                                    // 创建 tab 对象的副本，避免引用持久化数据
+                                    const tabCopy = { ...tab };
+                                    tabCopy.panelId = currentPanelId;
+                                    
+                                    // 注册到core数据结构
+                                    TabsmanCore.getAllTabs()[tab.id] = tabCopy;
+                                    TabsmanCore.getTabIdSetByPanelId().get(currentPanelId).add(tab.id);
+                                    // 更新排序缓存，并刷新左侧栏渲染
+                                    TabsmanCore.updateSortedTabsCache(currentPanelId);
+                                    renderTabsByPanel();
+                                    
+                                    // 从持久化数据中移除（会自动更新数组引用）
+                                    await TabsmanPersistence.removeAndSaveTab(tab.id, "recently-closed");
                                 }
-                                getTabIdSetByPanelId().get(currentPanelId).add(tab.id);
-                                
-                                // 更新排序缓存，并刷新左侧栏渲染
-                                updateSortedTabsCache(currentPanelId);
-                                renderTabsByPanel();
-                                
-                                // 从最近关闭标签页数组中移除已恢复的标签页
-                                const index = recentlyClosedTabs.findIndex(t => t.id === tab.id);
-                                if (index !== -1) {
-                                    recentlyClosedTabs.splice(index, 1);
-                                    await removeAndSaveTabData(tab.id, "recently-closed");
-                                }
-
-                                // 不执行close函数，让菜单保持打开状态
-                            }
-                        })
+                            })
+                        )
                     )
                 )
-            ),
-            children:(open) => createElement(
-                Button,
-                {variant: "plain", onClick: open},
-                createElement("i", {
-                    className: "ti ti-stack-pop orca-headbar-icon",
-                })
-            )
+            ]
         }
     ));
     

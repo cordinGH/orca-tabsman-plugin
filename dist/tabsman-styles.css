@@ -89,3 +89,9 @@
 .plugin-tabsman-panel-group:not(.active-panel){
     opacity: .5;
 }
+
+
+/* ———————————————————————————————————收藏的标签页————————————————————————————————————————— */
+.plugin-tabsman-tab-favorite{
+    outline: 1px solid var(--orca-color-primary-5);
+}

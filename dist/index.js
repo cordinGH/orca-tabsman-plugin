@@ -2,15 +2,15 @@
 // 负责启动核心功能和UI注入
 
 
-import { start, destroy, createTab } from './tabsman-core.js';
+import { start, destroy } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
-import { startBackAndForwardHistory, stopBackAndForwardHistory } from './tabsman-access-history.js';
 
 let pluginName;
 
 // 防重复执行标志，代表正在创建标签页
 let isCreatingTab = false;
+
 
 // 更新活跃面板样式的辅助函数
 function updateActivePanelStyle() {
@@ -51,23 +51,6 @@ async function load(name) {
     // 启动标签页系统，传递UI更新回调
     await start(renderTabsByPanel);
     
-    // 注册右键菜单命令
-    orca.blockMenuCommands.registerBlockMenuCommand("tabsman.createTabInBackground", {
-        worksOnMultipleBlocks: false,
-        render: (blockId, rootBlockId, close) => {
-            const { createElement } = window.React;
-            return createElement(orca.components.MenuText, {
-                preIcon: "ti ti-external-link",
-                title: "在后台创建Tab",
-                onClick: () => {
-                    close();
-                    createTab(blockId, false);
-                    orca.notify("success", "[tabsman] 已在后台创建新标签页");
-                }
-            });
-        }
-    });
-    
     
     // 检查设置，如果启用默认显示Tabs栏
     const settings = orca.state.plugins[pluginName]?.settings;
@@ -81,9 +64,6 @@ async function load(name) {
             tabOption.classList.add('orca-selected');
         }
     }
-    
-    // 插件启动完成后，主动触发一次渲染通知
-    await renderTabsByPanel();
 
     // 对于orca.state.activePanel 的面板group，注入 .active-panel    
     const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-panel-id="${orca.state.activePanel}"]`);
@@ -102,14 +82,15 @@ async function load(name) {
     orca.commands.registerAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
     orca.commands.registerAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
     
-    // 启动前进后退历史模块
-    startBackAndForwardHistory();
     
     // 注入样式文件
     orca.themes.injectCSSResource(`${pluginName}/dist/tabsman-styles.css`, pluginName);
     
     // 启动最近关闭标签页模块
     await startRecentlyClosed(renderTabsByPanel);
+
+    // 插件启动完成后，主动触发一次渲染通知
+    renderTabsByPanel();
     
     console.log(`${pluginName} 已加载`);
 }
@@ -123,7 +104,6 @@ async function unload() {
     
     // 停止功能模块（先停止依赖模块）
     stopRecentlyClosed();
-    stopBackAndForwardHistory();
     
     // 停止UI渲染（停止UI层）
     stopTabsRender();
@@ -132,7 +112,6 @@ async function unload() {
     destroy();
     
     // 注销命令和样式（清理注册）
-    orca.blockMenuCommands.unregisterBlockMenuCommand("tabsman.createTabInBackground");
     orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
     orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
     orca.themes.removeCSSResources(pluginName);

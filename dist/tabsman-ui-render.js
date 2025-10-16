@@ -14,9 +14,9 @@ import {
     pinTab,
     unpinTab
 } from './tabsman-core.js';
+import * as Persistence from './tabsman-persistence.js';
 import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.js';
-
-const Tabsman = {
+const TabsmanCore = {
     // 数据访问层
     data: {
         getTabIdSetByPanelId,
@@ -36,6 +36,8 @@ const Tabsman = {
     }
 };
 
+
+
 // 全局变量存储标签页容器元素
 let tabsmanTabsEle = null;
 
@@ -54,6 +56,12 @@ function getTabsmanTabsEle() {
  * @returns {Promise<Object>} 返回包含DOM元素和子元素引用的对象
  */
 async function createTabElement(tab, panelId) {
+    // 判断是否为收藏块
+    let isFavorite = false;
+    if (Persistence.getFavoriteBlockArray().findIndex(item => item.id.toString() === tab.currentBlockId.toString()) !== -1) {
+        isFavorite = true;
+    }
+
     const tabElement = document.createElement('div');
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
@@ -68,13 +76,9 @@ async function createTabElement(tab, panelId) {
     // 块图标
     const blockIcon = document.createElement('i');
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质是相同的。
-    blockIcon.className = 'plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font';
+    blockIcon.className = `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`;
     blockIcon.setAttribute('data-tab-id', tab.id);
     blockIcon.setAttribute('data-panel-id', panelId);
-
-    // 根据存储的图标类名设置图标
-    const iconClass = tab.currentIcon || 'ti ti-cube';
-    blockIcon.className += ` ${iconClass}`;
 
     // 标签页标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
@@ -131,6 +135,7 @@ async function createPanelItemElement(panelId) {
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
     const newTabButton = document.createElement('i');
     newTabButton.className = 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu';
+    newTabButton.setAttribute('data-panel-id', panelId);
 
     panelItemElement.appendChild(collapseIcon);
     panelItemElement.appendChild(title);
@@ -145,7 +150,70 @@ async function createPanelItemElement(panelId) {
     };
 }
 
+/**
+ * 处理tabsman容器点击事件
+ * @param {Event} e - 点击事件
+ */
+async function handleTabsmanClick(e) {
+    // 处理标签页相关事件
+    const tabElement = e.target.closest('.plugin-tabsman-tab-item');
+    if (tabElement) {
+        const tabId = tabElement.getAttribute('data-tab-id');
+        const panelId = tabElement.getAttribute('data-panel-id');
+        
+        // 确保有tabId和panelId
+        if (!tabId || !panelId) return;
 
+        const tab = TabsmanCore.data.getAllTabs()[tabId];
+        // 确保有tab对象
+        if (!tab) return;
+
+        if (e.target.classList.contains('plugin-tabsman-tab-pin')) {
+            e.stopPropagation();
+            // 根据当前置顶状态切换置顶状态
+            if (tab.isPinned) {
+                await TabsmanCore.actions.unpinTab(tab.id);
+            } else {
+                await TabsmanCore.actions.pinTab(tab.id);
+            }
+        } else if (e.target.classList.contains('plugin-tabsman-tab-close')) {
+            e.stopPropagation();
+            await TabsmanCore.actions.deleteTab(tab.id);
+        } else if (e.target.classList.contains('plugin-tabsman-tab-icon')) {
+            e.stopPropagation();
+            // 点击块图标切换收藏状态
+            if (e.target.classList.contains('plugin-tabsman-tab-favorite')) {
+                e.target.classList.remove('plugin-tabsman-tab-favorite');
+                await Persistence.removeAndSaveFavoriteBlock(tab.currentBlockId);
+            } else {
+                e.target.classList.add('plugin-tabsman-tab-favorite');
+                await Persistence.addAndSaveFavoriteBlock({id: tab.currentBlockId, icon: tab.currentIcon, title: tab.name});
+            }
+            renderTabsByPanel();
+        } else {
+            // 点击其他区域切换到该标签页
+            await TabsmanCore.actions.switchTab(tab.id);
+        }
+        return;
+    }
+
+    // 处理面板相关事件
+    const panelElement = e.target.closest('.plugin-tabsman-panel-item');
+    if (panelElement) {
+        if (e.target.classList.contains('plugin-tabsman-panel-collapse-icon')) {
+            e.stopPropagation();
+            // TODO: 实现折叠/展开功能
+            // orca.notify('切换面板折叠状态');
+        } else if (e.target.classList.contains('plugin-tabsman-panel-new-tab')) {
+            e.stopPropagation();
+            const panelId = e.target.getAttribute('data-panel-id');
+            if (panelId) {
+                await TabsmanCore.actions.createTab(-1, false, panelId);
+            }
+        }
+        return;
+    }
+}
 
 /**
  * 按面板分组渲染所有标签页列表
@@ -162,7 +230,7 @@ async function renderTabsByPanel() {
     tabsmanTabsEle.innerHTML = '';
 
     // 获取所有面板的排序标签页列表（直接使用核心模块的排序缓存）
-    const allSortedTabs = Tabsman.data.getAllSortedTabs();
+    const allSortedTabs = TabsmanCore.data.getAllSortedTabs();
 
     if (allSortedTabs && allSortedTabs.size > 0) {
         // 直接遍历已排序的标签页列表，避免重复函数调用
@@ -177,46 +245,14 @@ async function renderTabsByPanel() {
             // 创建面板标题项
             const panelItem = await createPanelItemElement(panelId);
 
-            // 添加面板项事件处理
-            panelItem.collapseIcon.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // TODO: 实现折叠/展开功能
-                // orca.notify('切换面板折叠状态');
-            });
-
-            panelItem.newTabButton.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                // 在当前面板创建新标签页
-                await Tabsman.actions.createTab(-1, false, panelId);
-            });
-
             panelGroup.appendChild(panelItem.element);
 
             // 渲染该面板的标签页并加入面板分组容器
             for (const tab of panelTabs) {
                 const tabItem = await createTabElement(tab, panelId);
-                // 添加点击事件处理
-                tabItem.element.addEventListener('click', async (e) => {
-                    if (e.target === tabItem.pinIcon) {
-                        e.stopPropagation();
-                        // 根据当前置顶状态切换
-                        if (tab.isPinned) {
-                            await Tabsman.actions.unpinTab(tab.id);
-                        } else {
-                            await Tabsman.actions.pinTab(tab.id);
-                        }
-                    } else if (e.target === tabItem.closeBtn) {
-                        e.stopPropagation();
-                        await Tabsman.actions.deleteTab(tab.id);
-                        return;
-                    } else {
-                        // 点击其他区域切换到该标签页
-                        await Tabsman.actions.switchTab(tab.id);
-                    }
-                });
 
                 // 添加活跃状态样式并加入面板分组容器
-                const activeTabs = Tabsman.data.getActiveTabs();
+                const activeTabs = TabsmanCore.data.getActiveTabs();
                 if (activeTabs && activeTabs[panelId] === tab) {
                     tabItem.element.classList.add('active-tab-item');
                 }
@@ -256,6 +292,9 @@ async function startTabsRender() {
             return false;
         }
 
+        // 注册监听器
+        tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
+
         return true;
 
     } catch (error) {
@@ -269,6 +308,8 @@ async function startTabsRender() {
  * @returns {void}
  */
 function stopTabsRender() {
+    // 注销监听器
+    tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
     // 清理注入的外壳（包含所有渲染元素）
     cleanupTabsmanShell();
 }

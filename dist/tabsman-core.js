@@ -555,7 +555,12 @@ async function switchTab(tabId) {
         isInternalNavigation = true;
 
         // 如果目标标签页和活跃标签页的当前块ID相同，后续不会触发goTo跳转，也就不会重置标志位，因此这里手动重置
-        if (activeTab.currentBlockId === tab.currentBlockId) {
+        // 日期对象比较其字符串值是否为同一天。数字块ID直接比较是否相等。
+        const isSameBlockId = (activeTab.currentBlockId instanceof Date && tab.currentBlockId instanceof Date) 
+            ? activeTab.currentBlockId.toDateString() === tab.currentBlockId.toDateString()
+            : activeTab.currentBlockId === tab.currentBlockId;
+        
+        if (isSameBlockId) {
             isInternalNavigation = false;
             
             // 由于没有执行goTo跳转，UI不会自动更新，需要手动刷新
@@ -1015,6 +1020,17 @@ async function start(callback = null) {
     } catch (error) {
         console.error('[tabsman] 恢复置顶标签页失败:', error);
     }
+
+    // 暴露 get 函数到全局（调试）
+    window.getAllTabs = getAllTabs;
+    window.getActiveTabs = getActiveTabs;
+    window.getTabIdSetByPanelId = getTabIdSetByPanelId;
+    window.getOneSortedTabs = getOneSortedTabs;
+    window.getAllSortedTabs = getAllSortedTabs;
+    
+    // 暴露 show 函数到全局（调试）
+    window.showSummary = showSummary;
+    window.showTabDetails = showTabDetails;
 }
 
 /**
@@ -1071,17 +1087,13 @@ function destroy() {
     beforeCommandHooks = {};
     
     // 清理全局暴露的函数
-    delete window.tabs;
-    delete window.activeTabs;
-    delete window.tabIdSetByPanelId;
-    delete window.createTab;
-    delete window.switchTab;
-    delete window.deleteTab;
+    delete window.getAllTabs;
+    delete window.getActiveTabs;
+    delete window.getTabIdSetByPanelId;
+    delete window.getOneSortedTabs;
+    delete window.getAllSortedTabs;
     delete window.showSummary;
     delete window.showTabDetails;
-    delete window.switchToNextTab;
-    delete window.switchToPreviousTab;
-    delete window.updateAllTabs;
     
     // 清理UI渲染回调函数
     renderTabsCallback = null;

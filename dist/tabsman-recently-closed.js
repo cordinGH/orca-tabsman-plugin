@@ -1,5 +1,5 @@
 const { createElement } = window.React;
-const { Button, HoverContextMenu, Menu, MenuText } = orca.components;
+const { Button, ContextMenu, Menu, MenuText } = orca.components;
 
 // 导入核心模块
 import { getAllTabs, getTabIdSetByPanelId, updateSortedTabsCache } from './tabsman-core.js';
@@ -50,16 +50,21 @@ async function startRecentlyClosed(renderTabsByPanel) {
     }
     
     // 注册顶部栏按钮
-    orca.headbar.registerHeadbarButton("tabsman.recently-closed", () =>
-    createElement(HoverContextMenu, {
-        menu: (close) => (
-            recentlyClosedTabs.length === 0 ?
+    orca.headbar.registerHeadbarButton("tabsman.recently-closed", () => createElement(
+        ContextMenu, 
+        {
+            menu: (close) => (recentlyClosedTabs.length === 0 ?
                 createElement("div", {
                     className: 'plugin-tabsman-empty-state',
-                    style: { padding: '10px', textAlign: 'center', color: '#666' }
+                    style: { 
+                        padding: '10px', 
+                        textAlign: 'center', 
+                        color: '#666' 
+                    }
                 }, "暂无最近关闭的标签页") :
+                // 有item时包裹一层menu容器，好看一些
                 createElement(Menu, {},
-                    // 这里通过 recentlyClosedTabs.map 生成元素数组，作为 Menu 的子元素
+                    // 这里通过 recentlyClosedTabs.map 生成元素数组，作为 createElement 的第三个参数传递给 Menu 组件
                     recentlyClosedTabs.map(tab =>
                         createElement(MenuText, {
                             key: tab.id,
@@ -104,19 +109,22 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                     recentlyClosedTabs.splice(index, 1);
                                     await removeAndSaveTabData(tab.id, "recently-closed");
                                 }
+
+                                // 不执行close函数，让菜单保持打开状态
                             }
                         })
                     )
                 )
-        )
-    }, createElement(Button, {
-        variant: "plain"
-    }, [
-        createElement("i", {
-            className: "ti ti-stack-pop orca-headbar-icon",
-        })
-    ]))
-    );
+            ),
+            children:(open) => createElement(
+                Button,
+                {variant: "plain", onClick: open},
+                createElement("i", {
+                    className: "ti ti-stack-pop orca-headbar-icon",
+                })
+            )
+        }
+    ));
     
     console.log('最近关闭标签页模块启动完成');
 }

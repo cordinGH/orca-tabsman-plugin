@@ -183,7 +183,7 @@ async function generateTabNameAndIcon(blockId) {
 
         return { name, icon };
     } catch (error) {
-        console.error('生成标签页信息失败:', error);
+        console.error('[tabsman] 生成标签页信息失败:', error);
         return { name: '新标签页', icon: 'ti ti-cube' };
     }
 }
@@ -213,12 +213,12 @@ async function updateTabProperties() {
         activeTab.name = tabInfo.name;
         activeTab.currentIcon = tabInfo.icon;
 
-        console.log(`当前标签页 ${activeTab.id} 的属性已更新: 块ID: ${activeTab.currentBlockId}, 名称: ${activeTab.name}, 图标: ${activeTab.currentIcon}`);
+        console.log(`[tabsman] 当前标签页 ${activeTab.id} 的属性已更新: 块ID: ${activeTab.currentBlockId}, 名称: ${activeTab.name}, 图标: ${activeTab.currentIcon}`);
         
         // 更新UI
         if (renderTabsCallback) renderTabsCallback();
     } catch (error) {
-        console.error('更新标签页属性失败:', error);
+        console.error('[tabsman] 更新标签页属性失败:', error);
         // 设置默认值
         activeTab.name = '新标签页';
         activeTab.currentIcon = 'ti ti-cube';
@@ -312,7 +312,7 @@ function setupSubscription() {
         const currentLength = orca.state.panelBackHistory.length;
         // 不处理历史记录被删除的情况（虎鲸1.41版本关闭面板会删除该面板的历史记录）
         if (currentLength >= lastHistoryLength) {
-        // console.log(`⭐️触发全局历史更新 - 上次长度: ${lastHistoryLength}, 本次长度: ${currentLength}`);
+        // console.log(`[tabsman] ⭐️触发全局历史更新 - 上次长度: ${lastHistoryLength}, 本次长度: ${currentLength}`);
             handleHistoryChange();
             lastHistoryLength = currentLength;
         }
@@ -347,7 +347,7 @@ function fillCurrentAccess() {
     activeTab.backStack.push(historyItem);
     activeTab.forwardStack = []; // 清空前进栈
     
-    console.log(`当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
+    console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
 }
 
 /**
@@ -358,7 +358,7 @@ function fillCurrentAccess() {
 function handleHistoryChange() {
     // 如果上一次是内部导航操作，重置标志并直接返回
     if (isInternalNavigation) {
-        console.log("本次为内部导航操作，不会产生新的访问记录,无需填充")
+        console.log("[tabsman] 本次为内部导航操作，不会产生新的访问记录,无需填充")
         isInternalNavigation = false;
         // 异步更新属性（内部会刷新渲染），不阻塞
         updateTabProperties();
@@ -403,7 +403,7 @@ async function navigateTabBack(tab) {
     // 导航到新的当前项
     orca.nav.goTo(newCurrent.view, newCurrent.viewArgs);
     
-    console.log(`标签页后退: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
+    console.log(`[tabsman] 标签页后退: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
     
     return true;
 }
@@ -431,7 +431,7 @@ async function navigateTabForward(tab) {
     // 导航到取出的项
     orca.nav.goTo(item.view, item.viewArgs);
         
-    console.log(`标签页前进: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
+    console.log(`[tabsman] 标签页前进: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
     
     return true;
 }
@@ -508,7 +508,7 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
         activeTabs[panelId] = tab;
     }
     
-    console.log(`标签页对象创建成功: （ID: ${tab.id}），(名称：${tab.name})`);
+    console.log(`[tabsman] 标签页对象创建成功: （ID: ${tab.id}），(名称：${tab.name})`);
 
     // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
     if (needSwitch) {
@@ -530,7 +530,7 @@ async function switchTab(tabId) {
     const tab = tabs[tabId];
     
     if (!tab) {
-        console.warn(`尝试切换不存在的标签页: ${tabId}`);
+        console.warn(`[tabsman] 尝试切换不存在的标签页: ${tabId}`);
         return false;
     }
 
@@ -544,7 +544,7 @@ async function switchTab(tabId) {
     }
 
     if (activeTab === tab) {
-        console.log(`当前就在目标标签页，无需切换`);
+        console.log(`[tabsman] 当前就在目标标签页，无需切换`);
         return true;
     } else {
         // 重新标记活跃标签页
@@ -575,7 +575,7 @@ async function switchTab(tabId) {
         fillCurrentAccess();
     }
 
-    console.log(`已切换到标签页 ${tab.id} （名称：${tab.name}）`);    
+    console.log(`[tabsman] 已切换到标签页 ${tab.id} （名称：${tab.name}）`);    
     return true;
 }
 
@@ -590,7 +590,7 @@ async function switchTab(tabId) {
 async function deleteTab(tabId) {
     const tab = tabs[tabId];
     if (!tab) {
-        console.warn(`尝试删除不存在的标签页: ${tabId}`);
+        console.warn(`[tabsman] 尝试删除不存在的标签页: ${tabId}`);
         return false;
     }
 
@@ -653,7 +653,7 @@ async function deleteTab(tabId) {
     // 考虑一下直接用这个id作为tabid
     // tabCounter--;
 
-    console.log(`已删除标签页: ${tabId}`);
+    console.log(`[tabsman] 已删除标签页: ${tabId}`);
     return true;
 }
 
@@ -665,12 +665,12 @@ async function deleteTab(tabId) {
 async function pinTab(tabId) {
     const tab = tabs[tabId];
     if (!tab) {
-        console.warn(`尝试置顶不存在的标签页: ${tabId}`);
+        console.warn(`[tabsman] 尝试置顶不存在的标签页: ${tabId}`);
         return false;
     }
     
     if (tab.isPinned) {
-        console.log(`标签页 ${tabId} 已经置顶`);
+        console.log(`[tabsman] 标签页 ${tabId} 已经置顶`);
         return true;
     }
     
@@ -687,7 +687,7 @@ async function pinTab(tabId) {
     // 通知UI更新
     if (renderTabsCallback) renderTabsCallback();
     
-    console.log(`已置顶标签页: ${tabId} (${tab.name})`);
+    console.log(`[tabsman] 已置顶标签页: ${tabId} (${tab.name})`);
     return true;
 }
 
@@ -699,12 +699,12 @@ async function pinTab(tabId) {
 async function unpinTab(tabId) {
     const tab = tabs[tabId];
     if (!tab) {
-        console.warn(`尝试取消置顶不存在的标签页: ${tabId}`);
+        console.warn(`[tabsman] 尝试取消置顶不存在的标签页: ${tabId}`);
         return false;
     }
     
     if (!tab.isPinned) {
-        console.log(`标签页 ${tabId} 未置顶`);
+        console.log(`[tabsman] 标签页 ${tabId} 未置顶`);
         return true;
     }
     
@@ -721,7 +721,7 @@ async function unpinTab(tabId) {
     // 通知UI更新
     if (renderTabsCallback) renderTabsCallback();
     
-    console.log(`已取消置顶标签页: ${tabId} (${tab.name})`);
+    console.log(`[tabsman] 已取消置顶标签页: ${tabId} (${tab.name})`);
     return true;
 }
 
@@ -756,7 +756,7 @@ async function switchToNextTab() {
     const nextIndex = (currentIndex + 1) % panelTabs.length;
     const nextTab = panelTabs[nextIndex];
     
-    console.log(`切换到下一个标签页: ${nextTab.name} (${nextTab.id})`);
+    console.log(`[tabsman] 切换到下一个标签页: ${nextTab.name} (${nextTab.id})`);
     return await switchTab(nextTab.id);
 }
 
@@ -790,7 +790,7 @@ async function switchToPreviousTab() {
     const prevIndex = currentIndex === 0 ? panelTabs.length - 1 : currentIndex - 1;
     const prevTab = panelTabs[prevIndex];
     
-    console.log(`切换到上一个标签页: ${prevTab.name} (${prevTab.id})`);
+    console.log(`[tabsman] 切换到上一个标签页: ${prevTab.name} (${prevTab.id})`);
     return await switchTab(prevTab.id);
 }
 
@@ -806,7 +806,7 @@ let beforeCommandHooks = {};
  * 拦截Orca的核心导航命令和面板创建API和关闭API
  */
 function setupCommandInterception() {
-    // console.log('开始设置命令拦截器...');
+    // console.log('[tabsman] 开始设置命令拦截器...');
     
     // 1. 拦截后退命令
     beforeCommandHooks.goBack = (cmdId, ...args) => {
@@ -847,7 +847,7 @@ function setupCommandInterception() {
                 await createTab(targetBlockId, false);
                 orca.notify("success", "[tabsman] 已创建后台标签页");
             } catch (error) {
-                console.error('创建后台标签页失败:', error);
+                console.error('[tabsman] 创建后台标签页失败:', error);
                 orca.notify("error", "创建后台标签页失败");
             }
             return;
@@ -909,7 +909,7 @@ function setupCommandInterception() {
     orca.nav.addTo = async function(id, dir, src) {
         // 调用原始函数
         const newPanelId = originalAddTo.call(this, id, dir, src);
-        console.log('✅ 面板创建API执行完成: addTo', newPanelId);
+        console.log('[tabsman] ✅ 面板创建API执行完成: addTo', newPanelId);
         
         // 如果成功创建面板，立即处理标签页创建
         if (newPanelId) await createTabForNewPanel(newPanelId);
@@ -926,7 +926,7 @@ function setupCommandInterception() {
                 await createTab(targetBlockId, true);
                 orca.notify("success", "[tabsman] 已创建前台标签页");
             } catch (error) {
-                console.error('创建前台标签页失败:', error);
+                console.error('[tabsman] 创建前台标签页失败:', error);
                 orca.notify("error", "创建前台标签页失败");
             }
             return;
@@ -934,13 +934,13 @@ function setupCommandInterception() {
         
         // 调用原始函数
         originalOpenInLastPanel.call(this, view, viewArgs);
-        console.log('✅ 面板创建API执行完成: openInLastPanel');
+        console.log('[tabsman] ✅ 面板创建API执行完成: openInLastPanel');
         
         // 如果还没有这个面板的标签页，则初始化一份默认的标签页
         if (!tabIdSetByPanelId.has(orca.state.activePanel)) await createTabForNewPanel();
     };
 
-    // console.log('✅ 命令拦截器设置完成: 拦截了 core.goBack, core.goForward, core.closePanel, core.closeOtherPanels 命令，包装了 orca.nav.addTo, orca.nav.openInLastPanel API');
+    // console.log('[tabsman] ✅ 命令拦截器设置完成: 拦截了 core.goBack, core.goForward, core.closePanel, core.closeOtherPanels 命令，包装了 orca.nav.addTo, orca.nav.openInLastPanel API');
 }
 
 // ==================== 初始化和清理 ====================
@@ -949,7 +949,7 @@ function setupCommandInterception() {
  * 初始化历史订阅、命令拦截和当前面板的标签页
  */
 async function start(callback = null) {
-    // console.log('\n=== tabsman管理器启动 ===');
+    // console.log('\n=== [tabsman] tabsman管理器启动 ===');
     
     // 设置UI渲染回调函数
     renderTabsCallback = callback;
@@ -957,7 +957,7 @@ async function start(callback = null) {
     // 保存原始API函数
     originalAddTo = orca.nav.addTo;
     originalOpenInLastPanel = orca.nav.openInLastPanel;
-    // console.log('✅ 原始API函数已保存');
+    // console.log('[tabsman] ✅ 原始API函数已保存');
     
     // 为启动时的所有面板创建初始标签页
     try {
@@ -968,9 +968,9 @@ async function start(callback = null) {
             await createTabForNewPanel(panelId);
         }
         
-        console.log(`共发现了 ${panelIds.length} 个面板:`, panelIds, '，均已为其创建初始标签页。');
+        console.log(`[tabsman] 共发现了 ${panelIds.length} 个面板:`, panelIds, '，均已为其创建初始标签页。');
     } catch (error) {
-        console.error('创建初始标签页失败:', error);
+        console.error('[tabsman] 创建初始标签页失败:', error);
     }
     
     // 设置订阅
@@ -1001,42 +1001,19 @@ async function start(callback = null) {
         },
         'Go to previous tab'
     );
-    
-    // 暴露核心功能到全局（调试）
-    window.tabs = tabs;
-    window.activeTabs = activeTabs;
-    window.tabIdSetByPanelId = tabIdSetByPanelId;
-    window.createTab = createTab;
-    window.switchTab = switchTab;
-    window.deleteTab = deleteTab;
-    window.showSummary = showSummary;
-    window.showTabDetails = showTabDetails;
-    window.switchToNextTab = switchToNextTab;
-    window.switchToPreviousTab = switchToPreviousTab;
-    
-    console.log('\n核心API（9个）:');
-    console.log('  createTab(currentBlockId=0, needSwitch=true, panelId?) - 创建标签页');
-    console.log('  switchTab(tabId) - 切换标签页');
-    console.log('  deleteTab(tabId) - 删除标签页');
-    console.log('  showSummary() - 显示摘要');
-    console.log('  showTabDetails(tabId) - 显示标签页详细信息');
-    console.log('  switchToNextTab() - 切换到下一个标签页');
-    console.log('  switchToPreviousTab() - 切换到上一个标签页');
-    console.log('  navigateTabBack(tab) - 标签页后退');
-    console.log('  navigateTabForward(tab) - 标签页前进');
-    
+
     // 恢复置顶标签页
     try {
         const pinnedTabsData = await orca.plugins.getData('tabsman', 'pinned-tabs-data');
         if (pinnedTabsData) {
             // 直接传递解析后的数据恢复置顶标签页，并更新core中的pinOrder起始值
             globalPinCounter = await Persistence.restoreTabs(JSON.parse(pinnedTabsData), "pinned", getAllTabs(), getTabIdSetByPanelId());
-            console.log(`恢复置顶标签页完成，共恢复 ${globalPinCounter} 个标签页`);
+            console.log(`[tabsman] 恢复置顶标签页完成，共恢复 ${globalPinCounter} 个标签页`);
             // 更新当前面板的排序缓存
             updateSortedTabsCache(orca.state.activePanel);
         }
     } catch (error) {
-        console.error('恢复置顶标签页失败:', error);
+        console.error('[tabsman] 恢复置顶标签页失败:', error);
     }
 }
 
@@ -1117,28 +1094,28 @@ function destroy() {
  * 输出所有标签页的统计信息和详细信息
  */
 function showSummary() {
-    console.log('\n=== 标签页管理器摘要 ===');
-    console.log(`总标签页数量: ${Object.keys(tabs).length}，总面板数量: ${Object.keys(tabIdSetByPanelId).length}`);
+    console.log('\n=== [tabsman] 标签页管理器摘要 ===');
+    console.log(`[tabsman] 总标签页数量: ${Object.keys(tabs).length}，总面板数量: ${Object.keys(tabIdSetByPanelId).length}`);
     
     // 按面板分组显示
     for (const [panelId, tabIdSet] of tabIdSetByPanelId) {
-        console.log(`\n面板ID:${panelId}，标签页数量:${tabIdSet.size}`);
+        console.log(`[tabsman] \n面板ID:${panelId}，标签页数量:${tabIdSet.size}`);
         const activeTab = activeTabs[panelId];
-        console.log(`  活跃标签页ID: ${activeTab.id}`);
-        console.log(`    名称: ${activeTab.name}`);
-        console.log(`    当前块ID: ${activeTab.currentBlockId}`);
-        console.log(`    后退栈长度: ${activeTab.backStack.length} (栈顶为当前访问)`);
-        console.log(`    前进栈长度: ${activeTab.forwardStack.length}`);
+        console.log(`[tabsman]   活跃标签页ID: ${activeTab.id}`);
+        console.log(`[tabsman]     名称: ${activeTab.name}`);
+        console.log(`[tabsman]     当前块ID: ${activeTab.currentBlockId}`);
+        console.log(`[tabsman]     后退栈长度: ${activeTab.backStack.length} (栈顶为当前访问)`);
+        console.log(`[tabsman]     前进栈长度: ${activeTab.forwardStack.length}`);
         
         for (const tabId of tabIdSet) {
             if (tabId === activeTab.id) continue;
             const tab = tabs[tabId];
             if (tab) {
-                console.log(`  后台标签页ID: ${tabId}`);
-                console.log(`    名称: ${tab.name}`);
-                console.log(`    当前块ID: ${tab.currentBlockId}`);
-                console.log(`    后退栈长度: ${tab.backStack.length} (栈顶为当前访问)`);
-                console.log(`    前进栈长度: ${tab.forwardStack.length}`);
+                console.log(`[tabsman]   后台标签页ID: ${tabId}`);
+                console.log(`[tabsman]     名称: ${tab.name}`);
+                console.log(`[tabsman]     当前块ID: ${tab.currentBlockId}`);
+                console.log(`[tabsman]     后退栈长度: ${tab.backStack.length} (栈顶为当前访问)`);
+                console.log(`[tabsman]     前进栈长度: ${tab.forwardStack.length}`);
             }
         }
     }
@@ -1152,25 +1129,25 @@ async function showTabDetails(tabId) {
     const tab = tabs[tabId];
     
     if (!tab) {
-        console.warn(`标签页 ${tabId} 不存在`);
+        console.warn(`[tabsman] 标签页 ${tabId} 不存在`);
         return;
     }
-    console.log(`归属面板ID: ${tab.panelId}`);
-    console.log(`\n后退栈长度: ${tab.backStack.length}(栈顶为当前访问)`);
+    console.log(`[tabsman] 归属面板ID: ${tab.panelId}`);
+    console.log(`[tabsman] \n后退栈长度: ${tab.backStack.length}(栈顶为当前访问)`);
     for (let index = 0; index < tab.backStack.length; index++) {
         const history = tab.backStack[index];
         const isBackStackTop = index === tab.backStack.length - 1;
         const marker = isBackStackTop ? '→ ' : '   ';
         if (history.view === 'block' && history.viewArgs?.blockId) {
             const block = await orca.invokeBackend("get-block", history.viewArgs.blockId);
-            console.log(`${marker}[${index}] 视图类型: ${history.view}，块ID: ${history.viewArgs.blockId}，块类型: ${block.properties.find(prop => prop.name === '_repr').value.type}，块别名：${block.aliases[0]}  块文本：${block.text}`);
+            console.log(`[tabsman] ${marker}[${index}] 视图类型: ${history.view}，块ID: ${history.viewArgs.blockId}，块类型: ${block.properties.find(prop => prop.name === '_repr').value.type}，块别名：${block.aliases[0]}  块文本：${block.text}`);
         } else if (history.view === 'journal' && history.viewArgs?.date) {
             const block = await orca.invokeBackend("get-block", history.viewArgs.blockId);
-            console.log(`${marker}[${index}] 视图类型: ${history.view}，日期: ${history.viewArgs.date}`);
+            console.log(`[tabsman] ${marker}[${index}] 视图类型: ${history.view}，日期: ${history.viewArgs.date}`);
         }
     }
     
-    console.log(`\n前进栈长度: ${tab.forwardStack.length}`);
+    console.log(`[tabsman] \n前进栈长度: ${tab.forwardStack.length}`);
     if (tab.forwardStack.length === 0) {
         return;
     }
@@ -1178,9 +1155,9 @@ async function showTabDetails(tabId) {
         const history = tab.forwardStack[index];
         if (history.view === 'block' && history.viewArgs?.blockId) {
             const block = await orca.invokeBackend("get-block", history.viewArgs.blockId);
-            console.log(`   [${index}] 视图类型: ${history.view}，块ID: ${history.viewArgs.blockId}，块类型: ${block.properties.find(prop => prop.name === '_repr').value.type}，块别名：${block.aliases[0]}  块文本：${block.text}`);
+            console.log(`[tabsman]    [${index}] 视图类型: ${history.view}，块ID: ${history.viewArgs.blockId}，块类型: ${block.properties.find(prop => prop.name === '_repr').value.type}，块别名：${block.aliases[0]}  块文本：${block.text}`);
         } else if (history.view === 'journal' && history.viewArgs?.date) {
-            console.log(`   [${index}] 视图类型: ${history.view}，日期: ${history.viewArgs.date}`);
+            console.log(`[tabsman]    [${index}] 视图类型: ${history.view}，日期: ${history.viewArgs.date}`);
         }
     }
 }

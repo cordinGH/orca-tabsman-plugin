@@ -2,7 +2,7 @@
 // 负责启动核心功能和UI注入
 
 
-import { start, destroy } from './tabsman-core.js';
+import { start, destroy, createTab } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startBackAndForwardHistory, stopBackAndForwardHistory } from './tabsman-access-history.js';
@@ -51,7 +51,7 @@ async function load(name) {
     // 启动标签页系统，传递UI更新回调
     await start(renderTabsByPanel);
     
-    // 注册右键菜单命令（依赖window.createTab）
+    // 注册右键菜单命令
     orca.blockMenuCommands.registerBlockMenuCommand("tabsman.createTabInBackground", {
         worksOnMultipleBlocks: false,
         render: (blockId, rootBlockId, close) => {
@@ -61,7 +61,7 @@ async function load(name) {
                 title: "在后台创建Tab",
                 onClick: () => {
                     close();
-                    window.createTab(blockId, false);
+                    createTab(blockId, false);
                     orca.notify("success", "[tabsman] 已在后台创建新标签页");
                 }
             });

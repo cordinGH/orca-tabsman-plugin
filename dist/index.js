@@ -20,7 +20,7 @@ function updateActivePanelStyle() {
     allActivePanels.forEach(panel => panel.classList.remove('active-panel'));
     
     // 为当前活跃面板添加样式
-    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-panel-id="${orca.state.activePanel}"]`);
+    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
     if (activePanelGroup) {
         activePanelGroup.classList.add('active-panel');
     }
@@ -67,7 +67,7 @@ async function load(name) {
     }
 
     // 对于orca.state.activePanel 的面板group，注入 .active-panel    
-    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-panel-id="${orca.state.activePanel}"]`);
+    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
     if (activePanelGroup) {
         activePanelGroup.classList.add('active-panel');
     }

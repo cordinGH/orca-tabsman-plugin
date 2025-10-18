@@ -57,12 +57,6 @@ function stopbackforwardbutton() {
     // 恢复原始按钮
     backButton.replaceWith(orcaBackButton);
     forwardButton.replaceWith(orcaForwardButton);
-    
-    // 清理引用
-    headbar = null;
-    backButton = null;
-    forwardButton = null;
-    currentPopup = null;
 }
 
 
@@ -104,11 +98,11 @@ function handleClosePopup(e) {
             return;
         }
         
-        // 如果点击的元素包含data-backforward-block-id属性，执行特定逻辑
-        const targetElement = e.target.closest('[data-backforward-block-id]');
+        // 如果点击的元素包含data-tabsman-backforward-block-id属性，执行特定逻辑
+        const targetElement = e.target.closest('[data-tabsman-backforward-block-id]');
         if (e.type === 'click' && targetElement) {
-            const blockId = targetElement.getAttribute('data-backforward-block-id');
-            const view = targetElement.getAttribute('data-backforward-view');
+            const blockId = targetElement.getAttribute('data-tabsman-backforward-block-id');
+            const view = targetElement.getAttribute('data-tabsman-backforward-view');
             if (view === 'journal') {
                 orca.nav.goTo(view, {date: new Date(blockId)});
             } else {
@@ -130,12 +124,12 @@ function handleClosePopup(e) {
  * @returns {void}
  */
 function handleHeadbarLeftClick(e) {
-    // 检查是否点击到了具有 data-backforward-block-id 的元素
-    const target = e.target.closest('[data-backforward-block-id]');
+    // 检查是否点击到了具有 data-tabsman-backforward-block-id 的元素
+    const target = e.target.closest('[data-tabsman-backforward-block-id]');
     
     if (target) {
-        const blockId = target.getAttribute('data-backforward-block-id');
-        const view = target.getAttribute('data-backforward-view');
+        const blockId = target.getAttribute('data-tabsman-backforward-block-id');
+        const view = target.getAttribute('data-tabsman-backforward-view');
         if (view === 'journal') {
             orca.nav.goTo(view, {date: new Date(blockId)});
         } else {
@@ -265,16 +259,16 @@ function createMenuItem(stackItemInfo) {
     // 创建图标
     let icon = document.createElement('i');
     icon.className = `${stackItemInfo.icon} orca-menu-text-icon orca-menu-text-pre`;
-    icon.setAttribute('data-backforward-view', stackItemInfo.view);
-    icon.setAttribute('data-backforward-block-id', stackItemInfo.blockId);
+    icon.setAttribute('data-tabsman-backforward-view', stackItemInfo.view);
+    icon.setAttribute('data-tabsman-backforward-block-id', stackItemInfo.blockId);
 
     // 创建 orca-menu-text-text（内容元素）
     let textText = document.createElement('div');
     textText.className = 'orca-menu-text-text';
     textText.innerText = stackItemInfo.name;
     textText.style = {fontFamily: 'var(--orca-fontfamily-code)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '20em', flex: 1};
-    textText.setAttribute('data-backforward-block-id', stackItemInfo.blockId);
-    textText.setAttribute('data-backforward-view', stackItemInfo.view);
+    textText.setAttribute('data-tabsman-backforward-block-id', stackItemInfo.blockId);
+    textText.setAttribute('data-tabsman-backforward-view', stackItemInfo.view);
     
     ele.appendChild(icon);
     ele.appendChild(textText);

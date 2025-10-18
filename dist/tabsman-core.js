@@ -1047,7 +1047,6 @@ function destroy() {
     // 清理全局状态
     tabs = {};
     tabCounter = 0;  // 重置计数器
-    globalPinCounter = 0;  // 重置pin计数器
     activeTabs = {};
     tabIdSetByPanelId.clear();
     sortedTabsByPanelId.clear();  // 清理排序缓存

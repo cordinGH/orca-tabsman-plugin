@@ -66,8 +66,8 @@ async function createTabElement(tab, panelId) {
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
     tabElement.className = 'plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item';
-    tabElement.setAttribute('data-tab-id', tab.id);
-    tabElement.setAttribute('data-panel-id', panelId);
+    tabElement.setAttribute('data-tabsman-tab-id', tab.id);
+    tabElement.setAttribute('data-tabsman-panel-id', panelId);
 
     // 置顶图标
     const pinIcon = document.createElement('i');
@@ -77,8 +77,8 @@ async function createTabElement(tab, panelId) {
     const blockIcon = document.createElement('i');
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质是相同的。
     blockIcon.className = `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`;
-    blockIcon.setAttribute('data-tab-id', tab.id);
-    blockIcon.setAttribute('data-panel-id', panelId);
+    blockIcon.setAttribute('data-tabsman-tab-id', tab.id);
+    blockIcon.setAttribute('data-tabsman-panel-id', panelId);
 
     // 标签页标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
@@ -90,8 +90,8 @@ async function createTabElement(tab, panelId) {
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
     const closeBtn = document.createElement('i');
     closeBtn.className = 'plugin-tabsman-tab-close ti ti-x orca-fav-item-menu';
-    closeBtn.setAttribute('data-tab-id', tab.id);
-    closeBtn.setAttribute('data-panel-id', panelId);
+    closeBtn.setAttribute('data-tabsman-tab-id', tab.id);
+    closeBtn.setAttribute('data-tabsman-panel-id', panelId);
 
     tabElement.appendChild(pinIcon);
     tabElement.appendChild(blockIcon);
@@ -118,7 +118,7 @@ async function createPanelItemElement(panelId) {
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
     panelItemElement.className = 'plugin-tabsman-panel-item plugin-tabsman-item-item orca-fav-item-item';
-    panelItemElement.setAttribute('data-panel-id', panelId);
+    panelItemElement.setAttribute('data-tabsman-panel-id', panelId);
 
     // 折叠图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
@@ -135,7 +135,7 @@ async function createPanelItemElement(panelId) {
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
     const newTabButton = document.createElement('i');
     newTabButton.className = 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu';
-    newTabButton.setAttribute('data-panel-id', panelId);
+    newTabButton.setAttribute('data-tabsman-panel-id', panelId);
 
     panelItemElement.appendChild(collapseIcon);
     panelItemElement.appendChild(title);
@@ -158,8 +158,8 @@ async function handleTabsmanClick(e) {
     // 处理标签页相关事件
     const tabElement = e.target.closest('.plugin-tabsman-tab-item');
     if (tabElement) {
-        const tabId = tabElement.getAttribute('data-tab-id');
-        const panelId = tabElement.getAttribute('data-panel-id');
+        const tabId = tabElement.getAttribute('data-tabsman-tab-id');
+        const panelId = tabElement.getAttribute('data-tabsman-panel-id');
         
         // 确保有tabId和panelId
         if (!tabId || !panelId) return;
@@ -206,7 +206,7 @@ async function handleTabsmanClick(e) {
             // orca.notify('切换面板折叠状态');
         } else if (e.target.classList.contains('plugin-tabsman-panel-new-tab')) {
             e.stopPropagation();
-            const panelId = e.target.getAttribute('data-panel-id');
+            const panelId = e.target.getAttribute('data-tabsman-panel-id');
             if (panelId) {
                 await TabsmanCore.actions.createTab(-1, false, panelId);
             }
@@ -240,7 +240,7 @@ async function renderTabsByPanel() {
             const panelGroup = document.createElement('div');
             // ⭐️⭐️⭐️借用fav-item样式，性质是相同的。
             panelGroup.className = 'plugin-tabsman-panel-group orca-fav-item';
-            panelGroup.setAttribute('data-panel-id', panelId);
+            panelGroup.setAttribute('data-tabsman-panel-id', panelId);
 
             // 创建面板标题项
             const panelItem = await createPanelItemElement(panelId);
@@ -264,7 +264,7 @@ async function renderTabsByPanel() {
         }
 
         // 在所有面板组都添加到DOM后，为当前活跃面板添加class active-panel
-        const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-panel-id="${orca.state.activePanel}"]`);
+        const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
         if (activePanelGroup) {
             activePanelGroup.classList.add('active-panel');
         }

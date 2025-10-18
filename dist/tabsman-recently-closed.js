@@ -49,17 +49,27 @@ async function startRecentlyClosed(renderTabsByPanel) {
                         TabsmanPersistence.getFavoriteBlockArray().map(block =>
                             createElement(MenuText, {
                                 key: block.id,
-                                title: block.title,
+                                title: createElement("div",
+                                    {style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }},
+                                    [createElement("span",
+                                        { style: {fontFamily: 'var(--orca-fontfamily-code)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '20em', flex: 1}},
+                                        block.title),
+                                    createElement("i", {
+                                        className: "ti ti-x plugin-tabsman-delete-btn", style: {cursor: 'pointer', opacity: 0.6, marginLeft: '8px', flexShrink: 0},
+                                        onClick: async (e) => {
+                                            e.stopPropagation();
+                                            if (TabsmanPersistence.getFavoriteBlockArray().findIndex(item => item.id === block.id) === -1) {
+                                                orca.notify("warn", "已经删除成功，无需再次删除");
+                                                return;
+                                            }
+                                            await TabsmanPersistence.removeAndSaveFavoriteBlock(block.id);
+                                            // 重新渲染侧边栏样式
+                                            renderTabsByPanel();
+                                        }
+                                    })]
+                                ),
                                 preIcon: block.icon || 'ti ti-cube',
                                 className: 'plugin-tabsman-favorite-block-item',
-                                className: 'plugin-tabsman-item-item',
-                                style: {
-                                    fontFamily: 'var(--orca-fontfamily-code)',
-                                    textOverflow: 'ellipsis',
-                                    overflow: 'hidden',
-                                    whiteSpace: 'nowrap',
-                                    maxWidth: '20em'
-                                },
                                 onClick: async () => {
                                     // 恢复收藏的块到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;
@@ -67,23 +77,35 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                 }
                             })
                         )
-                    )),
+                    )
+                ),
                 createElement(MenuText,
                     { title: "关闭的标签页", preIcon: "ti ti-progress-x" },
                     createElement(Menu, {}, TabsmanPersistence.getTabArray("recently-closed").length === 0 ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无关闭的标签页") :
                         TabsmanPersistence.getTabArray("recently-closed").map(tab =>
                             createElement(MenuText, {
                                 key: tab.id,
-                                title: tab.name,
+                                title: createElement("div",
+                                    {style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between',width: '100%'}},
+                                    [createElement("span", 
+                                        {style: { fontFamily: 'var(--orca-fontfamily-code)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '20em', flex: 1 }},
+                                        tab.name),
+                                    createElement("i", {
+                                        className: "ti ti-x plugin-tabsman-delete-btn",
+                                        style: {cursor: 'pointer', opacity: 0.6, marginLeft: '8px', flexShrink: 0},
+                                        onClick: async (e) => {
+                                            e.stopPropagation();
+                                            if (TabsmanPersistence.getTabArray("recently-closed").findIndex(item => item.id === tab.id) === -1) {
+                                                orca.notify("warn", "已经删除成功，无需再次删除");
+                                                return;
+                                            }
+                                            await TabsmanPersistence.removeAndSaveTab(tab.id, "recently-closed");
+                                        }
+                                    })]
+                                ),
                                 preIcon: tab.currentIcon || 'ti ti-cube',
                                 className: 'plugin-tabsman-recently-closed-tab-item',
-                                style: {
-                                    fontFamily: 'var(--orca-fontfamily-code)',
-                                    textOverflow: 'ellipsis',
-                                    overflow: 'hidden',
-                                    whiteSpace: 'nowrap',
-                                    maxWidth: '20em'
-                                },
+                                style: {},
                                 onClick: async () => {
                                     // 恢复关闭的标签页到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;

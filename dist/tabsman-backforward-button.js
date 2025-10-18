@@ -184,7 +184,7 @@ async function handleHistoryButtonRightClick(e, stackType) {
     e.stopImmediatePropagation();
     let stack = stackType === 'back' ? TabsmanCore.getActiveTabs()[orca.state.activePanel].backStack : TabsmanCore.getActiveTabs()[orca.state.activePanel].forwardStack;
     if ((stackType === 'back' && stack.length <= 1) || (stackType === 'forward' && stack.length === 0)) {
-        // TODO: 提示用户当前标签页后退历史为空
+        orca.notify("info", `[tabsman] 当前标签页暂无${stackType === 'back' ? '后退' : '前进'}历史`);
     } else {
         // 创建弹窗
         let popupEle = document.createElement('div');

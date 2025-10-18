@@ -115,13 +115,13 @@ async function removeAndSaveTab(tabId, tabType = "") {
  * @param {Object} block - 收藏块对象
  * @returns {Promise<boolean>} 返回是否成功
  */
-async function addAndSaveFavoriteBlock({id, icon, title}) {
+async function addAndSaveFavoriteBlock(blockObject = {id, icon, title}) {
     // 将id转换为字符串进行比较，避免日期对象比较失败
-    if (favoriteBlockArray.findIndex(item => item.id.toString() === id.toString()) !== -1) {
+    if (favoriteBlockArray.findIndex(item => item.id.toString() === blockObject.id.toString()) !== -1) {
         orca.notify("warn", "该收藏块已存在");
         return false;
     }
-    favoriteBlockArray.unshift({id, icon, title});
+    favoriteBlockArray.unshift(blockObject);
     await orca.plugins.setData('tabsman', 'favorite-blocks-data', JSON.stringify(favoriteBlockArray));
     console.log(`已保存 ${favoriteBlockArray.length} 个收藏块`);
     return true;

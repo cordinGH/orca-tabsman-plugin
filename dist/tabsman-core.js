@@ -140,6 +140,11 @@ async function generateTabNameAndIcon(blockId) {
 
     try {
         const block = await orca.invokeBackend("get-block", blockId);
+        
+        // 检查是否启用显示为别名
+        const asAliasProperty = block.properties.find(p => p.name === '_asAlias');
+        const isAlias = asAliasProperty && asAliasProperty.value === true;
+        
         const reprProperty = block.properties.find(p => p.name === '_repr');
 
         if (!reprProperty || !reprProperty.value) {
@@ -152,8 +157,14 @@ async function generateTabNameAndIcon(blockId) {
         let name = '新标签页';
         if (blockType === 'journal') {
             name = reprProperty.value.date.toString().substring(0, 15);
-        } else if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType) && block.text) {
-            name = block.text.substring(0, 30) + (block.text.length > 30 ? '...' : '');
+        } else if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType)) {
+            if (isAlias) {
+                name = block.aliases[0];
+            } else if (block.text) {
+                name = block.text.substring(0, 30) + (block.text.length > 30 ? '...' : '');
+            } else {
+                name = `(${blockType})`;
+            }
         } else {
             name = `(${blockType})`;
         }

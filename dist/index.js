@@ -12,6 +12,23 @@ let pluginName;
 // 防重复执行标志，代表正在创建标签页
 let isCreatingTab = false;
 
+/**
+ * 清除所有持久化数据
+ * @returns {Promise<void>}
+ */
+async function clearAllData() {
+    try {
+        // 清除持久化数据
+        await orca.plugins.setData('tabsman', 'recently-closed-tabs-data', "[]");
+        await orca.plugins.setData('tabsman', 'pinned-tabs-data', "[]");
+        await orca.plugins.setData('tabsman', 'favorite-blocks-data', "[]");
+        
+        orca.notify("success", "[tabsman] 持久化数据已清除，请CTRL+R刷新生效");
+    } catch (error) {
+        orca.notify("error", `[tabsman] 清除数据失败: ${error.message}`);
+    }
+}
+
 
 // 更新活跃面板样式的辅助函数
 function updateActivePanelStyle() {
@@ -45,6 +62,13 @@ async function load(name) {
             defaultValue: true
         }
     });
+    
+    // 注册清除数据命令
+    orca.commands.registerCommand(
+        `${pluginName}.clearData`,
+        clearAllData,
+        "[tabsman] 清空持久化数据"
+    );
     
     // 启动标签页渲染
     await startTabsRender();
@@ -117,6 +141,7 @@ async function unload() {
     // 注销命令和样式（清理注册）
     orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
     orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
+    orca.commands.unregisterCommand(`${pluginName}.clearData`);
     orca.themes.removeCSSResources(pluginName);
     
     console.log(`${pluginName} 已卸载`);

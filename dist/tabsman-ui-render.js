@@ -123,7 +123,7 @@ async function createPanelItemElement(panelId) {
     // 折叠图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
     const collapseIcon = document.createElement('i');
-    collapseIcon.className = 'plugin-tabsman-panel-collapse-icon ti ti-chevron-down orca-fav-item-icon orca-fav-item-icon-font';
+    collapseIcon.className = 'plugin-tabsman-panel-collapse-icon ti ti-dual-screen orca-fav-item-icon orca-fav-item-icon-font';
 
     // 面板标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。

@@ -49,6 +49,9 @@ async function startRecentlyClosed(renderTabsByPanel) {
                         TabsmanPersistence.getFavoriteBlockArray().map(block =>
                             createElement(MenuText, {
                                 key: block.id,
+                                preIcon: block.icon || 'ti ti-cube',
+                                className: 'plugin-tabsman-favorite-block-item',
+                                style: {cursor: 'default'},
                                 title: createElement("div",
                                     {style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }},
                                     [createElement("span",
@@ -68,8 +71,6 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                         }
                                     })]
                                 ),
-                                preIcon: block.icon || 'ti ti-cube',
-                                className: 'plugin-tabsman-favorite-block-item',
                                 onClick: async () => {
                                     // 恢复收藏的块到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;
@@ -85,6 +86,9 @@ async function startRecentlyClosed(renderTabsByPanel) {
                         TabsmanPersistence.getTabArray("recently-closed").map(tab =>
                             createElement(MenuText, {
                                 key: tab.id,
+                                preIcon: tab.currentIcon || 'ti ti-cube',
+                                className: 'plugin-tabsman-recently-closed-tab-item',
+                                style: {cursor: 'default'},
                                 title: createElement("div",
                                     {style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between',width: '100%'}},
                                     [createElement("span", 
@@ -103,9 +107,6 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                         }
                                     })]
                                 ),
-                                preIcon: tab.currentIcon || 'ti ti-cube',
-                                className: 'plugin-tabsman-recently-closed-tab-item',
-                                style: {},
                                 onClick: async () => {
                                     // 恢复关闭的标签页到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;

@@ -5,6 +5,7 @@
 import { start, destroy } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
+import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
 
 let pluginName;
 
@@ -92,6 +93,7 @@ async function load(name) {
     // 插件启动完成后，主动触发一次渲染通知
     renderTabsByPanel();
     
+    startbackforwardbutton();
     console.log(`${pluginName} 已加载`);
 }
 
@@ -108,6 +110,7 @@ async function unload() {
     // 停止UI渲染（停止UI层）
     stopTabsRender();
     
+    stopbackforwardbutton();
     // 清理核心系统（最后清理核心）
     destroy();
     

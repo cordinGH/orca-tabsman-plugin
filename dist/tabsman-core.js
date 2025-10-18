@@ -857,7 +857,7 @@ function setupCommandInterception() {
     // 4. 拦截 core.closePanel 命令（关闭当前面板）
     beforeCommandHooks.closePanel = () => {       
         if (tabIdSetByPanelId.size === 1) {
-            orca.notify("info", "[tabsman] 当前仅剩一个面板，无法关闭关闭面板");
+            // orca.notify("info", "[tabsman] 当前仅剩一个面板，无法关闭关闭面板");
             return false;
         }
         

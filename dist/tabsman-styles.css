@@ -86,8 +86,8 @@
 
 
 /* ———————————————————————————————侧边栏未激活的面板group，可见度减半—————————————————————————————————— */
-.plugin-tabsman-panel-group:not(.active-panel){
-    opacity: .5;
+.plugin-tabsman-panel-group:not(.plugin-tabsman-panel-group-active){
+    opacity: .39;
 }
 
 

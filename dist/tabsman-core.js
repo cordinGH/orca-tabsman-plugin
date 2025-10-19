@@ -852,7 +852,13 @@ function setupCommandInterception() {
             // 根据视图类型确定目标内容ID
             const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
             try {
-                await createTab(targetBlockId, false);
+                // console.log(`panelId !== '_globalSearch' ================> ${panelId !== '_globalSearch'}`)
+                if (panelId === '_globalSearch' || panelId === undefined) {
+                    const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+                    await createTab(targetBlockId, false, activePanelId);
+                } else {
+                    await createTab(targetBlockId, false);
+                }
                 orca.notify("success", "[tabsman] 已创建后台标签页");
             } catch (error) {
                 console.error('[tabsman] 创建后台标签页失败:', error);
@@ -931,7 +937,13 @@ function setupCommandInterception() {
         if (window.event && window.event.ctrlKey && window.event.shiftKey && window.event.button === 0) {
             try {
                 const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
-                await createTab(targetBlockId, true);
+                // console.log(`orca.state.activePanel ==============> ${orca.state.activePanel}`)
+                if (orca.state.activePanel !== '_globalSearch') {
+                    const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+                    await createTab(targetBlockId, true, activePanelId);
+                } else {
+                    await createTab(targetBlockId, true);
+                }
                 orca.notify("success", "[tabsman] 已创建前台标签页");
             } catch (error) {
                 console.error('[tabsman] 创建前台标签页失败:', error);
@@ -987,28 +999,6 @@ async function start(callback = null) {
     // 设置命令拦截
     setupCommandInterception();
     
-    // 注册标签页导航命令
-    orca.commands.registerCommand(
-        'tabsman.goToNextTab',
-        async () => {
-            const success = await switchToNextTab();
-            if (success) {
-                orca.notify("success", "[tabsman] 已切换到下一个标签页");
-            }
-        },
-        'Go to next tab'
-    );
-    
-    orca.commands.registerCommand(
-        'tabsman.goToPreviousTab',
-        async () => {
-            const success = await switchToPreviousTab();
-            if (success) {
-                orca.notify("success", "[tabsman] 已切换到上一个标签页");
-            }
-        },
-        'Go to previous tab'
-    );
 
     // 恢复置顶标签页和收藏块数据
     try {
@@ -1237,5 +1227,8 @@ export {
     // 排序缓存函数
     updateSortedTabsCache,
     // 标签页信息生成函数
-    generateTabNameAndIcon
+    generateTabNameAndIcon,
+    // 标签页导航函数
+    switchToNextTab,
+    switchToPreviousTab
 };

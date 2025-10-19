@@ -2,7 +2,7 @@
 // 负责启动核心功能和UI注入
 
 
-import { start, destroy } from './tabsman-core.js';
+import { start, destroy, switchToNextTab, switchToPreviousTab } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
@@ -33,13 +33,13 @@ async function clearAllData() {
 // 更新活跃面板样式的辅助函数
 function updateActivePanelStyle() {
     // 移除所有活跃样式
-    const allActivePanels = document.querySelectorAll('.plugin-tabsman-panel-group.active-panel');
-    allActivePanels.forEach(panel => panel.classList.remove('active-panel'));
+    const allActivePanels = document.querySelectorAll('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active');
+    allActivePanels.forEach(panel => panel.classList.remove('plugin-tabsman-panel-group-active'));
     
     // 为当前活跃面板添加样式
     const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
     if (activePanelGroup) {
-        activePanelGroup.classList.add('active-panel');
+        activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
     }
 }
 
@@ -70,6 +70,29 @@ async function load(name) {
         "[tabsman] 清空持久化数据"
     );
     
+    // 注册标签页导航命令
+    orca.commands.registerCommand(
+        'tabsman.goToNextTab',
+        async () => {
+            const success = await switchToNextTab();
+            if (success) {
+                orca.notify("success", "[tabsman] 已切换到下一个标签页");
+            }
+        },
+        '[tabsman] Go to next tab'
+    );
+    
+    orca.commands.registerCommand(
+        'tabsman.goToPreviousTab',
+        async () => {
+            const success = await switchToPreviousTab();
+            if (success) {
+                orca.notify("success", "[tabsman] 已切换到上一个标签页");
+            }
+        },
+        '[tabsman] Go to previous tab'
+    );
+    
     // 启动标签页渲染
     await startTabsRender();
     
@@ -90,17 +113,19 @@ async function load(name) {
         }
     }
 
-    // 对于orca.state.activePanel 的面板group，注入 .active-panel    
+    // 对于orca.state.activePanel 的面板group，注入 .plugin-tabsman-panel-group-active    
     const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
     if (activePanelGroup) {
-        activePanelGroup.classList.add('active-panel');
+        activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
     }
 
-    // 包装 switchFocusTo 函数，使得每次切换面板都会变更.active-panel元素
+    // 包装 switchFocusTo 函数，使得每次切换面板都会变更.plugin-tabsman-panel-group-active元素
     const originalSwitchFocusTo = orca.nav.switchFocusTo;
     orca.nav.switchFocusTo = function(panelId) {
         originalSwitchFocusTo.call(this, panelId);
-        updateActivePanelStyle();
+        if (panelId !== '_globalSearch') {
+            updateActivePanelStyle();
+        }
     };
     
     // 为面板切换命令注册 after hooks
@@ -142,6 +167,8 @@ async function unload() {
     orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
     orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
     orca.commands.unregisterCommand(`${pluginName}.clearData`);
+    orca.commands.unregisterCommand('tabsman.goToNextTab');
+    orca.commands.unregisterCommand('tabsman.goToPreviousTab');
     orca.themes.removeCSSResources(pluginName);
     
     console.log(`${pluginName} 已卸载`);

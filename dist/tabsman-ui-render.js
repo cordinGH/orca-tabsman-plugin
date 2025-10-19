@@ -263,10 +263,11 @@ async function renderTabsByPanel() {
             tabsmanTabsEle.appendChild(panelGroup);
         }
 
-        // 在所有面板组都添加到DOM后，为当前活跃面板添加class active-panel
-        const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
+        // 在所有面板组都添加到DOM后，为当前活跃面板添加class plugin-tabsman-panel-group-active
+        const activePanel = orca.state.activePanel;
+        const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${activePanel}"]`);
         if (activePanelGroup) {
-            activePanelGroup.classList.add('active-panel');
+            activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
         }
     }
 }

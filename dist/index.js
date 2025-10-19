@@ -94,35 +94,6 @@ async function load(name) {
             defaultValue: true
         }
     });
-
-    // 注册清除数据命令（默认启用，用户可在设置中禁用）
-    orca.commands.registerCommand(
-        `tabsman.clearData`,
-        clearAllData,
-        "[tabsman]清空持久化数据"
-    );
-    
-    // 监听设置变化，动态控制清空持久化数据命令的可用性
-    unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
-        const enableClearData = orca.state.plugins[pluginName]?.settings?.enableClearData;
-        if (enableClearData === false) {
-            // 禁用命令
-            try {
-                orca.commands.unregisterCommand('tabsman.clearData');
-                orca.notify("success", "[tabsman] 清空持久化数据命令已禁用");
-            } catch (e) { /* 忽略错误 */ }
-        } else if (enableClearData === true) {
-            // 启用命令
-            try {
-                orca.commands.registerCommand(
-                    'tabsman.clearData',
-                    clearAllData,
-                    "[tabsman]清空持久化数据"
-                );
-                orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
-            } catch (e) { /* 忽略错误 */ }
-        }
-    });
     
     // 注册标签页导航命令
     orca.commands.registerCommand(
@@ -163,6 +134,31 @@ async function load(name) {
         '[tabsman] 开启/关闭显示侧边Tabs栏'
     );
 
+
+        
+    // 监听设置变化，动态控制清空持久化数据命令的可用性
+    unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
+        const enableClearData = orca.state.plugins[pluginName]?.settings?.enableClearData;
+        if (enableClearData === false) {
+            // 禁用命令
+            try {
+                orca.commands.unregisterCommand('tabsman.clearData');
+                orca.notify("success", "[tabsman] 清空持久化数据命令已禁用");
+            } catch (e) { /* 忽略错误 */ }
+        } else if (enableClearData === true) {
+            // 启用命令
+            try {
+                orca.commands.registerCommand(
+                    'tabsman.clearData',
+                    clearAllData,
+                    "[tabsman]清空持久化数据"
+                );
+                orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
+            } catch (e) { /* 忽略错误 */ }
+        }
+    });
+
+    
     // 检查设置，如果启用默认显示Tabs栏
     const settings = orca.state.plugins[pluginName]?.settings;
     if (settings?.defaultTabOption) {
@@ -173,6 +169,14 @@ async function load(name) {
             tabOption.classList.add('orca-selected');
         }
     }
+    if (settings?.enableClearData) {
+        orca.commands.registerCommand(
+            'tabsman.clearData',
+            clearAllData,
+            "[tabsman]清空持久化数据"
+        );
+    }
+    
     
 
     // 对于orca.state.activePanel 的面板group，注入 .plugin-tabsman-panel-group-active    

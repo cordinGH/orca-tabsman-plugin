@@ -41,6 +41,25 @@ const TabsmanCore = {
 // 全局变量存储标签页容器元素
 let tabsmanTabsEle = null;
 
+let unsubscribeDockedPanelId = null;
+let unsubscribeDockedPanelWaiter = null;
+let dockedPanelId = null;
+
+let rendering = false;
+
+
+/**
+ * 通用退订函数
+ * @param {Function|null} unsubscribeFn - 退订函数
+ * @returns {null} 返回 null 用于重新赋值
+ */
+function cleanupSubscription(unsubscribeFn) {
+    if (unsubscribeFn) {
+        unsubscribeFn();
+    }
+    return null;
+}
+
 /**
  * 获取tabsman标签页容器元素
  * @returns {Element|null} 返回标签页容器元素
@@ -123,13 +142,22 @@ async function createPanelItemElement(panelId) {
     // 折叠图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
     const collapseIcon = document.createElement('i');
-    collapseIcon.className = 'plugin-tabsman-panel-collapse-icon ti ti-dual-screen orca-fav-item-icon orca-fav-item-icon-font';
+    collapseIcon.className = 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font';
+    if (panelId !== dockedPanelId) {
+        collapseIcon.className += ' ti ti-chevron-down';
+    } else {
+        collapseIcon.className += ' ti ti-window-minimize';
+    } 
 
     // 面板标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
     const title = document.createElement('div');
     title.className = 'plugin-tabsman-panel-title orca-fav-item-label';
-    title.textContent = `面板 ${panelId}`;
+    if (panelId === dockedPanelId) {
+        title.textContent = "Docked";
+    } else {
+        title.textContent = `面板 ${panelId}`;
+    }
 
     // 创建新标签页按钮
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
@@ -220,6 +248,8 @@ async function handleTabsmanClick(e) {
  * @returns {Promise<void>}
  */
 async function renderTabsByPanel() {
+    if (rendering) return;
+    rendering = true;
     const tabsmanTabsEle = getTabsmanTabsEle();
     if (!tabsmanTabsEle) {
         console.warn('未找到tabsman标签页容器');
@@ -270,6 +300,7 @@ async function renderTabsByPanel() {
             activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
         }
     }
+    rendering = false;
 }
 
 
@@ -296,6 +327,8 @@ async function startTabsRender() {
         // 注册监听器
         tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
 
+        dockedpanelSubscribe();
+
         return true;
 
     } catch (error) {
@@ -313,6 +346,10 @@ function stopTabsRender() {
     tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
     // 清理注入的外壳（包含所有渲染元素）
     cleanupTabsmanShell();
+    
+    // 清理所有订阅
+    unsubscribeDockedPanelId = cleanupSubscription(unsubscribeDockedPanelId);
+    unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
 }
 
 // 导出模块接口
@@ -321,3 +358,62 @@ export {
     stopTabsRender,
     renderTabsByPanel
 };
+
+
+/**
+ * 订阅停靠面板ID变化
+ * 通过监听 orca.state.plugins 等待 dockedPanelState 暴露后再订阅
+ * @returns {void}
+ */
+function dockedpanelSubscribe() {
+    if (!window.Valtio || !window.Valtio.subscribe) {
+        console.warn('[tabsman] Valtio 不可用，无法订阅停靠面板状态');
+        return;
+    }
+
+    // 检查所有插件是否都已加载完成
+    const areAllPluginsLoaded = () => {
+        const { plugins } = orca.state;
+        const enabledPlugins = Object.entries(plugins).filter(([, plugin]) => plugin && plugin.enabled);
+        const loadingPlugins = enabledPlugins.filter(([, plugin]) => !plugin.module);
+        return loadingPlugins.length === 0;
+    };
+
+    // 检查 window.dockedPanelState 是否已暴露
+    const checkAndSubscribe = () => {
+        // 只检查全局对象是否存在，不依赖具体插件名
+        if (window.dockedPanelState) {
+            // 订阅停靠面板状态变化
+            unsubscribeDockedPanelId = window.Valtio.subscribe(window.dockedPanelState, () => {
+                if (window.dockedPanelState.id !== null) {
+                    dockedPanelId = window.dockedPanelState.id;
+                    renderTabsByPanel();
+                }
+            });
+            console.log('[tabsman] 已订阅停靠面板状态变化');
+            unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
+            return true;
+        }
+        
+        // 如果所有插件都加载完了还没有，说明没有 dockpanel 插件
+        if (areAllPluginsLoaded()) {
+            console.log('[tabsman] 所有插件已加载完成，未检测到 dockedPanelState，停止等待');
+            unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
+            return true; // 返回 true 表示结束等待
+        }
+        
+        return false;
+    };
+
+    // 先尝试直接订阅（可能已经暴露）
+    if (checkAndSubscribe()) {
+        return;
+    }
+
+    // 如果还未暴露，监听插件状态变化
+    // 当任何插件加载时都会触发检查，直到找到 dockedPanelState 或所有插件加载完成
+    unsubscribeDockedPanelWaiter = window.Valtio.subscribe(orca.state.plugins, () => {
+        checkAndSubscribe();
+    });
+    console.log('[tabsman] 正在等待 dockedPanelState 暴露...');
+}

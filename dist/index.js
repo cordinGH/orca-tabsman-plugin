@@ -17,6 +17,8 @@ let unsubscribeSettings = null;
 
 // 存储原始函数
 let originalSwitchFocusTo = null;
+let originalFocusNext = null;
+let originalFocusPrev = null;
 
 /**
  * 清除所有持久化数据
@@ -36,20 +38,6 @@ async function clearAllData() {
 }
 
 
-// 更新活跃面板样式的辅助函数
-function updateActivePanelStyle() {
-    // 移除所有活跃样式
-    const allActivePanels = document.querySelectorAll('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active');
-    allActivePanels.forEach(panel => panel.classList.remove('plugin-tabsman-panel-group-active'));
-    
-    // 为当前活跃面板添加样式
-    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
-    if (activePanelGroup) {
-        activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
-    }
-}
-
-
 /**
  * 插件加载
  * @param {string} name - 插件名称
@@ -62,13 +50,31 @@ async function load(name) {
     // 注入样式文件
     orca.themes.injectCSSResource(`${pluginName}/dist/tabsman-styles.css`, pluginName);
 
-    // 包装 switchFocusTo 函数，使得每次切换面板都会变更.plugin-tabsman-panel-group-active元素
+    // 包装导航 API，使得每次切换面板都会变更.plugin-tabsman-panel-group-active元素
     originalSwitchFocusTo = orca.nav.switchFocusTo;
     orca.nav.switchFocusTo = function(panelId) {
         originalSwitchFocusTo.call(this, panelId);
         if (panelId !== '_globalSearch') {
             updateActivePanelStyle();
         }
+    };
+
+    originalFocusNext = orca.nav.focusNext;
+    orca.nav.focusNext = async function() {
+        const result = await originalFocusNext.call(this);
+        if (orca.state.activePanel !== '_globalSearch') {
+            updateActivePanelStyle();
+        }
+        return result;
+    };
+
+    originalFocusPrev = orca.nav.focusPrev;
+    orca.nav.focusPrev = async function() {
+        const result = await originalFocusPrev.call(this);
+        if (orca.state.activePanel !== '_globalSearch') {
+            updateActivePanelStyle();
+        }
+        return result;
     };
 
     // 启动标签页渲染    
@@ -177,7 +183,6 @@ async function load(name) {
         );
     }
     
-    
 
     // 对于orca.state.activePanel 的面板group，注入 .plugin-tabsman-panel-group-active    
     const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
@@ -194,8 +199,29 @@ async function load(name) {
     
     // 启动前进后退按钮模块
     startbackforwardbutton();
-    console.log(`${pluginName} 已加载`);
+    console.log(`=== ${pluginName} 加载完毕 ===`);
 }
+
+
+
+// 更新活跃面板样式的辅助函数
+function updateActivePanelStyle() {
+    // 移除所有活跃样式
+    let activePanel = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active');
+    if (activePanel) {
+        activePanel.classList.remove('plugin-tabsman-panel-group-active');
+    }
+    
+    // 为当前活跃面板添加样式
+    activePanel = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
+    if (activePanel) {
+        activePanel.classList.add('plugin-tabsman-panel-group-active');
+    }
+}
+
+
+
+
 
 /**
  * 插件卸载
@@ -218,10 +244,18 @@ async function unload() {
     orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
     orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
     
-    // 恢复原始 switchFocusTo 函数
+    // 恢复原始导航 API 函数
     if (originalSwitchFocusTo) {
         orca.nav.switchFocusTo = originalSwitchFocusTo;
         originalSwitchFocusTo = null;
+    }
+    if (originalFocusNext) {
+        orca.nav.focusNext = originalFocusNext;
+        originalFocusNext = null;
+    }
+    if (originalFocusPrev) {
+        orca.nav.focusPrev = originalFocusPrev;
+        originalFocusPrev = null;
     }
     
     // 清理设置监听
@@ -242,6 +276,7 @@ async function unload() {
     
     console.log(`${pluginName} 已卸载`);
 }
+
 
 // 导出插件接口
 export {

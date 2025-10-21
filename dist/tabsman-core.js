@@ -1000,24 +1000,32 @@ async function start(callback = null) {
     setupCommandInterception();
     
 
-    // 恢复置顶标签页和收藏块数据
+    // 恢复所有持久化数据（置顶标签页、收藏块、最近关闭标签页）
     try {
+        // 1. 恢复置顶标签页
         const pinnedTabsData = await orca.plugins.getData('tabsman', 'pinned-tabs-data');
         if (pinnedTabsData) {
-            // 直接传递解析后的数据恢复置顶标签页
             const pinnedTabs = await TabsmanPersistence.restoreTabs(JSON.parse(pinnedTabsData), "pinned");
             console.log(`[tabsman] 恢复置顶标签页完成，共恢复 ${pinnedTabs.length} 个标签页`);
             // 更新当前面板的排序缓存
             updateSortedTabsCache(orca.state.activePanel);
         }
 
+        // 2. 恢复收藏块数据
         const favoriteBlocksData = await orca.plugins.getData('tabsman', 'favorite-blocks-data');
         if (favoriteBlocksData) {
             TabsmanPersistence.restoreFavoriteBlocks(JSON.parse(favoriteBlocksData));
             console.log(`[tabsman] 恢复收藏块数据完成，共恢复 ${TabsmanPersistence.getFavoriteBlockArray().length} 个收藏块`);
         }
+
+        // 3. 恢复最近关闭标签页
+        const recentlyClosedData = await orca.plugins.getData('tabsman', 'recently-closed-tabs-data');
+        if (recentlyClosedData) {
+            const closedTabs = await TabsmanPersistence.restoreTabs(JSON.parse(recentlyClosedData), "recently-closed");
+            console.log(`[tabsman] 恢复最近关闭标签页完成，共恢复 ${closedTabs.length} 个标签页`);
+        }
     } catch (error) {
-        console.error('[tabsman] 恢复数据失败:', error);
+        console.error('[tabsman] 恢复持久化数据失败:', error);
     }
 
     // 暴露 get 函数到全局（调试）

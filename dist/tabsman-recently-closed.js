@@ -22,17 +22,9 @@ async function stopRecentlyClosed() {
  * 启动最近关闭标签页模块
  * @param {Function} renderTabsByPanel - UI渲染函数
  * @returns {Promise<void>} 返回Promise
+ * @description 数据恢复已在 tabsman-core.js 的 start() 中统一完成
  */
 async function startRecentlyClosed(renderTabsByPanel) {
-
-    // 加载最近关闭和收藏块的数据
-    try {
-        const jsonClosedTabsData = await orca.plugins.getData('tabsman', 'recently-closed-tabs-data');
-        // 使用持久化模块的restoreTabs函数来恢复标签页对象数组
-        if (jsonClosedTabsData) await TabsmanPersistence.restoreTabs(JSON.parse(jsonClosedTabsData), "recently-closed");
-    } catch (error) {console.warn('加载最近关闭或收藏块数据失败:', error);}
-
-    
     // 注册顶部栏按钮
     orca.headbar.registerHeadbarButton("tabsman.recently-closed", () => createElement(
         ContextMenu,
@@ -138,8 +130,6 @@ async function startRecentlyClosed(renderTabsByPanel) {
             ]
         }
     ));
-    
-    console.log('最近关闭标签页模块启动完成');
 }
 
 // 导出启动和停止函数

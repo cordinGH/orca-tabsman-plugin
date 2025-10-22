@@ -583,7 +583,8 @@ async function switchTab(tabId) {
     const isJournal = tab.currentBlockId instanceof Date;
     orca.nav.goTo(
         isJournal ? 'journal' : 'block',
-        isJournal ? { date: tab.currentBlockId } : { blockId: tab.currentBlockId }
+        isJournal ? { date: tab.currentBlockId } : { blockId: tab.currentBlockId },
+        tab.panelId
     );
     
     // 检查目标标签页是否有历史记录，如果没有则填充初始历史（处理那种还未打开的后台tab页）
@@ -670,6 +671,28 @@ async function deleteTab(tabId) {
     // tabCounter--;
 
     console.log(`[tabsman] 已删除标签页: ${tabId}`);
+    return true;
+}
+
+
+window.moveTabToPanel = async function(tabId, newPanelId) {
+    const tab = tabs[tabId];
+    if (tab.panelId === newPanelId) {
+        return false;
+    }
+    const oldPanelId = tab.panelId;
+    if (tabIdSetByPanelId.get(oldPanelId).size === 1) {
+        orca.notify("warn", "[tabsman] 当前面板只有一个标签页，无法移动");
+        return false;
+    }
+
+    // 更新数据库，并通知ui刷新
+    tabIdSetByPanelId.get(oldPanelId).delete(tabId);
+    tab.panelId = newPanelId;
+    tabIdSetByPanelId.get(newPanelId).add(tabId);
+    updateSortedTabsCache(oldPanelId);
+    updateSortedTabsCache(newPanelId);
+    if (renderTabsCallback) renderTabsCallback();
     return true;
 }
 

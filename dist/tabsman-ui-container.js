@@ -116,14 +116,10 @@ async function injectTabsmanShell() {
         sidebarTabOptionsEl.appendChild(tabOptionEl);
 
         // 监听点击tab-option事件
-        sidebarTabOptionsEl.addEventListener('click', (e) => {
-            if (e.target === tabOptionEl) {
-                sidebarTabOptionsEl.classList.add('plugin-tabsman-selected');
-                tabOptionEl.classList.add('orca-selected');
-            } else {
-                sidebarTabOptionsEl.classList.remove('plugin-tabsman-selected');
-                tabOptionEl.classList.remove('orca-selected');
-            }
+        sidebarTabOptionsEl.addEventListener('click', () => {
+            // 切换选中状态
+            sidebarTabOptionsEl.classList.toggle('plugin-tabsman-selected');
+            tabOptionEl.classList.toggle('orca-selected');
         });
         
         // 保存完整的外壳对象（支持链式调用）到全局变量并返回

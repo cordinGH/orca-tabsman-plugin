@@ -210,16 +210,25 @@ async function handleTabsmanClick(e) {
         } else if (e.target.classList.contains('plugin-tabsman-tab-icon')) {
             e.stopPropagation();
             // 点击块图标切换收藏状态
-            if (e.target.classList.contains('plugin-tabsman-tab-favorite')) {
-                e.target.classList.remove('plugin-tabsman-tab-favorite');
-                await Persistence.removeAndSaveFavoriteBlock(tab.currentBlockId);
-            } else {
-                e.target.classList.add('plugin-tabsman-tab-favorite');
+            const isFavorite = e.target.classList.toggle('plugin-tabsman-tab-favorite');
+            if (isFavorite) {
                 await Persistence.addAndSaveFavoriteBlock({id: tab.currentBlockId, icon: tab.currentIcon, title: tab.name});
+            } else {
+                await Persistence.removeAndSaveFavoriteBlock(tab.currentBlockId);
             }
             renderTabsByPanel();
         } else {
-            // 点击其他区域切换到该标签页
+            // 如果点击的是停靠面板Tab是折叠状态，则切换到展开，但如果不是折叠状态且点击的本就是停靠面板前台标签页且面板是active，则切换折叠。
+            // 如果点击的是不是停靠面板Tab，且停靠面板不是折叠，则先切换到折叠。
+            if (panelId === dockedPanelId && window.dockedPanelIsCollapsed) {
+                await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+            } else if (panelId === dockedPanelId && !window.dockedPanelIsCollapsed && tab.id === TabsmanCore.data.getActiveTabs()[panelId].id && orca.state.activePanel === dockedPanelId) {
+                await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+            } else if (panelId !== dockedPanelId && !window.dockedPanelIsCollapsed) {
+                await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+            }
+
+            // 点击其他区域切换到目标标签页
             await TabsmanCore.actions.switchTab(tab.id);
         }
         return;

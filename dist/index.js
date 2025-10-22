@@ -15,7 +15,7 @@ let isCreatingTab = false;
 // 设置取消订阅
 let unsubscribeSettings = null;
 
-// 存储原始函数
+// 存储原始导航 API 函数
 let originalSwitchFocusTo = null;
 let originalFocusNext = null;
 let originalFocusPrev = null;
@@ -129,13 +129,8 @@ async function load(name) {
     orca.commands.registerCommand(
         'tabsman.toggleSidebarTabsman',
         () => {
-            if (sidebarTabOptions.classList.contains('plugin-tabsman-selected')) {
-                sidebarTabOptions.classList.remove('plugin-tabsman-selected');
-                tabOption.classList.remove('orca-selected');
-            } else {
-                sidebarTabOptions.classList.add('plugin-tabsman-selected');
-                tabOption.classList.add('orca-selected');
-            }
+            sidebarTabOptions.classList.toggle('plugin-tabsman-selected');
+            tabOption.classList.toggle('orca-selected');
         },
         '[tabsman] 开启/关闭显示侧边Tabs栏'
     );

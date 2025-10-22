@@ -87,6 +87,7 @@ async function createTabElement(tab, panelId) {
     tabElement.className = 'plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item';
     tabElement.setAttribute('data-tabsman-tab-id', tab.id);
     tabElement.setAttribute('data-tabsman-panel-id', panelId);
+    tabElement.setAttribute('draggable', 'true');
 
     // 置顶图标
     const pinIcon = document.createElement('i');
@@ -335,6 +336,7 @@ async function startTabsRender() {
 
         // 注册监听器
         tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
+        setUpTabDragAndDrop();
 
         dockedpanelSubscribe();
 
@@ -351,14 +353,17 @@ async function startTabsRender() {
  * @returns {void}
  */
 function stopTabsRender() {
-    // 注销监听器
     tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
+    cleanupTabDragAndDrop();
     // 清理注入的外壳（包含所有渲染元素）
     cleanupTabsmanShell();
     
     // 清理所有订阅
     unsubscribeDockedPanelId = cleanupSubscription(unsubscribeDockedPanelId);
     unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
+
+    // 清理全局变量
+    dragTabId = null;
 }
 
 // 导出模块接口
@@ -367,6 +372,7 @@ export {
     stopTabsRender,
     renderTabsByPanel
 };
+
 
 
 /**
@@ -390,7 +396,7 @@ function dockedpanelSubscribe() {
 
     // 检查 window.dockedPanelState 是否已暴露
     const checkAndSubscribe = () => {
-        // 只检查全局对象是否存在，不依赖具体插件名
+        // 检查是否存在 dockedPanelState 对象，存在就订阅，不存在就结束等待下一次检查，直到所有插件加载完成。
         if (window.dockedPanelState) {
             // 订阅停靠面板状态变化
             unsubscribeDockedPanelId = window.Valtio.subscribe(window.dockedPanelState, () => {
@@ -414,15 +420,73 @@ function dockedpanelSubscribe() {
         return false;
     };
 
-    // 先尝试直接订阅（可能已经暴露）
+    // 先尝试直接订阅（可能已经加载了）
     if (checkAndSubscribe()) {
         return;
     }
-
-    // 如果还未暴露，监听插件状态变化
-    // 当任何插件加载时都会触发检查，直到找到 dockedPanelState 或所有插件加载完成
+    // 订阅插件列表变化，变化时触发回调，直到找到 dockedPanelState 或所有插件加载完成后，退订。
     unsubscribeDockedPanelWaiter = window.Valtio.subscribe(orca.state.plugins, () => {
         checkAndSubscribe();
     });
     console.log('[tabsman] 正在等待 dockedPanelState 暴露...');
 }
+
+
+
+/**
+ * 设置标签页拖拽和放置事件
+ * @returns {void}
+ */
+let dragTabId = null;
+function setUpTabDragAndDrop() {
+    tabsmanTabsEle.addEventListener('dragstart', handleTabDragStart);
+    tabsmanTabsEle.addEventListener('dragover', handleTabDragOver);
+    tabsmanTabsEle.addEventListener('drop', handleTabDrop);
+    tabsmanTabsEle.addEventListener('dragend', handleTabDragEnd);
+}
+
+function cleanupTabDragAndDrop() {
+    tabsmanTabsEle.removeEventListener('dragstart', handleTabDragStart);
+    tabsmanTabsEle.removeEventListener('dragover', handleTabDragOver);
+    tabsmanTabsEle.removeEventListener('drop', handleTabDrop);
+    tabsmanTabsEle.removeEventListener('dragend', handleTabDragEnd);
+}
+
+function handleTabDragStart(e) {
+    const tabElement = e.target.closest('.plugin-tabsman-tab-item');
+    if (tabElement) {
+        dragTabId = tabElement.getAttribute('data-tabsman-tab-id');
+    }
+}
+
+function handleTabDragOver(e) {
+    const panelElement = e.target.closest('.plugin-tabsman-panel-group');
+    if (panelElement) {
+        e.preventDefault();
+        
+        // 清理所有面板的高亮
+        document.querySelectorAll('.plugin-tabsman-panel-group').forEach(el => {
+            el.classList.remove('plugin-tabsman-panel-group-drag-over');
+        });
+        
+        // 为当前面板添加高亮
+        panelElement.classList.add('plugin-tabsman-panel-group-drag-over');
+    }
+}
+
+async function handleTabDrop(e) {
+    const panelElement = e.target.closest('.plugin-tabsman-panel-group');
+    if (panelElement) {
+        e.preventDefault();
+        await window.moveTabToPanel(dragTabId, panelElement.getAttribute('data-tabsman-panel-id'));
+    }
+}
+
+function handleTabDragEnd(e) {
+    const panelElement = e.target.closest('.plugin-tabsman-panel-group');
+    if (panelElement) {
+        panelElement.classList.remove('plugin-tabsman-panel-group-drag-over');
+    }
+}
+
+

@@ -686,6 +686,31 @@ window.moveTabToPanel = async function(tabId, newPanelId) {
         return false;
     }
 
+    // 如果删除的是活跃标签页，则先切换到上一个标签页
+    if (activeTabs[oldPanelId] === tab) {
+        const tabIndex = getOneSortedTabs(oldPanelId).findIndex(tab => tab.id === tabId);
+        const prevTabIndex = tabIndex === 0 ? tabIndex + 1 : tabIndex - 1;
+        const prevTab = getOneSortedTabs(oldPanelId)[prevTabIndex];
+
+        // 切换activeTab
+        tab.isActive = false;
+        prevTab.isActive = true;
+        activeTabs[oldPanelId] = prevTab;
+
+        // 导航到新的前台标签页
+        const isJournal = prevTab.currentBlockId instanceof Date;
+        orca.nav.goTo(
+            isJournal ? 'journal' : 'block',
+            isJournal ? { date: prevTab.currentBlockId } : { blockId: prevTab.currentBlockId },
+            prevTab.panelId
+        );
+        
+        // 检查目标标签页是否有历史记录，如果没有则填充初始历史（处理那种还未打开的后台tab页）
+        if (prevTab.backStack.length === 0) {
+            fillCurrentAccess();
+        }
+    }
+    
     // 更新数据库，并通知ui刷新
     tabIdSetByPanelId.get(oldPanelId).delete(tabId);
     tab.panelId = newPanelId;

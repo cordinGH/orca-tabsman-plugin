@@ -6,11 +6,12 @@
 } */
 
 /* group容器 */
-.plugin-tabsman-tabs{
+.plugin-tabsman-tabs.orca-favorites-items{
     display: flex;
     flex-direction: column;
     gap: .5rem;
     padding-top: 1px;
+    height: auto;
 }
 
 /* 面板条目 */

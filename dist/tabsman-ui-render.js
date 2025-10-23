@@ -148,6 +148,7 @@ async function createPanelItemElement(panelId) {
         collapseIcon.className += ' ti ti-chevron-down';
     } else {
         collapseIcon.className += ' ti ti-window-minimize';
+        collapseIcon.style.color = "var(--orca-color-primary-5)"
     } 
 
     // 面板标题
@@ -155,9 +156,10 @@ async function createPanelItemElement(panelId) {
     const title = document.createElement('div');
     title.className = 'plugin-tabsman-panel-title orca-fav-item-label';
     if (panelId === dockedPanelId) {
-        title.textContent = "Docked";
+        title.textContent = "停靠面板";
+        title.style.color = "var(--orca-color-primary-5)"
     } else {
-        title.textContent = `面板 ${panelId}`;
+        title.textContent = "面板 " + panelId.slice(0, 5);
     }
 
     // 创建新标签页按钮
@@ -361,9 +363,6 @@ function stopTabsRender() {
     // 清理所有订阅
     unsubscribeDockedPanelId = cleanupSubscription(unsubscribeDockedPanelId);
     unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
-
-    // 清理全局变量
-    dragTabId = null;
 }
 
 // 导出模块接口
@@ -437,10 +436,10 @@ function dockedpanelSubscribe() {
  * 设置标签页拖拽和放置事件
  * @returns {void}
  */
-let dragTabId = null;
 function setUpTabDragAndDrop() {
     tabsmanTabsEle.addEventListener('dragstart', handleTabDragStart);
     tabsmanTabsEle.addEventListener('dragover', handleTabDragOver);
+    tabsmanTabsEle.addEventListener('dragenter', handleTabDragEnter);
     tabsmanTabsEle.addEventListener('drop', handleTabDrop);
     tabsmanTabsEle.addEventListener('dragend', handleTabDragEnd);
 }
@@ -448,45 +447,55 @@ function setUpTabDragAndDrop() {
 function cleanupTabDragAndDrop() {
     tabsmanTabsEle.removeEventListener('dragstart', handleTabDragStart);
     tabsmanTabsEle.removeEventListener('dragover', handleTabDragOver);
+    tabsmanTabsEle.removeEventListener('dragenter', handleTabDragEnter);
     tabsmanTabsEle.removeEventListener('drop', handleTabDrop);
     tabsmanTabsEle.removeEventListener('dragend', handleTabDragEnd);
 }
 
+let dragTabId = null;
+let panelGroupElement = null;
 function handleTabDragStart(e) {
     const tabElement = e.target.closest('.plugin-tabsman-tab-item');
     if (tabElement) {
         dragTabId = tabElement.getAttribute('data-tabsman-tab-id');
+        panelGroupElement = e.target.closest('.plugin-tabsman-panel-group');
+        panelGroupElement.classList.add('plugin-tabsman-panel-group-drag-over');
     }
 }
 
+function handleTabDragEnter(e) {
+    // 约束只有切到新的group时，才执行逻辑，避免重复执行。
+    const newPanelElement = e.target.closest('.plugin-tabsman-panel-group');
+    if (newPanelElement && newPanelElement !== panelGroupElement) {
+        // 清理旧的group的样式
+        panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
+        // 设置新的group的样式
+        newPanelElement.classList.add('plugin-tabsman-panel-group-drag-over');
+        panelGroupElement = newPanelElement;
+    }
+}
+
+// 持续阻止默认行为，以支持drop事件。
 function handleTabDragOver(e) {
-    const panelElement = e.target.closest('.plugin-tabsman-panel-group');
-    if (panelElement) {
-        e.preventDefault();
-        
-        // 清理所有面板的高亮
-        document.querySelectorAll('.plugin-tabsman-panel-group').forEach(el => {
-            el.classList.remove('plugin-tabsman-panel-group-drag-over');
-        });
-        
-        // 为当前面板添加高亮
-        panelElement.classList.add('plugin-tabsman-panel-group-drag-over');
-    }
+    e.preventDefault();   
 }
 
+// 处理drop事件，移动标签页到目标面板。
 async function handleTabDrop(e) {
-    const panelElement = e.target.closest('.plugin-tabsman-panel-group');
-    if (panelElement) {
-        e.preventDefault();
-        await window.moveTabToPanel(dragTabId, panelElement.getAttribute('data-tabsman-panel-id'));
-    }
+    e.preventDefault();
+    await window.moveTabToPanel(dragTabId, panelGroupElement.getAttribute('data-tabsman-panel-id'));
+
+    // 清理数据，因为drop到可拖拽区域是不会触发end事件的。
+    panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
+    panelGroupElement = null;
+    dragTabId = null;
 }
 
-function handleTabDragEnd(e) {
-    const panelElement = e.target.closest('.plugin-tabsman-panel-group');
-    if (panelElement) {
-        panelElement.classList.remove('plugin-tabsman-panel-group-drag-over');
+// 确保任何情况都清理，例如没有触发drop事件时，也清理。
+async function handleTabDragEnd(e) {
+    if (panelGroupElement) {
+        panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
+        panelGroupElement = null;
+        dragTabId = null;
     }
 }
-
-

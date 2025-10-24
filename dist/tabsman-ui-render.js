@@ -155,11 +155,14 @@ async function createPanelItemElement(panelId) {
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
     const title = document.createElement('div');
     title.className = 'plugin-tabsman-panel-title orca-fav-item-label';
+    title.setAttribute("contenteditable", "true");
+    
+    // 加载保存的标题，如果没有则使用默认标题
+    const savedTitle = getPanelTitle(panelId);
+    title.textContent = savedTitle;
+    
     if (panelId === dockedPanelId) {
-        title.textContent = "停靠面板";
         title.style.color = "var(--orca-color-primary-5)"
-    } else {
-        title.textContent = "面板 " + panelId.slice(0, 5);
     }
 
     // 创建新标签页按钮
@@ -339,6 +342,9 @@ async function startTabsRender() {
         // 注册监听器
         tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
         setUpTabDragAndDrop();
+        tabsmanTabsEle.addEventListener('blur', handlePanelTitleBlur);
+        tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
+        tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
         dockedpanelSubscribe();
 
@@ -357,6 +363,10 @@ async function startTabsRender() {
 function stopTabsRender() {
     tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
     cleanupTabDragAndDrop();
+    tabsmanTabsEle.removeEventListener('blur', handlePanelTitleBlur);
+    tabsmanTabsEle.removeEventListener('keydown', handlePanelTitleEnter);
+    tabsmanTabsEle.removeEventListener('input', handlePanelTitleInput);
+    
     // 清理注入的外壳（包含所有渲染元素）
     cleanupTabsmanShell();
     
@@ -373,7 +383,7 @@ export {
 };
 
 
-
+/** ========== 停靠面板状态订阅函数 ========== */
 /**
  * 订阅停靠面板ID变化
  * 通过监听 orca.state.plugins 等待 dockedPanelState 暴露后再订阅
@@ -431,7 +441,7 @@ function dockedpanelSubscribe() {
 }
 
 
-
+/** ========== 标签页拖拽和放置事件处理函数 ========== */
 /**
  * 设置标签页拖拽和放置事件
  * @returns {void}
@@ -452,6 +462,7 @@ function cleanupTabDragAndDrop() {
     tabsmanTabsEle.removeEventListener('dragend', handleTabDragEnd);
 }
 
+/** 标签页拖拽和放置事件处理函数 */
 let dragTabId = null;
 let panelGroupElement = null;
 function handleTabDragStart(e) {
@@ -463,6 +474,7 @@ function handleTabDragStart(e) {
     }
 }
 
+/** 标签页拖入事件处理函数 */
 function handleTabDragEnter(e) {
     // 约束只有切到新的group时，才执行逻辑，避免重复执行。
     const newPanelElement = e.target.closest('.plugin-tabsman-panel-group');
@@ -498,4 +510,68 @@ async function handleTabDragEnd(e) {
         panelGroupElement = null;
         dragTabId = null;
     }
+}
+
+// ========== 面板标题编辑处理函数 ==========
+// 内存中存储面板标题（本次会话有效）
+const panelTitles = new Map();
+
+/**
+ * 处理面板标题输入事件（实时监听）
+ * @param {Event} e - 事件对象
+ * @param {string} panelId - 面板ID
+ */
+function handlePanelTitleInput(e) {
+    if (!e.target.matches('.plugin-tabsman-panel-title')) return;
+    const titleElement = e.target;
+    const currentText = titleElement.textContent;
+
+    if (currentText.length > 20) {
+        titleElement.textContent = currentText.substring(0, 20);
+        // 将光标移到末尾
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(titleElement);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+}
+
+
+/**
+ * 处理面板标题回车事件
+ * @param {Event} e - 事件对象
+ */
+function handlePanelTitleEnter(e) {
+    if (!e.target.matches('.plugin-tabsman-panel-title')) return;
+    const titleElement = e.target;
+    const panelId = titleElement.parentElement.dataset.tabsmanPanelId;
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const newTitle = titleElement.textContent.trim();
+        newTitle? panelTitles.set(panelId, newTitle) : panelTitles.delete(panelId);
+        titleElement.blur();
+    }
+}
+
+/**
+ * 处理面板标题失去焦点事件
+ * @param {Event} e - 事件对象
+ */
+function handlePanelTitleBlur(e) {
+    if (!e.target.matches('.plugin-tabsman-panel-title')) return;
+    const titleElement = e.target;
+    const panelId = titleElement.parentElement.dataset.tabsmanPanelId;
+    titleElement.textContent = getPanelTitle(panelId);
+}
+
+
+/**
+ * 获取面板标题
+ * @param {string} panelId - 面板ID
+ * @returns {string} 面板标题
+ */
+function getPanelTitle(panelId) {
+    return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId.slice(0, 5));
 }

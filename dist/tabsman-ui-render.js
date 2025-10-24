@@ -342,7 +342,7 @@ async function startTabsRender() {
         // 注册监听器
         tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
         setUpTabDragAndDrop();
-        tabsmanTabsEle.addEventListener('blur', handlePanelTitleBlur);
+        tabsmanTabsEle.addEventListener('focusout', handlePanelTitleBlur);
         tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
         tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
@@ -363,7 +363,7 @@ async function startTabsRender() {
 function stopTabsRender() {
     tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
     cleanupTabDragAndDrop();
-    tabsmanTabsEle.removeEventListener('blur', handlePanelTitleBlur);
+    tabsmanTabsEle.removeEventListener('focusout', handlePanelTitleBlur);
     tabsmanTabsEle.removeEventListener('keydown', handlePanelTitleEnter);
     tabsmanTabsEle.removeEventListener('input', handlePanelTitleInput);
     
@@ -551,7 +551,7 @@ function handlePanelTitleEnter(e) {
         e.preventDefault();
         const newTitle = titleElement.textContent.trim();
         newTitle? panelTitles.set(panelId, newTitle) : panelTitles.delete(panelId);
-        titleElement.blur();
+        titleElement.focusout();
     }
 }
 

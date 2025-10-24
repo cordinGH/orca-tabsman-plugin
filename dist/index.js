@@ -126,11 +126,22 @@ async function load(name) {
     // 注册开关侧边Tabs栏命令
     const sidebarTabOptions = document.querySelector('.orca-sidebar-tab-options');
     const tabOption = document.querySelector('.plugin-tabsman-tab-option');
+    const appDiv = document.body.querySelector(':scope > #app');
     orca.commands.registerCommand(
         'tabsman.toggleSidebarTabsman',
         () => {
-            sidebarTabOptions.classList.toggle('plugin-tabsman-selected');
-            tabOption.classList.toggle('orca-selected');
+            if (appDiv.classList.contains('sidebar-closed')) {
+                orca.commands.invokeCommand('core.toggleSidebar');
+                sidebarTabOptions.classList.add('plugin-tabsman-selected');
+                tabOption.classList.add('orca-selected');
+            } else {
+                if (sidebarTabOptions.classList.contains('plugin-tabsman-selected')) {
+                    orca.commands.invokeCommand('core.toggleSidebar');
+                } else {
+                    sidebarTabOptions.classList.add('plugin-tabsman-selected');
+                    tabOption.classList.add('orca-selected');
+                }
+            }
         },
         '[tabsman] 开启/关闭显示侧边Tabs栏'
     );

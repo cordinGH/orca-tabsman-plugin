@@ -61,19 +61,32 @@ async function injectTabsmanShell() {
         sidebarTabOptionsEl.appendChild(tabOptionEl);
 
         // 监听点击tab-option事件
-        sidebarTabOptionsEl.addEventListener('click', () => {
-            // 切换选中状态
-            sidebarTabOptionsEl.classList.toggle('plugin-tabsman-selected');
-            tabOptionEl.classList.toggle('orca-selected');
+        sidebarTabOptionsEl.addEventListener('click', (e) => {
+            // 如果tab-option已选中，则取消选中
+            if (e.target.classList.contains('plugin-tabsman-tab-option')) {
+                if (!sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) {
+                    sidebarTabOptionsEl.classList.add('plugin-tabsman-selected');
+                    tabOptionEl.classList.add('orca-selected');
+                }
+            } else {
+                if (sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) {
+                    sidebarTabOptionsEl.classList.remove('plugin-tabsman-selected');
+                    tabOptionEl.classList.remove('orca-selected');
+                }
+            }
         });
         
         // 保存完整的外壳对象（支持链式调用）到全局变量并返回
         tabsmanShell = {
+            parentElement: sidebarTabOptionsEl,
             tabOptionEl: tabOptionEl,
             hideableContainerEl: hideableContainer.element,
             tabsmanContainerEl: hideableContainer.tabsmanContainer.element,
             tabsmanTabsEl: hideableContainer.tabsmanContainer.tabsmanTabs.element,
         };
+        
+        // 设置Orca命令拦截
+        setOrcaCommandIntercept();
         
     } catch (error) {
         console.error('外壳注入失败:', error);
@@ -104,8 +117,41 @@ function cleanupTabsmanShell() {
         tabOptionEl.parentNode.removeChild(tabOptionEl);
     }
     
+    // 清理Orca命令拦截
+    cleanupOrcaCommandIntercept();
+    
     // 清理全局变量
     tabsmanShell = null;
+}
+
+
+let commandHandler = {
+    removeFn: (optionName) => {
+        if (tabsmanShell.parentElement.classList.contains('plugin-tabsman-selected')) {
+            tabsmanShell.parentElement.classList.remove('plugin-tabsman-selected');
+            tabsmanShell.tabOptionEl.classList.remove('orca-selected');
+            return orca.state.sidebarTab === optionName? false : true;
+        }
+        return true;
+    },
+    goFavorites: () => commandHandler.removeFn("favorites"),
+    goTags: () => commandHandler.removeFn("tags"),
+    goPages: () => commandHandler.removeFn("pages")
+}
+
+/** 设置Orca命令拦截 */
+function setOrcaCommandIntercept() {
+    orca.commands.registerBeforeCommand("core.sidebar.goFavorites", commandHandler.goFavorites);
+    orca.commands.registerBeforeCommand("core.sidebar.goTags", commandHandler.goTags);
+    orca.commands.registerBeforeCommand("core.sidebar.goPages", commandHandler.goPages);
+}
+
+/** 清理Orca命令拦截 */
+function cleanupOrcaCommandIntercept() {
+    orca.commands.unregisterBeforeCommand("core.sidebar.goFavorites", commandHandler.goFavorites);
+    orca.commands.unregisterBeforeCommand("core.sidebar.goTags", commandHandler.goTags);
+    orca.commands.unregisterBeforeCommand("core.sidebar.goPages", commandHandler.goPages);
+    commandHandler = null;
 }
 
 // 导出模块接口

@@ -224,17 +224,23 @@ async function handleTabsmanClick(e) {
             }
             renderTabsByPanel();
         } else {
-            // 如果点击的是停靠面板Tab是折叠状态，则切换到展开，但如果不是折叠状态且点击的本就是停靠面板前台标签页且面板是active，则切换折叠。
-            // 如果点击的是不是停靠面板Tab，且停靠面板不是折叠，则先切换到折叠。
-            if (panelId === dockedPanelId && window.dockedPanelIsCollapsed) {
-                await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
-            } else if (panelId === dockedPanelId && !window.dockedPanelIsCollapsed && tab.id === TabsmanCore.data.getActiveTabs()[panelId].id && orca.state.activePanel === dockedPanelId) {
-                await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
-            } else if (panelId !== dockedPanelId && !window.dockedPanelIsCollapsed) {
-                await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
-            }
+            // 存在停靠面板，则联动dockpanel插件，切换停靠面板的折叠状态。
+            if (dockedPanelId) {
+                const is2DockedPanel = panelId === dockedPanelId;
 
-            // 点击其他区域切换到目标标签页
+                if (is2DockedPanel && window.dockedPanelIsCollapsed) {
+                    // 如果点击的是停靠面板Tab，且停靠面板是折叠，则切换到展开。
+                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+                } else if (is2DockedPanel && !window.dockedPanelIsCollapsed && tab.id === TabsmanCore.data.getActiveTabs()[panelId].id && orca.state.activePanel === dockedPanelId) {
+                    // 如果点击的是停靠面板Tab，且停靠面板不是折叠，且点击的本就是停靠面板前台标签页且面板是active，则切换折叠。
+                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+                } else if (!is2DockedPanel && !window.dockedPanelIsCollapsed) {
+                    // 如果点击的是不是停靠面板Tab，且停靠面板不是折叠，则先切换到折叠。
+                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+                }
+            } 
+
+            // 不存在停靠面板，则不做上述联动操作，直接切换到目标标签页
             await TabsmanCore.actions.switchTab(tab.id);
         }
         return;
@@ -342,7 +348,7 @@ async function startTabsRender() {
         // 注册监听器
         tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
         setUpTabDragAndDrop();
-        tabsmanTabsEle.addEventListener('focusout', handlePanelTitleBlur);
+        tabsmanTabsEle.addEventListener('focusout', handlePanelTitleFocusout);
         tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
         tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
@@ -363,7 +369,7 @@ async function startTabsRender() {
 function stopTabsRender() {
     tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
     cleanupTabDragAndDrop();
-    tabsmanTabsEle.removeEventListener('focusout', handlePanelTitleBlur);
+    tabsmanTabsEle.removeEventListener('focusout', handlePanelTitleFocusout);
     tabsmanTabsEle.removeEventListener('keydown', handlePanelTitleEnter);
     tabsmanTabsEle.removeEventListener('input', handlePanelTitleInput);
     
@@ -551,7 +557,7 @@ function handlePanelTitleEnter(e) {
         e.preventDefault();
         const newTitle = titleElement.textContent.trim();
         newTitle? panelTitles.set(panelId, newTitle) : panelTitles.delete(panelId);
-        titleElement.focusout();
+        titleElement.blur();
     }
 }
 
@@ -559,7 +565,7 @@ function handlePanelTitleEnter(e) {
  * 处理面板标题失去焦点事件
  * @param {Event} e - 事件对象
  */
-function handlePanelTitleBlur(e) {
+function handlePanelTitleFocusout(e) {
     if (!e.target.matches('.plugin-tabsman-panel-title')) return;
     const titleElement = e.target;
     const panelId = titleElement.parentElement.dataset.tabsmanPanelId;

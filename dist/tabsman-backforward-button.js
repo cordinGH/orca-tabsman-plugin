@@ -207,7 +207,7 @@ async function handleHistoryButtonRightClick(e, stackType) {
  * 创建后退前进菜单
  * @param {Array} stackArrary - 栈数组
  * @param {string} stackType - 栈类型 ('back' 或 'forward')
- * @returns {HTMLElement} 返回菜单元素
+ * @returns {Promise<HTMLElement>} 返回菜单元素
  */
 async function createBackForwardMenu(stackArrary, stackType) {
     // 获取栈，如果是后退栈，先弹出栈顶元素（当前块）

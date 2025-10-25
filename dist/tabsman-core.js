@@ -349,7 +349,7 @@ function fillCurrentAccess() {
         view: activePanel.view,
         viewArgs: activePanel.viewArgs
     };
-    
+
     // 添加到tab的历史记录
     // 约束后退栈长度：如果达到最大值，先移除最旧元素
     if (activeTab.backStack.length >= HISTORY_CONFIG.MAX_BACK_STACK) {
@@ -358,7 +358,7 @@ function fillCurrentAccess() {
     activeTab.backStack.push(historyItem);
     activeTab.forwardStack = []; // 清空前进栈
     
-    console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
+    // console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
 }
 
 /**
@@ -686,31 +686,42 @@ window.moveTabToPanel = async function(tabId, newPanelId) {
         return false;
     }
 
-    // 如果删除的是活跃标签页，则先切换到上一个标签页
-    if (activeTabs[oldPanelId] === tab) {
+    // 如果被移走的是active面板的active-tab，则先执行navPreviousTab
+    if (tab.panelId === orca.state.activePanel && tab.isActive) {
+        await switchToPreviousTab();
+
+    } else if (activeTabs[oldPanelId] === tab) {
+        // 否则，如果只是非active面板的active-tab，则切换到上一个标签页作为active-tab
         const tabIndex = getOneSortedTabs(oldPanelId).findIndex(tab => tab.id === tabId);
         const prevTabIndex = tabIndex === 0 ? tabIndex + 1 : tabIndex - 1;
         const prevTab = getOneSortedTabs(oldPanelId)[prevTabIndex];
-
-        // 切换activeTab
         tab.isActive = false;
         prevTab.isActive = true;
         activeTabs[oldPanelId] = prevTab;
 
         // 导航到新的前台标签页
+        isInternalNavigation = true;
         const isJournal = prevTab.currentBlockId instanceof Date;
         orca.nav.goTo(
             isJournal ? 'journal' : 'block',
             isJournal ? { date: prevTab.currentBlockId } : { blockId: prevTab.currentBlockId },
             prevTab.panelId
         );
-        
-        // 检查目标标签页是否有历史记录，如果没有则填充初始历史（处理那种还未打开的后台tab页）
+
+        // 如果新的前台标签页没有历史记录，则填充初始历史。
         if (prevTab.backStack.length === 0) {
-            fillCurrentAccess();
+            const prevPanel = orca.nav.findViewPanel(prevTab.panelId, orca.state.panels);
+            prevTab.backStack.push({
+                activePanel: prevPanel.id,
+                view: prevPanel.view,
+                viewArgs: prevPanel.viewArgs
+            });            
         }
+
+        // 重置内部导航标志（不用重置，handle函数会自动重置
+        // isInternalNavigation = false;
     }
-    
+
     // 更新数据库，并通知ui刷新
     tabIdSetByPanelId.get(oldPanelId).delete(tabId);
     tab.panelId = newPanelId;

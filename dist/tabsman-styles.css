@@ -16,7 +16,7 @@
 
 /* 面板条目 */
 .plugin-tabsman-panel-item.orca-fav-item-item {
-    grid-template-columns: 0 auto 1fr auto;
+    grid-template-columns: auto 1fr auto;
 
     /* 面板折叠按钮 */
     &>.plugin-tabsman-panel-collapse-icon {

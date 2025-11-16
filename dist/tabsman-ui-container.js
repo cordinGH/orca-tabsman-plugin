@@ -127,10 +127,16 @@ function cleanupTabsmanShell() {
 
 let commandHandler = {
     removeFn: (optionName) => {
+        const bodyApp = document.querySelector("body>#app");
+        // 如果当前是tabs栏，则先移除tabs栏选中样式，再查看当前是否就是目标栏，不是，就返回true执行切换，是就false不用执行。
         if (tabsmanShell.parentElement.classList.contains('plugin-tabsman-selected')) {
             tabsmanShell.parentElement.classList.remove('plugin-tabsman-selected');
             tabsmanShell.tabOptionEl.classList.remove('orca-selected');
-            return orca.state.sidebarTab === optionName? false : true;
+
+            // 如果是关闭面板，就正常执行命令
+            if (bodyApp.className === "sidebar-closed") return true
+
+            return orca.state.sidebarTab !== optionName;
         }
         return true;
     },

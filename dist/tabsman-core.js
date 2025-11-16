@@ -155,9 +155,7 @@ async function generateTabNameAndIcon(blockId) {
         
         // 生成名称
         let name = '新标签页';
-        if (blockType === 'journal') {
-            name = reprProperty.value.date.toString().substring(0, 15);
-        } else if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType)) {
+        if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType)) {
             if (isAlias) {
                 name = block.aliases[0];
             } else if (block.text) {
@@ -172,7 +170,6 @@ async function generateTabNameAndIcon(blockId) {
         // 生成图标
         let icon = 'ti ti-cube';
         switch (blockType) {
-            case 'journal': icon = 'ti ti-calendar-smile'; break;
             case 'heading':
                 const headingLevel = reprProperty.value.level || 1;
                 switch (headingLevel) {
@@ -189,6 +186,8 @@ async function generateTabNameAndIcon(blockId) {
             case 'code': icon = 'ti ti-code'; break;
             case 'quote2': icon = 'ti ti-blockquote'; break;
             case 'image': icon = 'ti ti-photo'; break;
+            case 'video': icon = 'ti ti-movie'; break;
+            case 'whiteboard': icon = 'ti ti-chalkboard'; break;
             default: icon = 'ti ti-cube';
         }
 
@@ -224,7 +223,7 @@ async function updateTabProperties() {
         activeTab.name = tabInfo.name;
         activeTab.currentIcon = tabInfo.icon;
 
-        console.log(`[tabsman] 当前标签页 ${activeTab.id} 的属性已更新: 块ID: ${activeTab.currentBlockId}, 名称: ${activeTab.name}, 图标: ${activeTab.currentIcon}`);
+        // console.log(`[tabsman] 当前标签页 ${activeTab.id} 的属性已更新: 块ID: ${activeTab.currentBlockId}, 名称: ${activeTab.name}, 图标: ${activeTab.currentIcon}`);
         
         // 更新UI
         if (renderTabsCallback) renderTabsCallback();
@@ -357,6 +356,14 @@ function fillCurrentAccess() {
     }
     activeTab.backStack.push(historyItem);
     activeTab.forwardStack = []; // 清空前进栈
+
+    // 如果是pinned标签页，就新开一个tab并跳转
+    if (activeTab.isPinned === true && activeTab.backStack.length > 1) {
+        navigateTabBack(activeTab)
+        activeTab.backStack.pop()
+        activeTab.forwardStack = []
+        createTab(Object.values(historyItem.viewArgs)[0], true);
+    }
     
     // console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
 }
@@ -369,7 +376,7 @@ function fillCurrentAccess() {
 function handleHistoryChange() {
     // 如果上一次是内部导航操作，重置标志并直接返回
     if (isInternalNavigation) {
-        console.log("[tabsman] 本次为内部导航操作，不会产生新的访问记录,无需填充")
+        // console.log("[tabsman] 本次为内部导航操作，不会产生新的访问记录,无需填充")
         isInternalNavigation = false;
         // 异步更新属性（内部会刷新渲染），不阻塞
         updateTabProperties();
@@ -414,7 +421,7 @@ async function navigateTabBack(tab) {
     // 导航到新的当前项
     orca.nav.goTo(newCurrent.view, newCurrent.viewArgs);
     
-    console.log(`[tabsman] 标签页后退: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
+    // console.log(`[tabsman] 标签页后退: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
     
     return true;
 }
@@ -442,7 +449,7 @@ async function navigateTabForward(tab) {
     // 导航到取出的项
     orca.nav.goTo(item.view, item.viewArgs);
         
-    console.log(`[tabsman] 标签页前进: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
+    // console.log(`[tabsman] 标签页前进: 后退栈长度${tab.backStack.length}, 前进栈长度${tab.forwardStack.length}`);
     
     return true;
 }
@@ -1047,7 +1054,7 @@ async function start(callback = null) {
             await createTabForNewPanel(panelId);
         }
         
-        console.log(`[tabsman] 共发现了 ${panelIds.length} 个面板:`, panelIds, '，均已为其创建初始标签页。');
+        console.log(`[tabsman] 本次启动共发现了 ${panelIds.length} 个面板:`, panelIds, '，现已创建初始标签页。');
     } catch (error) {
         console.error('[tabsman] 创建初始标签页失败:', error);
     }

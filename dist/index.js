@@ -45,7 +45,6 @@ async function clearAllData() {
  */
 async function load(name) {
     pluginName = name;
-    console.log(`=== ${pluginName} 加载中 ===`);
 
     // 注入样式文件
     orca.themes.injectCSSResource(`${pluginName}/dist/tabsman-styles.css`, pluginName);
@@ -205,7 +204,6 @@ async function load(name) {
     
     // 启动前进后退按钮模块
     startbackforwardbutton();
-    console.log(`=== ${pluginName} 加载完毕 ===`);
 }
 
 

@@ -140,23 +140,24 @@ async function generateTabNameAndIcon(blockId) {
 
     try {
         const block = await orca.invokeBackend("get-block", blockId);
-        
-        // 检查是否启用显示为别名
-        const asAliasProperty = block.properties.find(p => p.name === '_asAlias');
-        const isAlias = asAliasProperty && asAliasProperty.value === true;
-        
-        const reprProperty = block.properties.find(p => p.name === '_repr');
 
-        if (!reprProperty || !reprProperty.value) {
-            return { name: '新标签页', icon: 'ti ti-cube' };
-        }
+        const reprProperty = block.properties.find(p => p.name === '_repr');
+        if (!reprProperty || !reprProperty.value) return { name: '新标签页', icon: 'ti ti-cube' };
 
         const blockType = reprProperty.value.type;
         
         // 生成名称
         let name = '新标签页';
         if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType)) {
-            if (isAlias) {
+            // 检查是否具有"显示为别名"
+            // 如果没找到_asAlias，说明是默认状态（显示为别名）
+            let showAlias = false;
+            if (block.aliases.length != 0) {
+                const asAliasProperty = block.properties.find(p => p.name === '_asAlias');   
+                showAlias = asAliasProperty?asAliasProperty.value : true;
+            }
+
+            if (showAlias) {
                 name = block.aliases[0];
             } else if (block.text) {
                 name = block.text.substring(0, 30) + (block.text.length > 30 ? '...' : '');

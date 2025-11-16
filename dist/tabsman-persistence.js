@@ -254,6 +254,9 @@ async function restoreTabs(rawTabArray, tabType) {
             pinnedTabArray = tabArray;
             // 注册到core数据结构
             for (const tab of tabArray) {
+                const nameAndIcon = await Core.generateTabNameAndIcon(tab.currentBlockId);
+                tab.name = nameAndIcon.name;
+                tab.currentIcon = nameAndIcon.icon
                 Core.getAllTabs()[tab.id] = tab;
                 Core.getTabIdSetByPanelId().get(currentPanelId).add(tab.id);
             }

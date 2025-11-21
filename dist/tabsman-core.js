@@ -192,6 +192,15 @@ async function generateTabNameAndIcon(blockId) {
             default: icon = 'ti ti-cube';
         }
 
+        // 版本1.8.0，判断是否为标签从而覆盖icon，如果块有别名，但不在别名列表，则说明是标签，反之说明是别名块
+        if (block.aliases.length != 0){
+            const blockAlias = block.aliases[0];
+            const blockId = block.id;
+            const aliasBlockIdList = (await orca.invokeBackend("get-aliased-blocks", blockAlias, 0, 99999))[1];
+            icon = aliasBlockIdList.includes(blockId) ? "ti ti-file" : "ti ti-hash"
+        }
+        
+
         return { name, icon };
     } catch (error) {
         console.error('[tabsman] 生成标签页信息失败:', error);
@@ -385,6 +394,7 @@ function handleHistoryChange() {
     }
     
     // 立即填充当前访问记录到当前标签页的历史栈
+    // console.log("__________触发历史填充")
     fillCurrentAccess();
     
     // 异步更新标签页属性（内部会刷新渲染），不阻塞历史记录填充

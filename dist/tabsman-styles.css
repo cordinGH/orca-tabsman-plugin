@@ -11,7 +11,7 @@
     flex-direction: column;
     gap: .5rem;
     padding-top: 1px;
-    height: auto;
+    height: 100%;
 }
 
 /* 面板条目 */

@@ -165,11 +165,19 @@ function wakeTabArray(rawTabArray, tabType = "") {
     }
 
     const currentPanelId = orca.state.activePanel;
+    let isWorkspace = false
+    if (tabType === "workspace") {
+        tabType = "recently-closed"
+        isWorkspace = true
+    }
+    
     switch (tabType) {
         case "recently-closed": {
             for (let i = 0; i < rawTabArray.length; i++) {
                 const rawTab = rawTabArray[i];
-                rawTab.panelId = currentPanelId;
+
+                if(!isWorkspace) rawTab.panelId = currentPanelId;
+
                 // 转换 backStack
                 for (let j = 0; j < rawTab.backStack.length; j++) {
                     const item = rawTab.backStack[j];
@@ -302,5 +310,6 @@ export {
     addAndSaveFavoriteBlock,
     removeAndSaveFavoriteBlock,
     restoreFavoriteBlocks,
-    getFavoriteBlockArray
+    getFavoriteBlockArray,
+    wakeTabArray
 };

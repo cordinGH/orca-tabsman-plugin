@@ -24,7 +24,8 @@
  */
 
 // 导入持久化模块
-import { addAndSaveTab, removeAndSaveTab, restoreTabs, restoreFavoriteBlocks, getFavoriteBlockArray} from './tabsman-persistence.js';
+import { addAndSaveTab, removeAndSaveTab, restoreTabs, restoreFavoriteBlocks, getFavoriteBlockArray, wakeTabArray } from './tabsman-persistence.js';
+import * as WorkspaceRender from './tabsman-workspace.js'
 
 // 创建持久化命名空间
 const TabsmanPersistence = {
@@ -32,7 +33,8 @@ const TabsmanPersistence = {
     removeAndSaveTab,
     restoreTabs,
     restoreFavoriteBlocks,
-    getFavoriteBlockArray
+    getFavoriteBlockArray,
+    wakeTabArray
 };
 
 /**
@@ -329,6 +331,13 @@ function setupSubscription() {
     // 监听全局历史变化，触发导航处理
     let lastHistoryLength = orca.state.panelBackHistory.length;
     const backHistoryUnsubscribe = subscribe(orca.state.panelBackHistory, () => {
+
+        // 切换工作区期间重置lastHistoryLength后直接return
+        if (workspaceSwitching) {
+            lastHistoryLength = 0
+            return
+        }
+
         const currentLength = orca.state.panelBackHistory.length;
         // 不处理历史记录被删除的情况（虎鲸1.41版本关闭面板会删除该面板的历史记录）
         if (currentLength >= lastHistoryLength) {
@@ -388,16 +397,12 @@ function handleHistoryChange() {
     if (isInternalNavigation) {
         // console.log("[tabsman] 本次为内部导航操作，不会产生新的访问记录,无需填充")
         isInternalNavigation = false;
-        // 异步更新属性（内部会刷新渲染），不阻塞
         updateTabProperties();
         return;
     }
     
-    // 立即填充当前访问记录到当前标签页的历史栈
-    // console.log("__________触发历史填充")
+    // 非内部导航则进行填充历史
     fillCurrentAccess();
-    
-    // 异步更新标签页属性（内部会刷新渲染），不阻塞历史记录填充
     updateTabProperties();
 }
 
@@ -573,7 +578,7 @@ async function switchTab(tabId) {
     }
 
     if (activeTab === tab) {
-        console.log(`[tabsman] 当前就在目标标签页，无需切换`);
+        orca.notify("info", "[tabsman] 当前已在该标签页")
         return true;
     } else {
         // 重新标记活跃标签页
@@ -604,13 +609,9 @@ async function switchTab(tabId) {
         isJournal ? { date: tab.currentBlockId } : { blockId: tab.currentBlockId },
         tab.panelId
     );
-    
-    // 检查目标标签页是否有历史记录，如果没有则填充初始历史（处理那种还未打开的后台tab页）
-    if (tab.backStack.length === 0) {
-        fillCurrentAccess();
-    }
 
-    console.log(`[tabsman] 已切换到标签页 ${tab.id} （名称：${tab.name}）`);    
+    // 目标tab从未打开则填充一次当前历史（内部导航不会触发历史填充）
+    if (tab.backStack.length === 0) fillCurrentAccess()
     return true;
 }
 
@@ -641,8 +642,8 @@ async function deleteTab(tabId) {
 
     // 【持久化处理】保存删除的标签页到持久化模块
     await TabsmanPersistence.addAndSaveTab(tab, "recently-closed");    
-    // 【持久化处理】如果是置顶标签页，从持久化数据中移除
-    if (tab.isPinned) {
+    // 【持久化处理】如果是置顶标签页，且不在工作区，则从持久化数据中移除
+    if (tab.isPinned && !inWorkspace) {
         await TabsmanPersistence.removeAndSaveTab(tabId, "pinned");
     }
 
@@ -774,7 +775,8 @@ async function pinTab(tabId) {
     if (renderTabsCallback) renderTabsCallback();
     
     // 持久化
-    await TabsmanPersistence.addAndSaveTab(tab, "pinned");
+    // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
+    if (!inWorkspace) await TabsmanPersistence.addAndSaveTab(tab, "pinned")
     return true;
 }
 
@@ -806,9 +808,205 @@ async function unpinTab(tabId) {
     if (renderTabsCallback) renderTabsCallback();
     
     // 移除对应数据
-    await TabsmanPersistence.removeAndSaveTab(tabId, "pinned");
+    // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
+    if (!inWorkspace) await TabsmanPersistence.removeAndSaveTab(tabId, "pinned")
     return true;
 }
+
+
+/* ————————————————————————————————————————————————————————————————————————————————————————————————— */
+/* ———————————————————————————————————————实现工作区————————————————————————————————————————————————— */
+/* ————————————————————————————————————————————————————————————————————————————————————————————————— */
+
+// 保存工作空间
+async function saveWorkspace(name){
+    const sname = String(name)
+    // 时间戳前缀用于排序（getDataKeys获取的数组是按照keys的码值排序的）
+    // 【变更】不再刻意重名，只禁止恶意重名：一个时间戳内连续生成相同name
+    const saveName = String(Date.now()) + "_" + sname
+
+    const existName = await orca.plugins.getData('tabsman-workspace', saveName)
+    if (existName || existName === "tabsman-workspace-exit"){
+        orca.notify("info", "[tabsman]name已存在。另外，name不可使用tabsman-workspace-exit");
+        return ""
+    }    
+    await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));
+    orca.notify("success", "[tabsman]新工作区创建成功！");
+    return saveName
+
+    // 【变更】不再禁止重名
+    // TODO const hasPrefix = sname.indexOf("_") === 13 
+    // const existName = await orca.plugins.getData('tabsman-workspace', sname)
+    // if (existName || existName === "tabsman-workspace-exit"){
+    //     orca.notify("info", "[tabsman]name已存在。另外，name不可使用tabsman-workspace-exit");
+    //     return 0
+    // }
+    // await orca.plugins.setData('tabsman-workspace', sname, JSON.stringify(tabs));
+    // orca.notify("success", "[tabsman]新工作区创建成功！");
+    // return 1
+}
+
+// 显示所有的工作空间name
+async function getAllWorkspace(){
+    const keys = await orca.plugins.getDataKeys("tabsman-workspace")
+    // console.log("Stored tabsman-workspace names:", keys)
+
+    // 【变更】不再去除前缀
+    // const cleanKeys = keys.map(k => k.slice(k.indexOf('_') + 1));
+
+    return keys
+}
+
+// 删除指定name的工作空间，返回值1用于删除时是否正处于该工作区
+async function deleteWorkspace(name) {
+    const sname = String(name)
+    await orca.plugins.removeData("tabsman-workspace", sname)
+    orca.notify("success", "[tabsman]工作区删除成功");
+    // 正在工作区就先退出
+    if (inWorkspace) {
+        exitWorkspace()
+        return 1
+    }
+    return 0
+}
+
+// 删除所有的工作空间
+function deleteAllWorkspace() {
+    // 正在工作区就先退出
+    if (inWorkspace) exitWorkspace()
+    orca.plugins.clearData("tabsman-workspace")
+}
+
+// 退出当前工作空间
+function exitWorkspace() {
+    openWorkspace("tabsman-workspace-exit")
+}
+
+// 进入工作空间
+// 只有先进入工作空间后，才实时同步更新=>保存后需要进入才可实时更新。进入后inWorkspace改为true
+let inWorkspace = false
+let openWorkspaceName = ""
+
+// 标记正在切换工作空间
+let workspaceSwitching = false
+async function openWorkspace(name){
+    const sname = String(name)
+
+    if (openWorkspaceName === sname) {
+        orca.notify("info", "[tabsman]当前已在该工作空间")
+        return
+    }
+    
+    // 读取持久化数据
+    const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname);
+    if (!workspaceRaw) {
+        orca.notify("info", "[tabsman]该工作空间数据不存在")
+        return
+    }
+
+    // 如果当前不在工作空间，则先存储一下退出点再进入工作区。
+    if (!inWorkspace) {
+        inWorkspace = true
+        await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
+    }
+
+    // 如果进入的工作区是退出点，则重置退出点；反之 更新当前工作区name
+    if (sname === "tabsman-workspace-exit"){
+        inWorkspace = false
+        openWorkspaceName = ""
+        await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
+    } else {
+        openWorkspaceName = sname
+    }
+
+
+    // 恢复工作区tabs数据
+    let workspaceTabs = {};
+    let workspaceActiveTabs = {};
+    let workspaceTabIdSetByPanelId = new Map();
+    const workspaceValue = TabsmanPersistence.wakeTabArray(Object.values(JSON.parse(workspaceRaw)), "workspace");
+    for (const tab of workspaceValue) {
+        const tabId = tab.id
+        const tabPanelId = tab.panelId
+
+        // 准备tabs
+        workspaceTabs[tabId] = tab
+
+        // 准备activeTabs
+        if (tab.isActive) {
+            workspaceActiveTabs[tabPanelId] = tab
+        }
+
+        // 准备TabIdSetByPanelId
+        if (!workspaceTabIdSetByPanelId.has(tabPanelId)) {
+            workspaceTabIdSetByPanelId.set(tabPanelId, new Set())
+        }
+        workspaceTabIdSetByPanelId.get(tabPanelId).add(tabId)
+    }
+    tabs = workspaceTabs
+    activeTabs = workspaceActiveTabs
+    tabIdSetByPanelId = workspaceTabIdSetByPanelId
+
+
+
+    // 新建新的面板
+    // 临时面板, 用作创建新面板的坐标
+    workspaceSwitching = true
+    const tmp = await originalAddTo(orca.state.activePanel, "right")
+    orca.nav.closeAllBut(tmp)
+
+    // 遍历activetab以准备新面板
+    const workspaceActiveTabsValue = Object.values(workspaceActiveTabs);
+    const workspaceTabsValue = Object.values(workspaceTabs);
+    const newPanelIds = []
+    // 清除旧的排序缓存
+    sortedTabsByPanelId.clear()
+    for (const tab of workspaceActiveTabsValue) {
+        const blockId = tab.currentBlockId
+        const isDate = blockId instanceof Date;
+        const viewpanel = {
+            view: isDate? "journal" : "block",
+            viewArgs: isDate? {date: blockId}:{blockId},
+            viewState: {}
+        }
+
+        // 调用原始的addTo，以确保不改变tabsman数据结构
+        const newPanelId = await originalAddTo(orca.state.activePanel, "left", viewpanel)
+        newPanelIds.push(newPanelId)
+        const oldPanelId = tab.panelId
+
+        // 更新数据结构的面板id
+        workspaceActiveTabs[newPanelId] = tab
+        delete workspaceActiveTabs[oldPanelId]
+        workspaceTabIdSetByPanelId.set(newPanelId,workspaceTabIdSetByPanelId.get(oldPanelId))
+        workspaceTabIdSetByPanelId.delete(oldPanelId)
+
+        // 修改该面板所有tab对象的面板id
+        workspaceTabsValue.forEach(tab => {
+            if (tab.panelId === oldPanelId) tab.panelId = newPanelId
+        })
+
+        // 更新排序
+        updateSortedTabsCache(newPanelId)
+    }
+
+    orca.nav.close(tmp)
+
+    if (renderTabsCallback) renderTabsCallback();
+
+    workspaceSwitching = false
+}
+window.getAllWS = getAllWorkspace
+window.deleteWS = deleteWorkspace
+window.deleteAllWS = deleteAllWorkspace
+window.saveWS = saveWorkspace
+window.openWS = openWorkspace
+window.exitWS = exitWorkspace
+
+/* —————————————————————————————————————————————————————————————————————————————————————————————————— */
+/* —————————————————————————————————————————————————————————————————————————————————————————————————— */
+/* —————————————————————————————————————————————————————————————————————————————————————————————————— */
+
 
 
 /**
@@ -1049,7 +1247,13 @@ async function start(callback = null) {
     // console.log('\n=== [tabsman] tabsman管理器启动 ===');
     
     // 设置UI渲染回调函数
-    renderTabsCallback = callback;
+    // 2025年11月23日 适配工作区的更新
+    renderTabsCallback = async function (){
+        callback();
+        if (inWorkspace){
+            await orca.plugins.setData('tabsman-workspace', openWorkspaceName, JSON.stringify(tabs));
+        }
+    }
     
     // 保存原始API函数
     originalAddTo = orca.nav.addTo;
@@ -1111,10 +1315,12 @@ async function start(callback = null) {
     window.getTabIdSetByPanelId = getTabIdSetByPanelId;
     window.getOneSortedTabs = getOneSortedTabs;
     window.getAllSortedTabs = getAllSortedTabs;
-    
-    // 暴露 show 函数到全局（调试）
-    window.showSummary = showSummary;
-    window.showTabDetails = showTabDetails;
+
+    /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
+    // 每次启动时先重置退出点
+    await orca.plugins.removeData("tabsman-workspace","tabsman-workspace-exit")
+    WorkspaceRender.startWSRender()
+    /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
 }
 
 /**
@@ -1175,87 +1381,11 @@ function destroy() {
     delete window.getTabIdSetByPanelId;
     delete window.getOneSortedTabs;
     delete window.getAllSortedTabs;
-    delete window.showSummary;
-    delete window.showTabDetails;
     
     // 清理UI渲染回调函数
     renderTabsCallback = null;
 }
 
-// ==================== 调试函数 ====================
-
-/**
- * 显示标签页管理器摘要
- * 输出所有标签页的统计信息和详细信息
- */
-function showSummary() {
-    console.log('\n=== [tabsman] 标签页管理器摘要 ===');
-    console.log(`[tabsman] 总标签页数量: ${Object.keys(tabs).length}，总面板数量: ${Object.keys(tabIdSetByPanelId).length}`);
-    
-    // 按面板分组显示
-    for (const [panelId, tabIdSet] of tabIdSetByPanelId) {
-        console.log(`[tabsman] \n面板ID:${panelId}，标签页数量:${tabIdSet.size}`);
-        const activeTab = activeTabs[panelId];
-        console.log(`[tabsman]   活跃标签页ID: ${activeTab.id}`);
-        console.log(`[tabsman]     名称: ${activeTab.name}`);
-        console.log(`[tabsman]     当前块ID: ${activeTab.currentBlockId}`);
-        console.log(`[tabsman]     后退栈长度: ${activeTab.backStack.length} (栈顶为当前访问)`);
-        console.log(`[tabsman]     前进栈长度: ${activeTab.forwardStack.length}`);
-        
-        for (const tabId of tabIdSet) {
-            if (tabId === activeTab.id) continue;
-            const tab = tabs[tabId];
-            if (tab) {
-                console.log(`[tabsman]   后台标签页ID: ${tabId}`);
-                console.log(`[tabsman]     名称: ${tab.name}`);
-                console.log(`[tabsman]     当前块ID: ${tab.currentBlockId}`);
-                console.log(`[tabsman]     后退栈长度: ${tab.backStack.length} (栈顶为当前访问)`);
-                console.log(`[tabsman]     前进栈长度: ${tab.forwardStack.length}`);
-            }
-        }
-    }
-}
-
-/**
- * 输出指定标签页的详细信息
- * @param {string} tabId - 标签页ID
- */
-async function showTabDetails(tabId) {
-    const tab = tabs[tabId];
-    
-    if (!tab) {
-        console.warn(`[tabsman] 标签页 ${tabId} 不存在`);
-        return;
-    }
-    console.log(`[tabsman] 归属面板ID: ${tab.panelId}`);
-    console.log(`[tabsman] \n后退栈长度: ${tab.backStack.length}(栈顶为当前访问)`);
-    for (let index = 0; index < tab.backStack.length; index++) {
-        const history = tab.backStack[index];
-        const isBackStackTop = index === tab.backStack.length - 1;
-        const marker = isBackStackTop ? '→ ' : '   ';
-        if (history.view === 'block' && history.viewArgs?.blockId) {
-            const block = await orca.invokeBackend("get-block", history.viewArgs.blockId);
-            console.log(`[tabsman] ${marker}[${index}] 视图类型: ${history.view}，块ID: ${history.viewArgs.blockId}，块类型: ${block.properties.find(prop => prop.name === '_repr').value.type}，块别名：${block.aliases[0]}  块文本：${block.text}`);
-        } else if (history.view === 'journal' && history.viewArgs?.date) {
-            const block = await orca.invokeBackend("get-block", history.viewArgs.blockId);
-            console.log(`[tabsman] ${marker}[${index}] 视图类型: ${history.view}，日期: ${history.viewArgs.date}`);
-        }
-    }
-    
-    console.log(`[tabsman] \n前进栈长度: ${tab.forwardStack.length}`);
-    if (tab.forwardStack.length === 0) {
-        return;
-    }
-    for (let index = 0; index < tab.forwardStack.length; index++) {
-        const history = tab.forwardStack[index];
-        if (history.view === 'block' && history.viewArgs?.blockId) {
-            const block = await orca.invokeBackend("get-block", history.viewArgs.blockId);
-            console.log(`[tabsman]    [${index}] 视图类型: ${history.view}，块ID: ${history.viewArgs.blockId}，块类型: ${block.properties.find(prop => prop.name === '_repr').value.type}，块别名：${block.aliases[0]}  块文本：${block.text}`);
-        } else if (history.view === 'journal' && history.viewArgs?.date) {
-            console.log(`[tabsman]    [${index}] 视图类型: ${history.view}，日期: ${history.viewArgs.date}`);
-        }
-    }
-}
 
 // ==================== 数据访问函数 ====================
 

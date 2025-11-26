@@ -863,7 +863,7 @@ async function deleteWorkspace(name) {
     await orca.plugins.removeData("tabsman-workspace", sname)
     orca.notify("success", "[tabsman]工作区删除成功");
     // 正在工作区就先退出
-    if (workspaceNow !== "") {
+    if (workspaceNow === sname) {
         exitWorkspace()
         return 1
     }

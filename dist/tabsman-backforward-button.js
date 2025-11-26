@@ -7,6 +7,8 @@ let forwardButton = orcaForwardButton.cloneNode(true);
 let headbar = document.querySelector('#headbar');
 let currentPopup = null;
 
+const createDomWithClass = window.pluginTabsman.createDomWithClass
+const closePopupwithAnimation = window.pluginTabsman.closePopupwithAnimation
 
 /**
  * 启动后退前进按钮模块
@@ -20,8 +22,8 @@ async function startbackforwardbutton() {
     orcaForwardButton.replaceWith(forwardButton);
     
     // 监听新创建的按钮（右键触发）
-    backButton.addEventListener('contextmenu', handleBackButtonRightClick);
-    forwardButton.addEventListener('contextmenu', handleForwardButtonRightClick);
+    backButton.addEventListener('contextmenu', handleHistoryButtonRightClick);
+    forwardButton.addEventListener('contextmenu', handleHistoryButtonRightClick);
     
     // 监听新创建的按钮（左键触发）
     backButton.addEventListener('click', handleBackButtonLeftClick);
@@ -29,10 +31,6 @@ async function startbackforwardbutton() {
 
     // 注册item点击跳转
     headbar.addEventListener('click', handleHeadbarLeftClick);
-    
-    // 注册全局关闭弹窗事件监听器
-    document.addEventListener('keydown', handleClosePopup);
-    document.addEventListener('click', handleClosePopup);
 }
 
 
@@ -42,17 +40,13 @@ async function startbackforwardbutton() {
  */
 function stopbackforwardbutton() {
     // 移除新按钮的事件监听器
-    backButton.removeEventListener('contextmenu', handleBackButtonRightClick);
-    forwardButton.removeEventListener('contextmenu', handleForwardButtonRightClick);
+    backButton.removeEventListener('contextmenu', handleHistoryButtonRightClick);
+    forwardButton.removeEventListener('contextmenu', handleHistoryButtonRightClick);
     backButton.removeEventListener('click', handleBackButtonLeftClick);
     forwardButton.removeEventListener('click', handleForwardButtonLeftClick);
     
     // 移除headbar的事件监听器
     headbar.removeEventListener('click', handleHeadbarLeftClick);
-    
-    // 移除关闭弹窗事件监听器
-    document.removeEventListener('keydown', handleClosePopup);
-    document.removeEventListener('click', handleClosePopup);
 
     // 恢复原始按钮
     backButton.replaceWith(orcaBackButton);
@@ -91,28 +85,38 @@ function handleForwardButtonLeftClick(e) {
  * @param {KeyboardEvent|MouseEvent} e - 键盘或鼠标事件对象
  * @returns {void}
  */
-function handleClosePopup(e) {
+async function handleClosePopup(e) {
     if (currentPopup) {
         // 如果是键盘事件，检查是否为ESC键
-        if (e.type === 'keydown' && e.key !== 'Escape') {
-            return;
+        let needClose = false
+        if (e.type === 'keydown' && e.key === 'Escape') {
+            needClose = true
         }
         
         // 如果点击的元素包含data-tabsman-backforward-block-id属性，执行特定逻辑
-        const targetElement = e.target.closest('[data-tabsman-backforward-block-id]');
-        if (e.type === 'click' && targetElement) {
-            const blockId = targetElement.getAttribute('data-tabsman-backforward-block-id');
-            const view = targetElement.getAttribute('data-tabsman-backforward-view');
-            if (view === 'journal') {
-                orca.nav.goTo(view, {date: new Date(blockId)});
-            } else {
-                orca.nav.goTo(view, {blockId: blockId});
+        if (e.type === 'click'){
+            needClose = true
+            const targetElement = e.target.closest('[data-tabsman-backforward-block-id]')
+            if (targetElement) {
+                const blockId = targetElement.getAttribute('data-tabsman-backforward-block-id')
+                const view = targetElement.getAttribute('data-tabsman-backforward-view')
+                if (view === 'journal') {
+                    orca.nav.goTo(view, {date: new Date(blockId)})
+                } else {
+                    orca.nav.goTo(view, {blockId: blockId})
+                }
             }
-        } 
-
+        }
+        
         // 关闭弹窗
-        currentPopup.remove();
-        currentPopup = null;
+        if (needClose) {
+            await closePopupwithAnimation(currentPopup)
+            currentPopup = null;
+            // 移除关闭弹窗事件监听器
+            document.removeEventListener('keydown', handleClosePopup);
+            document.removeEventListener('click', handleClosePopup);
+            orca.notify("success", "[tabsman] 移除历史菜单监听");
+        }
     }
 }
 
@@ -142,31 +146,12 @@ function handleHeadbarLeftClick(e) {
 // ———————————————————————————————————————————————————————按钮右键事件———————————————————————————————————————————————————————
 
 /**
- * 处理后退按钮右键点击事件
- * @param {Event} e - 事件对象
- * @returns {Promise<void>}
- */
-async function handleBackButtonRightClick(e) {
-    await handleHistoryButtonRightClick(e, 'back');
-}
-
-/**
- * 处理前进按钮右键点击事件
- * @param {Event} e - 事件对象
- * @returns {Promise<void>}
- */
-async function handleForwardButtonRightClick(e) {
-    await handleHistoryButtonRightClick(e, 'forward');
-}
-
-
-/**
  * 处理后退前进按钮右键点击事件
  * @param {Event} e - 事件对象
  * @param {string} stackType - 栈类型 ('back' 或 'forward')
  * @returns {Promise<void>}
  */
-async function handleHistoryButtonRightClick(e, stackType) {
+async function handleHistoryButtonRightClick(e) {
     // 判断是否已有弹窗，有则先移除
     if (currentPopup) {
         currentPopup.remove();
@@ -176,6 +161,8 @@ async function handleHistoryButtonRightClick(e, stackType) {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
+
+    const stackType = backButton.contains(e.target)? "back" : "forward"
     let stack = stackType === 'back' ? TabsmanCore.getActiveTabs()[orca.state.activePanel].backStack : TabsmanCore.getActiveTabs()[orca.state.activePanel].forwardStack;
     if ((stackType === 'back' && stack.length <= 1) || (stackType === 'forward' && stack.length === 0)) {
         orca.notify("info", `[tabsman] 当前标签页暂无${stackType === 'back' ? '后退' : '前进'}历史`);
@@ -184,12 +171,11 @@ async function handleHistoryButtonRightClick(e, stackType) {
         let popupEle = document.createElement('div');
         popupEle.className = 'orca-popup plugin-tabsman-history-popup';
         popupEle.setAttribute('contenteditable', 'false');
-        popupEle.style = {zIndex: 399, transformOrigin: 'center top', position: 'absolute', pointerEvents: 'auto', willChange: 'opacity, scale'};
+        Object.assign(popupEle.style, { zIndex: '399', transformOrigin: 'left top' });
         // 传递一个栈副本用于渲染菜单，避免修改原始栈数据
         popupEle.appendChild(await createBackForwardMenu([...stack], stackType));
         // 添加到headbar，并定位弹窗到按钮下方
         headbar.appendChild(popupEle);
-
         
         // 定位弹窗到按钮下方
         const buttonEle = stackType === 'back' ? backButton : forwardButton;
@@ -199,6 +185,11 @@ async function handleHistoryButtonRightClick(e, stackType) {
         
         // 保存当前弹窗引用
         currentPopup = popupEle;
+
+        // 移除关闭弹窗事件监听器
+        document.addEventListener('keydown', handleClosePopup);
+        document.addEventListener('click', handleClosePopup);
+        orca.notify("success", "[tabsman] 添加历史菜单监听");
     }
 }
 
@@ -257,21 +248,16 @@ function createMenuItem(stackItemInfo) {
     ele.className = 'orca-menu-text';
     
     // 创建图标
-    let icon = document.createElement('i');
-    icon.className = `${stackItemInfo.icon} orca-menu-text-icon orca-menu-text-pre`;
+    const icon = createDomWithClass("i", `${stackItemInfo.icon} orca-menu-text-icon orca-menu-text-pre`, ele)
     icon.setAttribute('data-tabsman-backforward-view', stackItemInfo.view);
     icon.setAttribute('data-tabsman-backforward-block-id', stackItemInfo.blockId);
 
     // 创建 orca-menu-text-text（内容元素）
-    let textText = document.createElement('div');
-    textText.className = 'orca-menu-text-text';
+    const textText = createDomWithClass("div", 'orca-menu-text-text', ele)
     textText.innerText = stackItemInfo.name;
-    textText.style = {fontFamily: 'var(--orca-fontfamily-code)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '20em', flex: 1};
+    Object.assign(textText.style, {fontFamily: 'var(--orca-fontfamily-code)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '20em'})
     textText.setAttribute('data-tabsman-backforward-block-id', stackItemInfo.blockId);
     textText.setAttribute('data-tabsman-backforward-view', stackItemInfo.view);
-    
-    ele.appendChild(icon);
-    ele.appendChild(textText);
 
     return ele;
 }

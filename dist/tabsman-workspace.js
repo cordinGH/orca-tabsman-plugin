@@ -18,28 +18,14 @@ let confirmPopup = null
 
 /** @type {HTMLInputElement} */
 let savePopup = null
-let savePopupExist = false
 
 /** @type {HTMLInputElement} */
 let wsItemSelected = null
 
 let wsItemsObj = {}
-// let hasExit = false
 
-/**
- * 【工具函数】创建一个指定类名的 DOM 元素并追加到父元素中
- * @param {string} eName - 标签名，如 'div', 'button'
- * @param {string} eClassName - 类名
- * @param {HTMLElement} parentE - 需要append进去的父元素
- * @returns {HTMLElement} 创建的元素
- */
-function createDomWithClass (eName, eClassName, parentE) {
-    const e = document.createElement(eName)
-    e.className = eClassName
-    parentE.appendChild(e)
-    return e
-}
-
+const createDomWithClass = window.pluginTabsman.createDomWithClass
+const closePopupwithAnimation = window.pluginTabsman.closePopupwithAnimation
 
 // 启动初始渲染
 export async function startWSRender() {
@@ -50,7 +36,7 @@ export async function startWSRender() {
     wsItems = createDomWithClass("div", "plugin-tabsman-ws-items", wsTools)
 
     // 提取用户的工作区
-    const allUserWS = await window.getAllWS()
+    const allUserWS = await window.pluginTabsman.getAllWS()
     // const allUserWS = allWS.filter(item => item !== "tabsman-workspace-exit")
 
     // 创建userWS（选项卡）
@@ -74,27 +60,34 @@ export async function startWSRender() {
             getConfirmPopup()
             confirmPopup.result = wsName
             // 定位弹窗到按钮下方
-            const rect = target.getBoundingClientRect();
+            const rect = target.parentElement.getBoundingClientRect();
             confirmPopup.style.left = `${rect.left}px`;
             confirmPopup.style.top = "var(--orca-height-headbar)";
             return
         } else if (target.closest(".plugin-tabsman-ws-exit")) {
-            window.exitWS()
+            window.pluginTabsman.exitWS()
             exitButton.remove()
             clearWSItemSelected()
             return
         } else if (target.closest(".plugin-tabsman-ws-save")) {
-            getSavePopup()
+            if (savePopup?.isConnected) {
+                // 有两处执行移除操作，另一处是回调函数中，这两处都只在isConnected时触发，因此不必担心重复执行。
+                removeSavePopup()
+                return
+            }
+            appendSavePopup()
+            // 加入进dom后，监听savePopup的关闭事件
+            setTimeout(() => {
+                document.addEventListener('click', closeSavePopup);
+                document.addEventListener('keydown', closeSavePopup);
+                orca.notify("success", "[tabsman] 添加save监听");
+            }, 0);   
             const rect = target.getBoundingClientRect();
             savePopup.style.left = `${rect.left}px`;
             savePopup.style.top = "var(--orca-height-headbar)";
+            savePopup.inputEle.focus()
         }
     })
-
-    // 监听保存弹窗的关闭事件
-    document.addEventListener('keydown', closeSavePopup);
-    document.addEventListener('click', closeSavePopup);
-
 }
 
 
@@ -127,7 +120,7 @@ function appendWSItemEle(name) {
 
 // 点击元素打开工作区
 function openWSByClickEle(name) {
-    window.openWS(name)
+    window.pluginTabsman.openWS(name)
 
     // 确保存在退出点如果还没有退出点元素则先建立
     if (!exitButton) {
@@ -147,8 +140,8 @@ async function getConfirmPopup() {
     }
 
     // 创建确认窗口
-    confirmPopup = createDomWithClass("div", 'orca-popup', headbar)
-    confirmPopup.style = {zIndex: 299, transformOrigin: 'center bottom', position: 'absolute', pointerEvents: 'auto', willChange: 'opacity, scale'};
+    confirmPopup = createDomWithClass("div", 'orca-popup plugin-tabsman-ws-confirm_popup', headbar)
+    Object.assign(confirmPopup.style, { zIndex: '299', transformOrigin: 'left top' });
 
     // 弹窗的内容盒子
     const confirmBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-confirm-box', confirmPopup)
@@ -161,15 +154,17 @@ async function getConfirmPopup() {
     noBtn.textContent = "取消"
     const yesBtn = createDomWithClass("div", 'orca-button dangerous', confirmBox)
     yesBtn.textContent = "确认"
-    noBtn.onclick = () => {
-        confirmPopup.remove()
+    noBtn.onclick = async function() {
+        confirmPopup.classList.add("is-closing")
+        await closePopupwithAnimation(confirmPopup)
     };
     yesBtn.onclick = async function(){
-        confirmPopup.remove()
+        confirmPopup.classList.add("is-closing")
+        await closePopupwithAnimation(confirmPopup)
         const wsName = confirmPopup.result
 
         // 如果删除的是当前工作区，则先移除退出按钮和样式
-        const deleteKind = await window.deleteWS(wsName)
+        const deleteKind = await window.pluginTabsman.deleteWS(wsName)
         if ( deleteKind === 1) {
             exitButton.remove()
             clearWSItemSelected()
@@ -179,43 +174,48 @@ async function getConfirmPopup() {
 }
 
 // 获取保存窗对象，result属性为获取的name
-async function getSavePopup() {
-    savePopupExist = true
-    if (savePopup) {
+async function appendSavePopup() {
+    if (savePopup && !savePopup.isConnected) {
         headbar.appendChild(savePopup)
         return
     }
-
-    // 创建确认窗口
+    // 创建save弹窗
     savePopup = createDomWithClass("div", 'orca-popup plugin-tabsman-ws-save_popup', headbar)
-    savePopup.style = {zIndex: 299, transformOrigin: 'center bottom', position: 'absolute', pointerEvents: 'auto', willChange: 'opacity, scale'};
+    Object.assign(savePopup.style, { zIndex: '299', transformOrigin: 'left top' });
 
-    // 弹窗的内容盒子
+    // 弹窗的命名输入区
     const saveInputBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-input-box', savePopup)
     const input = createDomWithClass("span", 'orca-input', saveInputBox)
     const inputInput = createDomWithClass("span", 'orca-input-input', input)
-    const inputInputI = createDomWithClass("i", 'ti ti-forms orca-input-box-icon orca-input-pre', inputInput)
+    createDomWithClass("i", 'ti ti-forms orca-input-box-icon orca-input-pre', inputInput)
     const inputActualinput = createDomWithClass("input", 'orca-input-actualinput', inputInput)
+    savePopup.inputEle = inputActualinput
     inputActualinput.placeholder = "请为新工作区命名..."
     inputActualinput.type = "text"
 
+    // 确认按钮
     const yesBtn = createDomWithClass("button", 'orca-button solid', saveInputBox)
     yesBtn.textContent = "确定"
-    yesBtn.style = "color: var(--orca-color-white);"
+    yesBtn.style.color = "var(--orca-color-white)"
 
-    // 提示已存在
+    // 提示高频重复创建
     const inputError = createDomWithClass("span", 'orca-input-error', input)
     inputError.remove()
-    inputError.textContent = "命名已存在，请重新命名。"
-    
+    inputError.textContent = "1毫秒内创建多次？emmm"
+
     yesBtn.onclick = async function (){
-        const inputValue = inputActualinput.value
-        savePopup.result = inputValue
-        const saveReturn = await window.saveWS(inputValue)
+        const inputValue = savePopup.inputEle.value
+        
+        if (inputValue === "") {
+            const dateToday = new Date()
+            savePopup.result = String(dateToday.getMonth() + 1) + "-" + dateToday.getDate()
+        } else {
+            savePopup.result = inputValue
+        }
+        const saveReturn = await window.pluginTabsman.saveWS(savePopup.result)
         if (saveReturn) {
-            savePopup.remove()
-            savePopupExist = false
-            inputActualinput.value = ""
+            savePopup.inputEle.value = ""
+            removeSavePopup()
             appendWSItemEle(saveReturn)
         } else {
             input.classList.add("orca-input-has-error")
@@ -224,22 +224,19 @@ async function getSavePopup() {
     };
 }
 
-function closeSavePopup(e) {
-    if (savePopupExist) {
+async function closeSavePopup(e) {
+    // 该回调只在appendSavePopup执行后才追加回调，因此savePopup是必然存在的
+    if (savePopup.isConnected) {
         // 如果是键盘esc则重置处理
-        let needClose = false
-        if (e.type === 'keydown' && e.key === 'Escape') {
-            needClose = true
-        }
-
-        const targetElement = e.target.closest('.plugin-tabsman-ws-save_popup');
-        if (e.type === 'click' && !targetElement) {
-            needClose = true
-        }
-
-        if (needClose) {
-            savePopup.remove()
-            savePopupExist = false
-        }
+        if (e.type === 'keydown' && e.key === 'Escape') removeSavePopup()
+        if (e.type === 'click' && !savePopup.contains(e.target)) removeSavePopup()
     }
+}
+
+// 从dom中移除save弹窗，同时一并移除监听器
+async function removeSavePopup (){
+    await closePopupwithAnimation(savePopup)
+    document.removeEventListener('click', closeSavePopup)
+    document.removeEventListener('keydown', closeSavePopup)
+    orca.notify("success", "[tabsman] 移除save监听");
 }

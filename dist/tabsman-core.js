@@ -643,7 +643,7 @@ async function deleteTab(tabId) {
     // 【持久化处理】保存删除的标签页到持久化模块
     await TabsmanPersistence.addAndSaveTab(tab, "recently-closed");    
     // 【持久化处理】如果是置顶标签页，且不在工作区，则从持久化数据中移除
-    if (tab.isPinned && !inWorkspace) {
+    if (tab.isPinned && workspaceNow === "") {
         await TabsmanPersistence.removeAndSaveTab(tabId, "pinned");
     }
 
@@ -694,7 +694,7 @@ async function deleteTab(tabId) {
 }
 
 
-window.moveTabToPanel = async function(tabId, newPanelId) {
+window.pluginTabsman.moveTabToPanel = async function(tabId, newPanelId) {
     const tab = tabs[tabId];
     if (tab.panelId === newPanelId) {
         return false;
@@ -776,7 +776,7 @@ async function pinTab(tabId) {
     
     // 持久化
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
-    if (!inWorkspace) await TabsmanPersistence.addAndSaveTab(tab, "pinned")
+    if (workspaceNow === "") await TabsmanPersistence.addAndSaveTab(tab, "pinned")
     return true;
 }
 
@@ -809,7 +809,7 @@ async function unpinTab(tabId) {
     
     // 移除对应数据
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
-    if (!inWorkspace) await TabsmanPersistence.removeAndSaveTab(tabId, "pinned")
+    if (workspaceNow === "") await TabsmanPersistence.removeAndSaveTab(tabId, "pinned")
     return true;
 }
 
@@ -863,7 +863,7 @@ async function deleteWorkspace(name) {
     await orca.plugins.removeData("tabsman-workspace", sname)
     orca.notify("success", "[tabsman]工作区删除成功");
     // 正在工作区就先退出
-    if (inWorkspace) {
+    if (workspaceNow !== "") {
         exitWorkspace()
         return 1
     }
@@ -873,52 +873,44 @@ async function deleteWorkspace(name) {
 // 删除所有的工作空间
 function deleteAllWorkspace() {
     // 正在工作区就先退出
-    if (inWorkspace) exitWorkspace()
+    if (workspaceNow !== "") exitWorkspace()
     orca.plugins.clearData("tabsman-workspace")
 }
 
 // 退出当前工作空间
 function exitWorkspace() {
-    openWorkspace("tabsman-workspace-exit")
+    openWorkspace()
 }
 
-// 进入工作空间
-// 只有先进入工作空间后，才实时同步更新=>保存后需要进入才可实时更新。进入后inWorkspace改为true
-let inWorkspace = false
-let openWorkspaceName = ""
-
+// 打开工作空间
+let workspaceNow = ""
 // 标记正在切换工作空间
 let workspaceSwitching = false
-async function openWorkspace(name){
+// 参数默认值为退出点
+async function openWorkspace(name = ""){
     const sname = String(name)
 
-    if (openWorkspaceName === sname) {
+    // 如果当前打开的就是目标工作区，则跳过。
+    if (workspaceNow === sname) {
         orca.notify("info", "[tabsman]当前已在该工作空间")
         return
     }
     
-    // 读取持久化数据
-    const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname);
+    // 读取工作空间数据
+    const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname ? sname : "tabsman-workspace-exit");
     if (!workspaceRaw) {
-        orca.notify("info", "[tabsman]该工作空间数据不存在")
+        orca.notify("info", "[tabsman]目标工作空间数据不存在")
         return
     }
 
-    // 如果当前不在工作空间，则先存储一下退出点再进入工作区。
-    if (!inWorkspace) {
-        inWorkspace = true
+    // 维护退出点数据
+    if (workspaceNow === "") {
         await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
-    }
-
-    // 如果进入的工作区是退出点，则重置退出点；反之 更新当前工作区name
-    if (sname === "tabsman-workspace-exit"){
-        inWorkspace = false
-        openWorkspaceName = ""
+    } else if (sname === "") {
+        // 丢弃过时的退出点
         await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
-    } else {
-        openWorkspaceName = sname
     }
-
+    workspaceNow = sname
 
     // 恢复工作区tabs数据
     let workspaceTabs = {};
@@ -996,12 +988,12 @@ async function openWorkspace(name){
 
     workspaceSwitching = false
 }
-window.getAllWS = getAllWorkspace
-window.deleteWS = deleteWorkspace
-window.deleteAllWS = deleteAllWorkspace
-window.saveWS = saveWorkspace
-window.openWS = openWorkspace
-window.exitWS = exitWorkspace
+window.pluginTabsman.getAllWS = getAllWorkspace
+window.pluginTabsman.deleteWS = deleteWorkspace
+window.pluginTabsman.deleteAllWS = deleteAllWorkspace
+window.pluginTabsman.saveWS = saveWorkspace
+window.pluginTabsman.openWS = openWorkspace
+window.pluginTabsman.exitWS = exitWorkspace
 
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
@@ -1250,8 +1242,9 @@ async function start(callback = null) {
     // 2025年11月23日 适配工作区的更新
     renderTabsCallback = async function (){
         callback();
-        if (inWorkspace){
-            await orca.plugins.setData('tabsman-workspace', openWorkspaceName, JSON.stringify(tabs));
+        // 进入具体工作空间后每次刷新ui都更新数据
+        if (workspaceNow !== ""){
+            await orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));
         }
     }
     
@@ -1310,11 +1303,11 @@ async function start(callback = null) {
     }
 
     // 暴露 get 函数到全局（调试）
-    window.getAllTabs = getAllTabs;
-    window.getActiveTabs = getActiveTabs;
-    window.getTabIdSetByPanelId = getTabIdSetByPanelId;
-    window.getOneSortedTabs = getOneSortedTabs;
-    window.getAllSortedTabs = getAllSortedTabs;
+    window.pluginTabsman.getAllTabs = getAllTabs;
+    window.pluginTabsman.getActiveTabs = getActiveTabs;
+    window.pluginTabsman.getTabIdSetByPanelId = getTabIdSetByPanelId;
+    window.pluginTabsman.getOneSortedTabs = getOneSortedTabs;
+    window.pluginTabsman.getAllSortedTabs = getAllSortedTabs;
 
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点
@@ -1376,11 +1369,11 @@ function destroy() {
     beforeCommandHooks = {};
     
     // 清理全局暴露的函数
-    delete window.getAllTabs;
-    delete window.getActiveTabs;
-    delete window.getTabIdSetByPanelId;
-    delete window.getOneSortedTabs;
-    delete window.getAllSortedTabs;
+    delete window.pluginTabsman.getAllTabs;
+    delete window.pluginTabsman.getActiveTabs;
+    delete window.pluginTabsman.getTabIdSetByPanelId;
+    delete window.pluginTabsman.getOneSortedTabs;
+    delete window.pluginTabsman.getAllSortedTabs;
     
     // 清理UI渲染回调函数
     renderTabsCallback = null;

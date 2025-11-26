@@ -111,12 +111,12 @@
 /* ——————————————————————————————————顶部栏工作区item—————————————————————————————————————————— */
 .plugin-tabsman-ws-items-item.orca-segmented-item {
     display: flex;
-    border: 1px solid #00000036;
-    padding: 0 .2em 0 .75em;
+    outline: .5px solid #00000036;
+    padding: 0 0 0 .75em;
     & i {
         padding: 0 .25em;
         color: initial;
-        opacity: .15;
+        opacity: .1;
     }
     & i:hover {
         opacity: 1;
@@ -129,8 +129,7 @@
 }
 
 .plugin-tabsman-ws-items-item.orca-segmented-item.plugin-tabsman-ws-selected{
-    /* border-color: var(--orca-color-primary-5); */
-    border-color: var(--orca-color-primary-5);
+    outline: 1px solid var(--orca-color-primary-5);
     color: initial;
 }
 
@@ -143,4 +142,36 @@
     margin-left: .25em;
     margin-right: .25em;
     gap: .5em;
+}
+
+
+@keyframes orcaPopIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes orcaPopOut {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+}
+
+.plugin-tabsman-ws-confirm_popup, .plugin-tabsman-ws-save_popup, .plugin-tabsman-history-popup {
+    animation: orcaPopIn .2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+.plugin-tabsman-ws-confirm_popup.is-closing, .plugin-tabsman-ws-save_popup.is-closing, .plugin-tabsman-history-popup.is-closing {
+    animation: orcaPopOut .2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    pointer-events: none;
 }

@@ -46,7 +46,7 @@ export async function startWSRender() {
 
     // ws工具栏监听委托
     wsTools.addEventListener("click", async function (e) {
-        e.stopPropagation()
+        // e.stopPropagation()
         const target = e.target
         const classList = target.classList
         if (classList.contains("plugin-tabsman-ws-items-item")) {
@@ -57,7 +57,13 @@ export async function startWSRender() {
             return
         } else if (classList.contains("plugin-tabsman-ws-items-item-delete")) {
             const wsName = target.closest(".plugin-tabsman-ws-items-item").dataset.pluginTabsmanWsName
-            getConfirmPopup()
+            appendConfirmPopup()
+            // 加入进dom后，监听savePopup的关闭事件
+            setTimeout(() => {
+                document.addEventListener('pointerdown', handleCancelConfirmPopup);
+                document.addEventListener('keydown', handleCancelConfirmPopup);
+                orca.notify("success", "[tabsman] 添加delete监听");
+            }, 0);
             confirmPopup.result = wsName
             // 定位弹窗到按钮下方
             const rect = target.parentElement.getBoundingClientRect();
@@ -72,14 +78,14 @@ export async function startWSRender() {
         } else if (target.closest(".plugin-tabsman-ws-save")) {
             if (savePopup?.isConnected) {
                 // 有两处执行移除操作，另一处是回调函数中，这两处都只在isConnected时触发，因此不必担心重复执行。
-                removeSavePopup()
+                removePopup(savePopup)
                 return
             }
             appendSavePopup()
             // 加入进dom后，监听savePopup的关闭事件
             setTimeout(() => {
-                document.addEventListener('click', closeSavePopup);
-                document.addEventListener('keydown', closeSavePopup);
+                document.addEventListener('pointerdown', handleCancelSavePopup);
+                document.addEventListener('keydown', handleCancelSavePopup);
                 orca.notify("success", "[tabsman] 添加save监听");
             }, 0);   
             const rect = target.getBoundingClientRect();
@@ -133,7 +139,7 @@ function openWSByClickEle(name) {
 }
 
 // 获取确认窗对象，确认窗result保存处理的wsName
-async function getConfirmPopup() {
+async function appendConfirmPopup() {
     if (confirmPopup) {
         headbar.appendChild(confirmPopup)
         return
@@ -215,7 +221,7 @@ async function appendSavePopup() {
         const saveReturn = await window.pluginTabsman.saveWS(savePopup.result)
         if (saveReturn) {
             savePopup.inputEle.value = ""
-            removeSavePopup()
+            removePopup(savePopup)
             appendWSItemEle(saveReturn)
         } else {
             input.classList.add("orca-input-has-error")
@@ -224,19 +230,32 @@ async function appendSavePopup() {
     };
 }
 
-async function closeSavePopup(e) {
+async function handleCancelConfirmPopup(e) {
+    if (confirmPopup.isConnected) {
+        if (e.type === 'keydown' && e.key === 'Escape') removePopup(confirmPopup)
+        if (e.type === 'pointerdown' && !confirmPopup.contains(e.target)) removePopup(confirmPopup)
+    }
+}
+
+async function handleCancelSavePopup(e) {
     // 该回调只在appendSavePopup执行后才追加回调，因此savePopup是必然存在的
     if (savePopup.isConnected) {
-        // 如果是键盘esc则重置处理
-        if (e.type === 'keydown' && e.key === 'Escape') removeSavePopup()
-        if (e.type === 'click' && !savePopup.contains(e.target)) removeSavePopup()
+        if (e.type === 'keydown' && e.key === 'Escape') removePopup(savePopup)
+        if (e.type === 'pointerdown' && !savePopup.contains(e.target)) removePopup(savePopup)
     }
 }
 
 // 从dom中移除save弹窗，同时一并移除监听器
-async function removeSavePopup (){
-    await closePopupwithAnimation(savePopup)
-    document.removeEventListener('click', closeSavePopup)
-    document.removeEventListener('keydown', closeSavePopup)
-    orca.notify("success", "[tabsman] 移除save监听");
+async function removePopup (popupEle){
+    await closePopupwithAnimation(popupEle)
+    if (popupEle === savePopup) {
+        document.removeEventListener('pointerdown', handleCancelSavePopup)
+        document.removeEventListener('keydown', handleCancelSavePopup)
+        orca.notify("success", "[tabsman] 移除save监听");
+    }
+    if (popupEle === confirmPopup) {
+        document.removeEventListener('pointerdown', handleCancelConfirmPopup)
+        document.removeEventListener('keydown', handleCancelConfirmPopup)
+        orca.notify("success", "[tabsman] 移除delete监听");
+    }
 }

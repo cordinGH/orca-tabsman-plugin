@@ -94,7 +94,7 @@ async function handleClosePopup(e) {
         }
         
         // 如果点击的元素包含data-tabsman-backforward-block-id属性，执行特定逻辑
-        if (e.type === 'click'){
+        if (e.type === 'pointerdown'){
             needClose = true
             const targetElement = e.target.closest('[data-tabsman-backforward-block-id]')
             if (targetElement) {
@@ -114,7 +114,7 @@ async function handleClosePopup(e) {
             currentPopup = null;
             // 移除关闭弹窗事件监听器
             document.removeEventListener('keydown', handleClosePopup);
-            document.removeEventListener('click', handleClosePopup);
+            document.removeEventListener('pointerdown', handleClosePopup);
             // orca.notify("success", "[tabsman] 移除历史菜单监听");
         }
     }
@@ -158,9 +158,9 @@ async function handleHistoryButtonRightClick(e) {
         currentPopup = null;
     }
     
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
+    // e.preventDefault();
+    // e.stopPropagation();
+    // e.stopImmediatePropagation();
 
     const stackType = backButton.contains(e.target)? "back" : "forward"
     let stack = stackType === 'back' ? TabsmanCore.getActiveTabs()[orca.state.activePanel].backStack : TabsmanCore.getActiveTabs()[orca.state.activePanel].forwardStack;
@@ -185,7 +185,7 @@ async function handleHistoryButtonRightClick(e) {
 
     // 移除关闭弹窗事件监听器
     document.addEventListener('keydown', handleClosePopup);
-    document.addEventListener('click', handleClosePopup);
+    document.addEventListener('pointerdown', handleClosePopup);
     // orca.notify("success", "[tabsman] 添加历史菜单监听");
 }
 

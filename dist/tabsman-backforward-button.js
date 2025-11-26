@@ -107,7 +107,7 @@ async function handleClosePopup(e) {
                 }
             }
         }
-        
+
         // 关闭弹窗
         if (needClose) {
             await closePopupwithAnimation(currentPopup)
@@ -115,7 +115,7 @@ async function handleClosePopup(e) {
             // 移除关闭弹窗事件监听器
             document.removeEventListener('keydown', handleClosePopup);
             document.removeEventListener('click', handleClosePopup);
-            orca.notify("success", "[tabsman] 移除历史菜单监听");
+            // orca.notify("success", "[tabsman] 移除历史菜单监听");
         }
     }
 }
@@ -164,33 +164,29 @@ async function handleHistoryButtonRightClick(e) {
 
     const stackType = backButton.contains(e.target)? "back" : "forward"
     let stack = stackType === 'back' ? TabsmanCore.getActiveTabs()[orca.state.activePanel].backStack : TabsmanCore.getActiveTabs()[orca.state.activePanel].forwardStack;
-    if ((stackType === 'back' && stack.length <= 1) || (stackType === 'forward' && stack.length === 0)) {
-        orca.notify("info", `[tabsman] 当前标签页暂无${stackType === 'back' ? '后退' : '前进'}历史`);
-    } else {
-        // 创建弹窗
-        let popupEle = document.createElement('div');
-        popupEle.className = 'orca-popup plugin-tabsman-history-popup';
-        popupEle.setAttribute('contenteditable', 'false');
-        Object.assign(popupEle.style, { zIndex: '399', transformOrigin: 'left top' });
-        // 传递一个栈副本用于渲染菜单，避免修改原始栈数据
-        popupEle.appendChild(await createBackForwardMenu([...stack], stackType));
-        // 添加到headbar，并定位弹窗到按钮下方
-        headbar.appendChild(popupEle);
-        
-        // 定位弹窗到按钮下方
-        const buttonEle = stackType === 'back' ? backButton : forwardButton;
-        const rect = buttonEle.getBoundingClientRect();
-        popupEle.style.left = `${rect.left}px`;
-        popupEle.style.top = "var(--orca-height-headbar)";
-        
-        // 保存当前弹窗引用
-        currentPopup = popupEle;
+    // 创建弹窗
+    let popupEle = document.createElement('div');
+    popupEle.className = 'orca-popup plugin-tabsman-history-popup';
+    popupEle.setAttribute('contenteditable', 'false');
+    Object.assign(popupEle.style, { zIndex: '399', transformOrigin: 'left top' });
+    // 传递栈副本用于渲染菜单，避免修改原始栈数据
+    popupEle.appendChild(await createBackForwardMenu([...stack], stackType));
+    // 添加到headbar，并定位弹窗到按钮下方
+    headbar.appendChild(popupEle);
+    
+    // 定位弹窗到按钮下方
+    const buttonEle = stackType === 'back' ? backButton : forwardButton;
+    const rect = buttonEle.getBoundingClientRect();
+    popupEle.style.left = `${rect.left}px`;
+    popupEle.style.top = "var(--orca-height-headbar)";
+    
+    // 保存当前弹窗引用
+    currentPopup = popupEle;
 
-        // 移除关闭弹窗事件监听器
-        document.addEventListener('keydown', handleClosePopup);
-        document.addEventListener('click', handleClosePopup);
-        orca.notify("success", "[tabsman] 添加历史菜单监听");
-    }
+    // 移除关闭弹窗事件监听器
+    document.addEventListener('keydown', handleClosePopup);
+    document.addEventListener('click', handleClosePopup);
+    // orca.notify("success", "[tabsman] 添加历史菜单监听");
 }
 
 
@@ -201,6 +197,15 @@ async function handleHistoryButtonRightClick(e) {
  * @returns {Promise<HTMLElement>} 返回菜单元素
  */
 async function createBackForwardMenu(stackArrary, stackType) {
+    // 创建菜单容器
+    let ele = document.createElement('div');
+    ele.className = 'orca-menu';
+    if ((stackType === 'back' && stackArrary.length <= 1) ||  (stackType === 'forward' && stackArrary.length == 0)){
+        ele.textContent = `暂无${stackType === 'back' ? '后退' : '前进'}历史`
+        Object.assign(ele.style, {color: "var(--orca-color-gray-5)", textAlign: "center"})
+        return ele;
+    }
+
     // 获取栈，如果是后退栈，先弹出栈顶元素（当前块）
     let stack = stackType === 'back' ? stackArrary.slice(0, -1) : stackArrary;
     let stackItemInfoArrary = [];
@@ -217,10 +222,6 @@ async function createBackForwardMenu(stackArrary, stackType) {
             view: itemView
         });
     }
-    
-    // 创建菜单容器
-    let ele = document.createElement('div');
-    ele.className = 'orca-menu';
 
     if (stackType === 'back') {
         stackItemInfoArrary.reverse();

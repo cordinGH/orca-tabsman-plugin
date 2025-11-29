@@ -817,6 +817,17 @@ async function unpinTab(tabId) {
 /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
 /* ———————————————————————————————————————实现工作区————————————————————————————————————————————————— */
 /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
+// 获取面板位置
+function getPanelScrollInfo() {
+    const panelIds = Object.keys(activeTabs)
+    const scrollInfo = {}
+    for(const panelId of panelIds) {
+        const panelViewState = orca.nav.findViewPanel(panelId, orca.state.panels).viewState
+        const rootBlockId = Object.keys(panelViewState).find(key => !isNaN(Number(key)))
+        scrollInfo[panelId] = panelViewState[rootBlockId].scrollTop
+    }
+    return scrollInfo
+}
 
 // 保存工作空间
 async function saveWorkspace(name){
@@ -831,6 +842,7 @@ async function saveWorkspace(name){
         return ""
     }    
     await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));
+    await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(getPanelScrollInfo()));
     orca.notify("success", "[tabsman]新工作区创建成功！");
     return saveName
 
@@ -861,6 +873,7 @@ async function getAllWorkspace(){
 async function deleteWorkspace(name) {
     const sname = String(name)
     await orca.plugins.removeData("tabsman-workspace", sname)
+    await orca.plugins.removeData("tabsman-workspace-scroll", sname)
     orca.notify("success", "[tabsman]工作区删除成功");
     // 正在工作区就先退出
     if (workspaceNow === sname) {
@@ -875,6 +888,7 @@ function deleteAllWorkspace() {
     // 正在工作区就先退出
     if (workspaceNow !== "") exitWorkspace()
     orca.plugins.clearData("tabsman-workspace")
+    orca.plugins.clearData("tabsman-workspace-scroll")
 }
 
 // 退出当前工作空间
@@ -896,8 +910,9 @@ async function openWorkspace(name = ""){
         return
     }
     
-    // 读取工作空间数据
+    // 读取工作空间数据，包括滚动信息
     const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname ? sname : "tabsman-workspace-exit");
+    const workspaceScroll = JSON.parse(await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit"));
     if (!workspaceRaw) {
         orca.notify("info", "[tabsman]目标工作空间数据不存在")
         return
@@ -906,9 +921,14 @@ async function openWorkspace(name = ""){
     // 维护退出点数据
     if (workspaceNow === "") {
         await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
+        await orca.plugins.setData('tabsman-workspace-scroll', "tabsman-workspace-exit", JSON.stringify(getPanelScrollInfo()));
     } else if (sname === "") {
         // 丢弃过时的退出点
         await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
+        await orca.plugins.removeData("tabsman-workspace-scroll", "tabsman-workspace-exit")
+        await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
+    } else if (sname) {
+        await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
     }
     workspaceNow = sname
 
@@ -980,6 +1000,16 @@ async function openWorkspace(name = ""){
 
         // 更新排序
         updateSortedTabsCache(newPanelId)
+
+        // 滚动到上次打开的位置
+        setTimeout(() => {
+            const selector = ".orca-panel[data-panel-id='" + newPanelId + "']>.orca-hideable>.orca-block-editor"
+            const scrollContainer = document.querySelector(selector)
+            scrollContainer.scrollTo({
+                top: workspaceScroll[oldPanelId],
+                behavior: 'smooth'
+            });
+        }, 500);
     }
 
     orca.nav.close(tmp)
@@ -1245,6 +1275,7 @@ async function start(callback = null) {
         // 进入具体工作空间后每次刷新ui都更新数据
         if (workspaceNow !== ""){
             await orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));
+            // await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
         }
     }
     

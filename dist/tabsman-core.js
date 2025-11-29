@@ -912,7 +912,10 @@ async function openWorkspace(name = ""){
     
     // 读取工作空间数据，包括滚动信息
     const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname ? sname : "tabsman-workspace-exit");
-    const workspaceScroll = JSON.parse(await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit"));
+    const workspaceScrollRaw = await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit")
+    let workspaceScroll = null;
+    if (workspaceScrollRaw) workspaceScroll = JSON.parse(workspaceScrollRaw);
+
     if (!workspaceRaw) {
         orca.notify("info", "[tabsman]目标工作空间数据不存在")
         return
@@ -1002,14 +1005,16 @@ async function openWorkspace(name = ""){
         updateSortedTabsCache(newPanelId)
 
         // 滚动到上次打开的位置
-        setTimeout(() => {
-            const selector = ".orca-panel[data-panel-id='" + newPanelId + "']>.orca-hideable>.orca-block-editor"
-            const scrollContainer = document.querySelector(selector)
-            scrollContainer.scrollTo({
-                top: workspaceScroll[oldPanelId],
-                behavior: 'smooth'
-            });
-        }, 500);
+        if (workspaceScroll){
+            setTimeout(() => {
+                const selector = ".orca-panel[data-panel-id='" + newPanelId + "']>.orca-hideable>.orca-block-editor"
+                const scrollContainer = document.querySelector(selector)
+                scrollContainer.scrollTo({
+                    top: workspaceScroll[oldPanelId],
+                    behavior: 'smooth'
+                });
+            }, 500);
+        }
     }
 
     orca.nav.close(tmp)

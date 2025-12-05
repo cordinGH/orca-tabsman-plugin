@@ -828,7 +828,7 @@ function getPanelScrollInfo() {
 }
 
 // 保存工作空间
-async function saveWorkspace(name){
+async function saveWorkspace(name, needEmpty = false){
     const sname = String(name)
     // 时间戳前缀用于排序（getDataKeys获取的数组是按照keys的码值排序的）
     // 【变更】不再刻意重名，只禁止恶意重名：一个时间戳内连续生成相同name
@@ -838,9 +838,27 @@ async function saveWorkspace(name){
     if (existName || existName === "tabsman-workspace-exit"){
         orca.notify("info", "[tabsman]name已存在。另外，name不可使用tabsman-workspace-exit");
         return ""
-    }    
-    await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));
-    await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(getPanelScrollInfo()));
+    }
+
+    if (needEmpty) {
+        const currentBlockId = new Date(new Date().toDateString());
+        const tabInfo = await generateTabNameAndIcon(currentBlockId);
+        const tab = createTabObject(currentBlockId, "", tabInfo.icon, tabInfo.name);
+        tab.isActive = true
+        tab.backStack.push({
+            activePanel: "",
+            view: "journal",
+            viewArgs: { date: new Date(new Date().toDateString())}
+        });
+        const tabsEmpty = {}
+        tabsEmpty[tab.id] = tab;
+        await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabsEmpty));
+
+    } else {
+        await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));
+        await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(getPanelScrollInfo()));
+    }
+
     orca.notify("success", "[tabsman]新工作区创建成功！");
     return saveName
 
@@ -923,7 +941,6 @@ async function openWorkspace(name = ""){
     } else if (sname === "") {
         // 丢弃过时的退出点
         await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
-        await orca.plugins.removeData("tabsman-workspace-scroll", "tabsman-workspace-exit")
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
     } else if (sname) {
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));

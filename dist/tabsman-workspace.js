@@ -93,7 +93,7 @@ export async function startWSRender() {
             setTimeout(() => {
                 document.addEventListener('pointerdown', handleCancelSavePopup);
                 document.addEventListener('keydown', handleCancelSavePopup);
-                savePopup.inputEle.focus()
+                savePopup.inputActualinput.focus()
                 // orca.notify("success", "[tabsman] 添加save监听");
             }, 0);   
             const rect = target.getBoundingClientRect();
@@ -198,13 +198,27 @@ async function appendSavePopup() {
 
     // 弹窗的命名输入区
     const saveInputBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-input-box', savePopup)
+
     const input = createDomWithClass("span", 'orca-input', saveInputBox)
+    savePopup.input = input
     const inputInput = createDomWithClass("span", 'orca-input-input', input)
     createDomWithClass("i", 'ti ti-forms orca-input-box-icon orca-input-pre', inputInput)
     const inputActualinput = createDomWithClass("input", 'orca-input-actualinput', inputInput)
-    savePopup.inputEle = inputActualinput
+    savePopup.inputActualinput = inputActualinput
     inputActualinput.placeholder = "请为新工作区命名..."
     inputActualinput.type = "text"
+
+    // 选项按钮，选择是否新建空工作区
+    const optionDiv = createDomWithClass("div", 'plugin-tabsman-ws-save_popup-option', saveInputBox)
+    optionDiv.textContent = "基于当前Tabs新建"
+    Object.assign(optionDiv.style, {
+        display: "flex",
+        justifyContent: "space-between"
+    })
+    const extendBtn = createDomWithClass("button", "orca-switch orca-switch-on", optionDiv)
+    savePopup.extendBtn = extendBtn
+    savePopup.needEmpty = false
+    const btnIcon = createDomWithClass("span", "orca-switch-toggle", extendBtn)
 
     // 确认按钮
     const yesBtn = createDomWithClass("button", 'orca-button solid', saveInputBox)
@@ -213,26 +227,39 @@ async function appendSavePopup() {
 
     // 提示高频重复创建
     const inputError = createDomWithClass("span", 'orca-input-error', input)
+    savePopup.inputError = inputError
     inputError.remove()
     inputError.textContent = "1毫秒内创建多次？emmm"
 
+    extendBtn.onclick = function(){
+        savePopup.needEmpty = !(savePopup.extendBtn.classList.toggle('orca-switch-on'))
+    }
+
     yesBtn.onclick = async function (){
-        const inputValue = savePopup.inputEle.value
+        const inputValue = savePopup.inputActualinput.value
         
+        // 未填写默认采用日期作为命名
         if (inputValue === "") {
             const dateToday = new Date()
             savePopup.result = String(dateToday.getMonth() + 1) + "-" + dateToday.getDate()
         } else {
             savePopup.result = inputValue
         }
-        const saveReturn = await window.pluginTabsman.saveWS(savePopup.result)
+
+        let saveReturn = null
+        if (savePopup.needEmpty) {
+            saveReturn = await window.pluginTabsman.saveWS(savePopup.result, true)
+        } else {
+            saveReturn = await window.pluginTabsman.saveWS(savePopup.result)
+        }
+
         if (saveReturn) {
-            savePopup.inputEle.value = ""
+            savePopup.inputActualinput.value = ""
             removePopup(savePopup)
             appendWSItemEle(saveReturn)
         } else {
-            input.classList.add("orca-input-has-error")
-            input.appendChild(inputError)
+            savePopup.input.classList.add("orca-input-has-error")
+            savePopup.input.appendChild(savePopup.inputError)
         }
     };
 }
@@ -259,6 +286,11 @@ async function removePopup (popupEle){
     if (popupEle === savePopup) {
         document.removeEventListener('pointerdown', handleCancelSavePopup)
         document.removeEventListener('keydown', handleCancelSavePopup)
+        // 恢复按钮
+        if(savePopup.needEmpty) {
+            savePopup.extendBtn.classList.toggle('orca-switch-on')
+            savePopup.needEmpty = false
+        }
         // orca.notify("success", "[tabsman] 移除save监听");
     }
     if (popupEle === confirmPopup) {

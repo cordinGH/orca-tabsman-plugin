@@ -886,10 +886,12 @@ async function getAllWorkspace(){
 }
 
 // 删除指定name的工作空间，返回值1用于删除时是否正处于该工作区
+// let lastWorkspaceName = ""
 async function deleteWorkspace(name) {
     const sname = String(name)
     await orca.plugins.removeData("tabsman-workspace", sname)
     await orca.plugins.removeData("tabsman-workspace-scroll", sname)
+    // if (lastWorkspaceName === sname) await orca.plugins.removeData("tabsman-workspace-feature", "last-workspace-name")
     orca.notify("success", "[tabsman]工作区删除成功");
     // 正在工作区就先退出
     if (workspaceNow === sname) {
@@ -905,6 +907,7 @@ function deleteAllWorkspace() {
     if (workspaceNow !== "") exitWorkspace()
     orca.plugins.clearData("tabsman-workspace")
     orca.plugins.clearData("tabsman-workspace-scroll")
+    // orca.plugins.clearData("tabsman-workspace-feature")
 }
 
 // 退出当前工作空间
@@ -938,12 +941,14 @@ async function openWorkspace(name = ""){
     if (workspaceNow === "") {
         await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
         await orca.plugins.setData('tabsman-workspace-scroll', "tabsman-workspace-exit", JSON.stringify(getPanelScrollInfo()));
+        // await orca.plugins.setData('tabsman-workspace-feature', "last-workspace-name", JSON.stringify(sname));
     } else if (sname === "") {
         // 丢弃过时的退出点
         await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
     } else if (sname) {
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
+        // await orca.plugins.setData('tabsman-workspace-feature', "last-workspace-name", JSON.stringify(sname));
     }
     workspaceNow = sname
 
@@ -1357,6 +1362,9 @@ async function start(callback = null) {
     // 每次启动时先重置退出点
     await orca.plugins.removeData("tabsman-workspace","tabsman-workspace-exit")
     WorkspaceRender.startWSRender()
+    // const n = await orca.plugins.getData('tabsman-workspace-feature', 'last-workspace-name')
+    // if (n) lastWorkspaceName = JSON.parse(n)
+    // WorkspaceRender.startWSRender(lastWorkspaceName)
     /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
 }
 

@@ -29,6 +29,7 @@ const closePopupwithAnimation = window.pluginTabsman.closePopupwithAnimation
 
 // 启动初始渲染
 export async function startWSRender() {
+// export async function startWSRender(lastWorkspaceName = "") {
     // 创建固定元素，保存按钮和WS容器
     wsTools = createDomWithClass("div", "plugin-tabsman-ws", orcaHeadbarSidebarTools)
     saveButton = createDomWithClass("button", "plugin-tabsman-ws-save orca-button plain", wsTools)
@@ -101,6 +102,13 @@ export async function startWSRender() {
             savePopup.style.top = "var(--orca-height-headbar)";
         }
     })
+
+    // setTimeout(() => {
+    //     if (lastWorkspaceName) {
+    //         const item = wsItemsObj[lastWorkspaceName]
+    //         if (item) item.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    //     }
+    // },1000)
 }
 
 

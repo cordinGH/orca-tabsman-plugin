@@ -828,7 +828,7 @@ function getPanelScrollInfo() {
 }
 
 // 保存工作空间
-async function saveWorkspace(name, needEmpty = false){
+async function saveWorkspace(name, onlyActiveTab = false){
     const sname = String(name)
     // 时间戳前缀用于排序（getDataKeys获取的数组是按照keys的码值排序的）
     // 【变更】不再刻意重名，只禁止恶意重名：一个时间戳内连续生成相同name
@@ -840,19 +840,20 @@ async function saveWorkspace(name, needEmpty = false){
         return ""
     }
 
-    if (needEmpty) {
-        const currentBlockId = new Date(new Date().toDateString());
-        const tabInfo = await generateTabNameAndIcon(currentBlockId);
-        const tab = createTabObject(currentBlockId, "", tabInfo.icon, tabInfo.name);
-        tab.isActive = true
-        tab.backStack.push({
-            activePanel: "",
-            view: "journal",
-            viewArgs: { date: new Date(new Date().toDateString())}
-        });
-        const tabsEmpty = {}
-        tabsEmpty[tab.id] = tab;
-        await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabsEmpty));
+    if (onlyActiveTab) {
+        // const currentBlockId = new Date(new Date().toDateString());
+        // const tabInfo = await generateTabNameAndIcon(currentBlockId);
+        // const tab = createTabObject(currentBlockId, "", tabInfo.icon, tabInfo.name);
+        // tab.isActive = true
+        // tab.backStack.push({
+        //     activePanel: "",
+        //     view: "journal",
+        //     viewArgs: { date: new Date(new Date().toDateString())}
+        // });
+        const tab = activeTabs[orca.state.activePanel]
+        const tabsNew = {}
+        tabsNew[tab.id] = tab;
+        await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabsNew));
 
     } else {
         await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));

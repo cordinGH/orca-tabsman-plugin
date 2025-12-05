@@ -216,16 +216,16 @@ async function appendSavePopup() {
     inputActualinput.placeholder = "请为新工作区命名..."
     inputActualinput.type = "text"
 
-    // 选项按钮，选择是否新建空工作区
+    // 选项按钮，选择是否仅保存当前tab
     const optionDiv = createDomWithClass("div", 'plugin-tabsman-ws-save_popup-option', saveInputBox)
-    optionDiv.textContent = "基于当前Tabs新建"
+    optionDiv.textContent = "仅保存当前Tab"
     Object.assign(optionDiv.style, {
         display: "flex",
         justifyContent: "space-between"
     })
-    const extendBtn = createDomWithClass("button", "orca-switch orca-switch-on", optionDiv)
+    const extendBtn = createDomWithClass("button", "orca-switch", optionDiv)
     savePopup.extendBtn = extendBtn
-    savePopup.needEmpty = false
+    savePopup.onlyActiveTab = false
     const btnIcon = createDomWithClass("span", "orca-switch-toggle", extendBtn)
 
     // 确认按钮
@@ -240,7 +240,7 @@ async function appendSavePopup() {
     inputError.textContent = "1毫秒内创建多次？emmm"
 
     extendBtn.onclick = function(){
-        savePopup.needEmpty = !(savePopup.extendBtn.classList.toggle('orca-switch-on'))
+        savePopup.onlyActiveTab = savePopup.extendBtn.classList.toggle('orca-switch-on')
     }
 
     yesBtn.onclick = async function (){
@@ -255,7 +255,7 @@ async function appendSavePopup() {
         }
 
         let saveReturn = null
-        if (savePopup.needEmpty) {
+        if (savePopup.onlyActiveTab) {
             saveReturn = await window.pluginTabsman.saveWS(savePopup.result, true)
         } else {
             saveReturn = await window.pluginTabsman.saveWS(savePopup.result)
@@ -295,9 +295,9 @@ async function removePopup (popupEle){
         document.removeEventListener('pointerdown', handleCancelSavePopup)
         document.removeEventListener('keydown', handleCancelSavePopup)
         // 恢复按钮
-        if(savePopup.needEmpty) {
+        if(savePopup.onlyActiveTab) {
             savePopup.extendBtn.classList.toggle('orca-switch-on')
-            savePopup.needEmpty = false
+            savePopup.onlyActiveTab = false
         }
         // orca.notify("success", "[tabsman] 移除save监听");
     }

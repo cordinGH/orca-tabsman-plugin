@@ -652,8 +652,6 @@ async function deleteTab(tabId) {
     const wasActiveTab = activeTabs[tabPanelId] === tab;
     if (wasActiveTab && tabIdSet.size === 1) {
         // 如果删除的是活跃标签页，且当前仅剩一个标签页，则直接关闭面板        
-        
-        // 调用原始函数关闭面板
         orca.nav.close(tabPanelId);
 
         // 清理标签页数据和排序缓存
@@ -903,7 +901,7 @@ let workspaceSwitching = false
 // 参数默认值为退出点
 async function openWorkspace(name = ""){
     const sname = String(name)
-
+    // console.log("1开始打开sname:", sname,"当前为：",workspaceNow)
     // 如果当前打开的就是目标工作区，则跳过。
     if (workspaceNow === sname) {
         orca.notify("info", "[tabsman]当前已在该工作空间")
@@ -912,15 +910,12 @@ async function openWorkspace(name = ""){
     
     // 读取工作空间数据，包括滚动信息
     const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname ? sname : "tabsman-workspace-exit");
-    const workspaceScrollRaw = await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit")
-    let workspaceScroll = null;
-    if (workspaceScrollRaw) workspaceScroll = JSON.parse(workspaceScrollRaw);
-
     if (!workspaceRaw) {
         orca.notify("info", "[tabsman]目标工作空间数据不存在")
         return
     }
 
+    // console.log("2开始打开sname:", sname,"当前为：",workspaceNow)
     // 维护退出点数据
     if (workspaceNow === "") {
         await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
@@ -963,11 +958,10 @@ async function openWorkspace(name = ""){
     tabIdSetByPanelId = workspaceTabIdSetByPanelId
 
 
-
     // 新建新的面板
     // 临时面板, 用作创建新面板的坐标
     workspaceSwitching = true
-    const tmp = await originalAddTo(orca.state.activePanel, "right")
+    const tmp = originalAddTo(orca.state.activePanel, "right")
     orca.nav.closeAllBut(tmp)
 
     // 遍历activetab以准备新面板
@@ -986,7 +980,7 @@ async function openWorkspace(name = ""){
         }
 
         // 调用原始的addTo，以确保不改变tabsman数据结构
-        const newPanelId = await originalAddTo(orca.state.activePanel, "left", viewpanel)
+        const newPanelId = originalAddTo(orca.state.activePanel, "left", viewpanel)
         newPanelIds.push(newPanelId)
         const oldPanelId = tab.panelId
 
@@ -1005,15 +999,20 @@ async function openWorkspace(name = ""){
         updateSortedTabsCache(newPanelId)
 
         // 滚动到上次打开的位置
-        if (workspaceScroll){
-            setTimeout(() => {
+        const workspaceScrollRaw = await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit")
+        if (workspaceScrollRaw) {
+            const workspaceScroll = JSON.parse(workspaceScrollRaw)
+            const topValue = workspaceScroll[oldPanelId]
+            if (topValue){
                 const selector = ".orca-panel[data-panel-id='" + newPanelId + "']>.orca-hideable>.orca-block-editor"
-                const scrollContainer = document.querySelector(selector)
-                scrollContainer.scrollTo({
-                    top: workspaceScroll[oldPanelId],
-                    behavior: 'smooth'
-                });
-            }, 500);
+                setTimeout(() => {
+                    const scrollContainer = document.querySelector(selector)
+                    scrollContainer.scrollTo({
+                        top: topValue,
+                        behavior: 'smooth'
+                    });
+                }, 500);
+            }
         }
     }
 
@@ -1147,7 +1146,7 @@ function setupCommandInterception() {
     orca.commands.registerBeforeCommand('core.goForward', beforeCommandHooks.goForward);
     
     // 3. 包装 orca.nav.goTo 以支持 Ctrl+点击创建后台标签页
-    originalGoTo = orca.nav.goTo;
+    originalGoTo = orca.nav.goTo.bind(orca.nav);
     orca.nav.goTo = async function(view, viewArgs, panelId) {        
         // 处理 Ctrl+Click，且没有按下shift：创建后台标签页
         if (window.event && window.event.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
@@ -1170,7 +1169,7 @@ function setupCommandInterception() {
         }
         
         // 所有其他情况都执行原函数
-        return originalGoTo.call(this, view, viewArgs, panelId);
+        return originalGoTo(view, viewArgs, panelId);
     };
     
     // 4. 拦截 core.closePanel 命令（关闭当前面板）
@@ -1220,49 +1219,7 @@ function setupCommandInterception() {
         return true; // 允许命令继续执行
     };
     orca.commands.registerBeforeCommand('core.closeOtherPanels', beforeCommandHooks.closeOtherPanels);
-    
-    // 6. 包装 addTo API（同步函数，返回面板ID）
-    orca.nav.addTo = async function(id, dir, src) {
-        // 调用原始函数
-        const newPanelId = originalAddTo.call(this, id, dir, src);
-        console.log('[tabsman] ✅ 面板创建API执行完成: addTo', newPanelId);
-        
-        // 如果成功创建面板，立即处理标签页创建
-        if (newPanelId) await createTabForNewPanel(newPanelId);
-        
-        return newPanelId;
-    };
-    
-    // 7. 包装 openInLastPanel API（同步函数，返回void）
-    orca.nav.openInLastPanel = async function(view, viewArgs) {
-        // 处理 Ctrl+Shift+Click：创建前台标签页
-        if (window.event && window.event.ctrlKey && window.event.shiftKey && window.event.button === 0) {
-            try {
-                const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
-                // console.log(`orca.state.activePanel ==============> ${orca.state.activePanel}`)
-                if (orca.state.activePanel !== '_globalSearch') {
-                    const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-                    await createTab(targetBlockId, true, activePanelId);
-                } else {
-                    await createTab(targetBlockId, true);
-                }
-                orca.notify("success", "[tabsman] 已创建前台标签页");
-            } catch (error) {
-                console.error('[tabsman] 创建前台标签页失败:', error);
-                orca.notify("error", "创建前台标签页失败");
-            }
-            return;
-        }
-        
-        // 调用原始函数
-        originalOpenInLastPanel.call(this, view, viewArgs);
-        console.log('[tabsman] ✅ 面板创建API执行完成: openInLastPanel');
-        
-        // 如果还没有这个面板的标签页，则初始化一份默认的标签页
-        if (!tabIdSetByPanelId.has(orca.state.activePanel)) await createTabForNewPanel();
-    };
 
-    // console.log('[tabsman] ✅ 命令拦截器设置完成: 拦截了 core.goBack, core.goForward, core.closePanel, core.closeOtherPanels 命令，包装了 orca.nav.addTo, orca.nav.openInLastPanel API');
 }
 
 // ==================== 初始化和清理 ====================
@@ -1284,10 +1241,44 @@ async function start(callback = null) {
         }
     }
     
-    // 保存原始API函数
-    originalAddTo = orca.nav.addTo;
-    originalOpenInLastPanel = orca.nav.openInLastPanel;
-    // console.log('[tabsman] ✅ 原始API函数已保存');
+    // 包装 addTo API
+    originalAddTo = orca.nav.addTo.bind(orca.nav);
+    orca.nav.addTo = function(id, dir, src) {
+        const newPanelId = originalAddTo(id, dir, src);
+        if (newPanelId) createTabForNewPanel(newPanelId);
+        return newPanelId;
+    };
+    
+    // 包装 openInLastPanel API（同步函数，返回void）
+    originalOpenInLastPanel = orca.nav.openInLastPanel.bind(orca.nav);
+    orca.nav.openInLastPanel = function(view, viewArgs) {
+        // 处理 Ctrl+Shift+Click：创建前台标签页
+        if (window.event && window.event.ctrlKey && window.event.shiftKey && window.event.button === 0) {
+            try {
+                const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
+                // console.log(`orca.state.activePanel ==============> ${orca.state.activePanel}`)
+                if (orca.state.activePanel !== '_globalSearch') {
+                    const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+                    createTab(targetBlockId, true, activePanelId);
+                } else {
+                    createTab(targetBlockId, true);
+                }
+                orca.notify("success", "[tabsman] 已创建前台标签页");
+            } catch (error) {
+                console.error('[tabsman] 创建前台标签页失败:', error);
+                orca.notify("error", "创建前台标签页失败");
+            }
+            return;
+        }
+        
+        // 调用原始函数
+        originalOpenInLastPanel(view, viewArgs);
+        console.log('[tabsman] ✅ 面板创建API执行完成: openInLastPanel');
+        
+        // 如果还没有这个面板的标签页，则初始化一份默认的标签页
+        if (!tabIdSetByPanelId.has(orca.state.activePanel)) createTabForNewPanel();
+    };
+
     
     // 为启动时的所有面板创建初始标签页
     try {

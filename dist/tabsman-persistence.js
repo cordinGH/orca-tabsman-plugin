@@ -173,27 +173,18 @@ function wakeTabArray(rawTabArray, tabType = "") {
     
     switch (tabType) {
         case "recently-closed": {
-            for (let i = 0; i < rawTabArray.length; i++) {
-                const rawTab = rawTabArray[i];
+            for (const rawTab of rawTabArray) {
 
                 if(!isWorkspace) rawTab.panelId = currentPanelId;
 
-                // 转换 backStack
-                for (let j = 0; j < rawTab.backStack.length; j++) {
-                    const item = rawTab.backStack[j];
-                    // 只处理日期字符串，跳过其他参数
-                    if (item.viewArgs && typeof item.viewArgs.date === 'string') {
-                        item.viewArgs.date = new Date(item.viewArgs.date);
-                    }
+                // 转换 backStack，只处理日志视图，block视图不用处理
+                for (const item of rawTab.backStack) {
+                    if (item.view === "journal") item.viewArgs.date = new Date(item.viewArgs.date)
                 }
 
-                // 转换 forwardStack
-                for (let j = 0; j < rawTab.forwardStack.length; j++) {
-                    const item = rawTab.forwardStack[j];
-                    // 只处理日期字符串，跳过其他参数
-                    if (item.viewArgs && typeof item.viewArgs.date === 'string') {
-                        item.viewArgs.date = new Date(item.viewArgs.date);
-                    }
+                // 转换 forwardStack，只处理日志视图，block视图不用处理
+                for (const item of rawTab.forwardStack) {
+                    if (item.view === "journal") item.viewArgs.date = new Date(item.viewArgs.date)
                 }
                 // 解析日期字段
                 wakeTabFields(rawTab);
@@ -202,8 +193,7 @@ function wakeTabArray(rawTabArray, tabType = "") {
         }
 
         case "favorite": {
-            for (let i = 0; i < rawTabArray.length; i++) {
-                const rawTab = rawTabArray[i];
+            for (const rawTab of rawTabArray) {
                 rawTab.panelId = currentPanelId;
                 // 解析日期字段
                 wakeTabFields(rawTab);
@@ -212,8 +202,7 @@ function wakeTabArray(rawTabArray, tabType = "") {
         }
 
         case "pinned": {
-            for (let i = 0; i < rawTabArray.length; i++) {
-                const rawTab = rawTabArray[i];
+            for (const rawTab of rawTabArray) {
                 rawTab.panelId = currentPanelId;
                 // 解析日期字段
                 wakeTabFields(rawTab);

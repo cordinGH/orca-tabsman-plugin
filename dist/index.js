@@ -97,7 +97,7 @@ async function load(name) {
             label: "启用命令：清空持久化数据",
             description: "启用后可以在命令面板中使用清空持久化数据功能",
             type: "boolean",
-            defaultValue: true
+            defaultValue: false
         }
     });
     

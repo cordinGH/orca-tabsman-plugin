@@ -2,6 +2,7 @@
 // 负责创建和注入标签页管理器的UI外壳到Orca侧边栏中
 let tabsmanShell = null;
 const createDomWithClass = window.pluginTabsman.createDomWithClass
+let commandInterceptHandler = null
 
 /**
  * 创建并注入可隐藏容器到目标元素
@@ -79,6 +80,7 @@ async function injectTabsmanShell() {
         };
         
         // 设置Orca命令拦截
+        createCommandInterceptHandler()
         setOrcaCommandIntercept();
         
     } catch (error) {
@@ -117,40 +119,41 @@ function cleanupTabsmanShell() {
     tabsmanShell = null;
 }
 
-
-let commandHandler = {
-    removeFn: (optionName) => {
-        const bodyApp = document.querySelector("body>#app");
-        // 如果当前是tabs栏，则先移除tabs栏选中样式，再查看当前是否就是目标栏，不是，就返回true执行切换，是就false不用执行。
-        if (tabsmanShell.parentElement.classList.contains('plugin-tabsman-selected')) {
-            tabsmanShell.parentElement.classList.remove('plugin-tabsman-selected');
-            tabsmanShell.tabOptionEl.classList.remove('orca-selected');
-
-            // 如果是关闭面板，就正常执行命令
-            if (bodyApp.className === "sidebar-closed") return true
-
-            return orca.state.sidebarTab !== optionName;
-        }
-        return true;
-    },
-    goFavorites: () => commandHandler.removeFn("favorites"),
-    goTags: () => commandHandler.removeFn("tags"),
-    goPages: () => commandHandler.removeFn("pages")
+function createCommandInterceptHandler() {
+    commandInterceptHandler = {
+        removeFn: (optionName) => {
+            const bodyApp = document.querySelector("body>#app");
+            // 如果当前是tabs栏，则先移除tabs栏选中样式，再查看当前是否就是目标栏，不是，就返回true执行切换，是就false不用执行。
+            if (tabsmanShell.parentElement.classList.contains('plugin-tabsman-selected')) {
+                tabsmanShell.parentElement.classList.remove('plugin-tabsman-selected');
+                tabsmanShell.tabOptionEl.classList.remove('orca-selected');
+    
+                // 如果是关闭面板，就正常执行命令
+                if (bodyApp.className === "sidebar-closed") return true
+    
+                return orca.state.sidebarTab !== optionName;
+            }
+            return true;
+        },
+        goFavorites: () => commandInterceptHandler.removeFn("favorites"),
+        goTags: () => commandInterceptHandler.removeFn("tags"),
+        goPages: () => commandInterceptHandler.removeFn("pages")
+    }
 }
 
 /** 设置Orca命令拦截 */
 function setOrcaCommandIntercept() {
-    orca.commands.registerBeforeCommand("core.sidebar.goFavorites", commandHandler.goFavorites);
-    orca.commands.registerBeforeCommand("core.sidebar.goTags", commandHandler.goTags);
-    orca.commands.registerBeforeCommand("core.sidebar.goPages", commandHandler.goPages);
+    orca.commands.registerBeforeCommand("core.sidebar.goFavorites", commandInterceptHandler.goFavorites);
+    orca.commands.registerBeforeCommand("core.sidebar.goTags", commandInterceptHandler.goTags);
+    orca.commands.registerBeforeCommand("core.sidebar.goPages", commandInterceptHandler.goPages);
 }
 
 /** 清理Orca命令拦截 */
 function cleanupOrcaCommandIntercept() {
-    orca.commands.unregisterBeforeCommand("core.sidebar.goFavorites", commandHandler.goFavorites);
-    orca.commands.unregisterBeforeCommand("core.sidebar.goTags", commandHandler.goTags);
-    orca.commands.unregisterBeforeCommand("core.sidebar.goPages", commandHandler.goPages);
-    commandHandler = null;
+    orca.commands.unregisterBeforeCommand("core.sidebar.goFavorites", commandInterceptHandler.goFavorites);
+    orca.commands.unregisterBeforeCommand("core.sidebar.goTags", commandInterceptHandler.goTags);
+    orca.commands.unregisterBeforeCommand("core.sidebar.goPages", commandInterceptHandler.goPages);
+    commandInterceptHandler = null;
 }
 
 // 导出模块接口

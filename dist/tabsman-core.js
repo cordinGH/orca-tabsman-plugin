@@ -1430,6 +1430,8 @@ function destroy() {
     
     // 清理UI渲染回调函数
     renderTabsCallback = null;
+
+    WorkspaceRender.stopWSRender()
 }
 
 

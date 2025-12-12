@@ -111,6 +111,9 @@ export async function startWSRender() {
     // },1000)
 }
 
+export function stopWSRender(){
+    wsTools.remove()
+}
 
 // 工具函数，移除选中样式和选中元素记录
 function clearWSItemSelected() {

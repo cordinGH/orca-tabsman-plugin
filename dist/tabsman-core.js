@@ -572,34 +572,30 @@ async function switchTab(tabId) {
     const tabPanelId = tab.panelId;
     const activeTab = activeTabs[tabPanelId];
 
-    // 切换到标签页所属的面板
-    if (tabPanelId !== orca.state.activePanel) {
-        orca.nav.switchFocusTo(tabPanelId);
-    }
+    // 如果当前不在目标tab面板，先切过去。
+    if (tabPanelId !== orca.state.activePanel) orca.nav.switchFocusTo(tabPanelId);
 
-    if (activeTab === tab) {
-        orca.notify("info", "[tabsman] 当前已在该标签页")
-        return true;
-    } else {
-        // 重新标记活跃标签页
-        activeTab.isActive = false;        
-        tab.isActive = true;
-        activeTabs[tabPanelId] = tab;
-        // 标记为标签页切换操作，无需更新Tab历史栈
-        isInternalNavigation = true;
+    // 如果目标tab就是活跃标签页，不需要处理。
+    if (activeTab === tab) return true
+    
+    // 重新标记活跃标签页
+    activeTab.isActive = false;        
+    tab.isActive = true;
+    activeTabs[tabPanelId] = tab;
+    // 标记为标签页切换操作，无需更新Tab历史栈
+    isInternalNavigation = true;
 
-        // 如果目标标签页和活跃标签页的当前块ID相同，后续不会触发goTo跳转，也就不会重置标志位，因此这里手动重置
-        // 日期对象比较其字符串值是否为同一天。数字块ID直接比较是否相等。
-        const isSameBlockId = (activeTab.currentBlockId instanceof Date && tab.currentBlockId instanceof Date) 
-            ? activeTab.currentBlockId.toDateString() === tab.currentBlockId.toDateString()
-            : activeTab.currentBlockId === tab.currentBlockId;
+    // 如果目标标签页和活跃标签页的当前块ID相同，后续不会触发goTo跳转，也就不会重置标志位，因此这里手动重置
+    // 日期对象比较其字符串值是否为同一天。数字块ID直接比较是否相等。
+    const isSameBlockId = (activeTab.currentBlockId instanceof Date && tab.currentBlockId instanceof Date) 
+        ? activeTab.currentBlockId.toDateString() === tab.currentBlockId.toDateString()
+        : activeTab.currentBlockId === tab.currentBlockId;
+    
+    if (isSameBlockId) {
+        isInternalNavigation = false;
         
-        if (isSameBlockId) {
-            isInternalNavigation = false;
-            
-            // 由于没有执行goTo跳转，UI不会自动更新，需要手动刷新
-            if (renderTabsCallback) renderTabsCallback();
-        }
+        // 由于没有执行goTo跳转，UI不会自动更新，需要手动刷新
+        if (renderTabsCallback) renderTabsCallback();
     }
     
     // 导航到标签页的当前内容

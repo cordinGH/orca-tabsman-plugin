@@ -371,7 +371,7 @@ export {
 /** ========== 停靠面板状态订阅函数 ========== */
 /**
  * 订阅停靠面板ID变化
- * 通过监听 orca.state.plugins 等待 dockedPanelState 暴露后再订阅
+ * 通过监听 orca.state.plugins 等待 pluginDockpanel.panel 暴露后再订阅
  * @returns {void}
  */
 function dockedpanelSubscribe() {
@@ -388,14 +388,14 @@ function dockedpanelSubscribe() {
         return loadingPlugins.length === 0;
     };
 
-    // 检查 window.dockedPanelState 是否已暴露
+    // 检查 window.pluginDockpanel.panel 是否已暴露
     const checkAndSubscribe = () => {
-        // 检查是否存在 dockedPanelState 对象，存在就订阅，不存在就结束等待下一次检查，直到所有插件加载完成。
-        if (window.dockedPanelState) {
+        // 检查是否存在 pluginDockpanel.panel 对象，存在就订阅，不存在就结束等待下一次检查，直到所有插件加载完成。
+        if (window.pluginDockpanel.panel) {
             // 订阅停靠面板状态变化
-            unsubscribeDockedPanelId = window.Valtio.subscribe(window.dockedPanelState, () => {
-                if (window.dockedPanelState.id !== null) {
-                    dockedPanelId = window.dockedPanelState.id;
+            unsubscribeDockedPanelId = window.Valtio.subscribe(window.pluginDockpanel.panel, () => {
+                if (window.pluginDockpanel.panel.id !== null) {
+                    dockedPanelId = window.pluginDockpanel.panel.id;
                     renderTabsByPanel();
                 }
             });
@@ -406,7 +406,7 @@ function dockedpanelSubscribe() {
         
         // 如果所有插件都加载完了还没有，说明没有 dockpanel 插件
         if (areAllPluginsLoaded()) {
-            console.log('[tabsman] 所有插件已加载完成，未检测到 dockedPanelState，停止等待');
+            console.log('[tabsman] 所有插件已加载完成，未检测到 pluginDockpanel.panel，停止等待');
             unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
             return true; // 返回 true 表示结束等待
         }
@@ -418,11 +418,11 @@ function dockedpanelSubscribe() {
     if (checkAndSubscribe()) {
         return;
     }
-    // 订阅插件列表变化，变化时触发回调，直到找到 dockedPanelState 或所有插件加载完成后，退订。
+    // 订阅插件列表变化，变化时触发回调，直到找到 pluginDockpanel.panel 或所有插件加载完成后，退订。
     unsubscribeDockedPanelWaiter = window.Valtio.subscribe(orca.state.plugins, () => {
         checkAndSubscribe();
     });
-    console.log('[tabsman] 正在等待 dockedPanelState 暴露...');
+    console.log('[tabsman] 正在等待 pluginDockpanel.panel 暴露...');
 }
 
 

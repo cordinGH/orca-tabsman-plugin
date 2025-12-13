@@ -577,7 +577,7 @@ async function switchTab(tabId) {
 
     // 如果目标tab就是活跃标签页，不需要处理。
     if (activeTab === tab) return true
-    
+
     // 重新标记活跃标签页
     activeTab.isActive = false;        
     tab.isActive = true;
@@ -1163,35 +1163,9 @@ function setupCommandInterception() {
         return false; // 阻止原始命令执行
     };
     orca.commands.registerBeforeCommand('core.goForward', beforeCommandHooks.goForward);
+
     
-    // 3. 包装 orca.nav.goTo 以支持 Ctrl+点击创建后台标签页
-    originalGoTo = orca.nav.goTo.bind(orca.nav);
-    orca.nav.goTo = async function(view, viewArgs, panelId) {        
-        // 处理 Ctrl+Click，且没有按下shift：创建后台标签页
-        if (window.event && window.event.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
-            // 根据视图类型确定目标内容ID
-            const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
-            try {
-                // console.log(`panelId !== '_globalSearch' ================> ${panelId !== '_globalSearch'}`)
-                if (panelId === '_globalSearch' || panelId === undefined) {
-                    const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-                    await createTab(targetBlockId, false, activePanelId);
-                } else {
-                    await createTab(targetBlockId, false);
-                }
-                orca.notify("success", "[tabsman] 已创建后台标签页");
-            } catch (error) {
-                console.error('[tabsman] 创建后台标签页失败:', error);
-                orca.notify("error", "创建后台标签页失败");
-            }
-            return;
-        }
-        
-        // 所有其他情况都执行原函数
-        return originalGoTo(view, viewArgs, panelId);
-    };
-    
-    // 4. 拦截 core.closePanel 命令（关闭当前面板）
+    // 3. 拦截 core.closePanel 命令（关闭当前面板）
     beforeCommandHooks.closePanel = () => {       
         if (tabIdSetByPanelId.size === 1) {
             // orca.notify("info", "[tabsman] 当前仅剩一个面板，无法关闭关闭面板");
@@ -1215,7 +1189,7 @@ function setupCommandInterception() {
     };
     orca.commands.registerBeforeCommand('core.closePanel', beforeCommandHooks.closePanel);
     
-    // 5. 拦截 core.closeOtherPanels 命令（关闭除当前面板外的所有面板）
+    // 4. 拦截 core.closeOtherPanels 命令（关闭除当前面板外的所有面板）
     beforeCommandHooks.closeOtherPanels = () => {
         const activePanelId = orca.state.activePanel;
         
@@ -1259,6 +1233,32 @@ async function start(callback = null) {
             // await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
         }
     }
+
+    // 包装 orca.nav.goTo 以支持 Ctrl+点击创建后台标签页，且确保始终是当前面板跳转
+    originalGoTo = orca.nav.goTo.bind(orca.nav);
+    orca.nav.goTo = function(view, viewArgs, panelId) {  
+        // 处理 Ctrl+Click，且没有按下shift：创建后台标签页
+        if (window.event && window.event.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
+            // 根据视图类型确定目标内容ID
+            const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
+
+            // 如果去往的面板不在当前tabs面板内（例如'_globalSearch'），则在当前activetab里打开
+            if (!activeTabs.hasOwnProperty(panelId)) {
+                const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+                createTab(targetBlockId, false, activePanelId);
+            }
+            
+            createTab(targetBlockId, false);
+            orca.notify("success", "[tabsman] 已创建后台标签页");
+            return;
+        }
+
+        // 不在当前面板先切过去，以免历史记录填错。
+        if (panelId !== orca.state.activePanel) orca.nav.switchFocusTo(panelId);
+        
+        // 所有其他情况都执行原函数
+        return originalGoTo(view, viewArgs, panelId);
+    };
     
     // 包装 addTo API
     originalAddTo = orca.nav.addTo.bind(orca.nav);

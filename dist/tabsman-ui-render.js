@@ -62,13 +62,6 @@ function cleanupSubscription(unsubscribeFn) {
     return null;
 }
 
-/**
- * 获取tabsman标签页容器元素
- * @returns {Element|null} 返回标签页容器元素
- */
-function getTabsmanTabsEle() {
-    return tabsmanTabsEle;
-}
 
 /**
  * 创建单个标签页的DOM元素
@@ -225,7 +218,7 @@ async function handleTabsmanClick(e) {
             } 
 
             // 不存在停靠面板，则不做上述联动操作，直接切换到目标标签页
-            await TabsmanCore.actions.switchTab(tab.id);
+            TabsmanCore.actions.switchTab(tab.id);
         }
         
         return;
@@ -237,10 +230,8 @@ async function handleTabsmanClick(e) {
             // TODO: 实现折叠/展开功能
             // orca.notify('切换面板折叠状态');
         } else if (target.classList.contains('plugin-tabsman-panel-new-tab')) {
-            const panelId = target.getAttribute('data-tabsman-panel-id');
-            if (panelId) {
-                await TabsmanCore.actions.createTab(-1, false, panelId);
-            }
+            const panelId = target.getAttribute('data-tabsman-panel-id')
+            if (panelId) TabsmanCore.actions.createTab(-1, false, panelId)
         }
     }
 }
@@ -252,7 +243,6 @@ async function handleTabsmanClick(e) {
 async function renderTabsByPanel() {
     if (rendering) return;
     rendering = true;
-    const tabsmanTabsEle = getTabsmanTabsEle();
     if (!tabsmanTabsEle) {
         console.warn('未找到tabsman标签页容器');
         return;

@@ -41,8 +41,9 @@ const TabsmanCore = {
 // 全局变量存储标签页容器元素
 let tabsmanTabsEle = null;
 
-let unsubscribeDockedPanelId = null;
+let unsubscribeDockedPanel = null
 let unsubscribeDockedPanelWaiter = null;
+let pluginDockPanelReady = false
 let dockedPanelId = null;
 
 let rendering = false;
@@ -316,7 +317,8 @@ async function startTabsRender() {
         tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
         tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
-        dockedpanelSubscribe();
+        // 订阅插件列表变化，为停靠面板的id绑定订阅
+        unsubscribeDockedPanelWaiter = window.Valtio.subscribe(orca.state.plugins, () => dockedpanelSubscribe())
 
         return true;
 
@@ -340,8 +342,8 @@ function stopTabsRender() {
     // 清理注入的外壳（包含所有渲染元素）
     cleanupTabsmanShell();
     
-    // 清理所有订阅
-    unsubscribeDockedPanelId = cleanupSubscription(unsubscribeDockedPanelId);
+    // 清理订阅
+    unsubscribeDockedPanel = cleanupSubscription(unsubscribeDockedPanel);
     unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
 }
 
@@ -353,60 +355,34 @@ export {
 };
 
 
-/** ========== 停靠面板状态订阅函数 ========== */
-/**
- * 订阅停靠面板ID变化
- * 通过监听 orca.state.plugins 等待 pluginDockpanel.panel 暴露后再订阅
- * @returns {void}
- */
+// 订阅停靠面板插件
 function dockedpanelSubscribe() {
-    if (!window.Valtio || !window.Valtio.subscribe) {
-        console.warn('[tabsman] Valtio 不可用，无法订阅停靠面板状态');
-        return;
+    // 已就位不需要处理
+    if (pluginDockPanelReady) return
+
+    const pluginInfoArray = Object.values(orca.state.plugins)
+    for (const pluginInfo of pluginInfoArray) {
+        if (!pluginInfo.settings) continue
+        if (!Object.hasOwn(pluginInfo.settings, "pluginDockPanelDefaultBlockId")) continue
+        // 先重置，防止用户关闭了停靠面板插件
+        pluginDockPanelReady = false
+        if (Object.hasOwn(pluginInfo, "module")) {
+            pluginDockPanelReady = true
+            break
+        }
     }
 
-    // 检查所有插件是否都已加载完成
-    const areAllPluginsLoaded = () => {
-        const { plugins } = orca.state;
-        const enabledPlugins = Object.entries(plugins).filter(([, plugin]) => plugin && plugin.enabled);
-        const loadingPlugins = enabledPlugins.filter(([, plugin]) => !plugin.module);
-        return loadingPlugins.length === 0;
-    };
-
-    // 检查 window.pluginDockpanel.panel 是否已暴露
-    const checkAndSubscribe = () => {
-        // 检查是否存在 pluginDockpanel.panel 对象，存在就订阅，不存在就结束等待下一次检查，直到所有插件加载完成。
-        if (window.pluginDockpanel.panel) {
-            // 订阅停靠面板状态变化
-            unsubscribeDockedPanelId = window.Valtio.subscribe(window.pluginDockpanel.panel, () => {
-                // 取消停靠面板也应当触发刷新
-                dockedPanelId = window.pluginDockpanel.panel.id;
-                renderTabsByPanel();
-            });
-            console.log('[tabsman] 已订阅停靠面板状态变化');
-            unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
-            return true;
-        }
-        
-        // 如果所有插件都加载完了还没有，说明没有 dockpanel 插件
-        if (areAllPluginsLoaded()) {
-            console.log('[tabsman] 所有插件已加载完成，未检测到 pluginDockpanel.panel，停止等待');
-            unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
-            return true; // 返回 true 表示结束等待
-        }
-        
-        return false;
-    };
-
-    // 先尝试直接订阅（可能已经加载了）
-    if (checkAndSubscribe()) {
-        return;
+    // 审查变化后如果停靠面板依旧未就位，就清理可能存在的过时订阅（如用户关闭了停靠面板插件）
+    if (!pluginDockPanelReady) {
+        cleanupSubscription(unsubscribeDockedPanel)
+        return
     }
-    // 订阅插件列表变化，变化时触发回调，直到找到 pluginDockpanel.panel 或所有插件加载完成后，退订。
-    unsubscribeDockedPanelWaiter = window.Valtio.subscribe(orca.state.plugins, () => {
-        checkAndSubscribe();
+
+    // 订阅停靠面板id，更新时重新刷新tabs栏
+    unsubscribeDockedPanel = window.Valtio.subscribe(window.pluginDockpanel.panel, () => {
+        dockedPanelId = window.pluginDockpanel.panel.id;
+        renderTabsByPanel();
     });
-    console.log('[tabsman] 正在等待 pluginDockpanel.panel 暴露...');
 }
 
 

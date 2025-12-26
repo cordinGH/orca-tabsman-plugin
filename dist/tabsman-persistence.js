@@ -160,7 +160,10 @@ function wakeTabArray(rawTabArray, tabType = "") {
             rawTab.createdAt = new Date(rawTab.createdAt);
         }
         if (typeof rawTab.currentBlockId === 'string') {
-            rawTab.currentBlockId = new Date(rawTab.currentBlockId);
+            const testDateString = new Date(rawTab.currentBlockId);
+            // 无效的日期字符串
+            const isNotDate = !isNaN(testDateString.getTime())
+            rawTab.currentBlockId = isNotDate ? testDateString : rawTab.currentBlockId
         }
     }
 

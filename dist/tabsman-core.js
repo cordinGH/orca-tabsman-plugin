@@ -46,6 +46,8 @@ const HISTORY_CONFIG = {
 };
 const BLOCK_NOT_EXIST = 0
 
+// 插件视图特殊currentBlockId前缀
+const PREFIX_PLUGIN_VIEW = "插件视图："
 // ==================== 全局变量 ====================
 
 // 标签页UI渲染回调函数
@@ -75,6 +77,26 @@ let tabIdSetByPanelId = new Map();
 /** @type {Map<string, Array<Object>>} 按面板ID分组的已排序标签页列表缓存，用于渲染 */
 let sortedTabsByPanelId = new Map();
 
+
+function getViewAndViewArgs(currentBlockId) {
+    let view = ""
+    let viewArgs = null
+    if (currentBlockId instanceof Date) {
+        // 1. 日志视图
+        view = 'journal';
+        viewArgs = { date: currentBlockId };
+    
+    } else if (typeof currentBlockId === 'string' && currentBlockId.startsWith(PREFIX_PLUGIN_VIEW)) {
+        // 2. 插件视图
+        view = currentBlockId.slice(PREFIX_PLUGIN_VIEW.length);
+        viewArgs = {};
+    } else if (typeof currentBlockId === 'number') {
+        // 3. block视图
+        view = 'block';
+        viewArgs = { blockId: currentBlockId };
+    }
+    return {view, viewArgs}
+}
 
 /**
  * 获取所有面板的当前内容ID
@@ -132,10 +154,12 @@ async function generateTabNameAndIcon(blockId) {
     if (!blockId) return
 
     // 如果是Date对象（journal视图），直接使用日期字符串
-    if (blockId instanceof Date) return { name: blockId.toDateString(), icon: 'ti ti-calendar-smile' }
-
-    // 如果也不是数字，则表示第三方插件创建的新view
-    if (!(typeof blockId === 'number')) return {name: blockId, icon: "ti ti-apps"}        
+    if (blockId instanceof Date) {
+        return { name: blockId.toDateString(), icon: 'ti ti-calendar-smile' }
+    } else if (typeof blockId === "string" && blockId.startsWith(PREFIX_PLUGIN_VIEW)) {
+        // 第三方插件视图
+        return {name: blockId, icon: "ti ti-apps"}
+    }
 
     try {
         const block = await orca.invokeBackend("get-block", blockId);
@@ -159,12 +183,12 @@ async function generateTabNameAndIcon(blockId) {
                 name = block.aliases[0];
             } else {
                 const {text} = block
-                shortText = (text.length > 30) ? (text.slice(0, 30) + "...") : text
+                const shortText = (text.length > 30) ? (text.slice(0, 30) + "...") : text
                 name = text ? shortText : blockType
             }
         } else {
             // 非可编辑文本块，如果存在caption，则显示caption作为name
-            blockCap = blockRepr.value.cap
+            const blockCap = blockRepr.value.cap
             name = blockCap ? blockCap : blockType
         }
 
@@ -201,6 +225,7 @@ async function generateTabNameAndIcon(blockId) {
 
         return { name, icon };
     } catch (error) {
+        console.error("[tabsman]标签页生成失败", error)
         return { name: '标签页生成失败', icon: 'ti ti-cube' };
     }
 }
@@ -215,13 +240,11 @@ async function updateTabProperties() {
     if (!activeTab) return;
     
     const activePanel = orca.nav.findViewPanel(activePanelId, orca.state.panels);
-    const isJournal = activePanel.view === 'journal';
-    
-    // 立即更新块ID
-    if (isJournal) {
-        activeTab.currentBlockId = activePanel.viewArgs?.date;
-    } else {
-        activeTab.currentBlockId = activePanel.viewArgs?.blockId;
+    // 第三方插件的视图以插件自己的panel.view作为当前块id
+    switch (activePanel.view) {
+        case 'journal': activeTab.currentBlockId = activePanel.viewArgs.date; break;
+        case 'block': activeTab.currentBlockId = activePanel.viewArgs.blockId; break;
+        default: activeTab.currentBlockId = PREFIX_PLUGIN_VIEW + activePanel.view;
     }
     
     try {
@@ -327,16 +350,17 @@ function updateSortedTabsCache(panelId) {
 function setupSubscription() {
     let lastHistoryLength = orca.state.panelBackHistory.length;
     const backHistoryUnsubscribe = window.Valtio.subscribe(orca.state.panelBackHistory, () => {
+        // 切换工作区期间，只重置lastHistoryLength，不做其他处理。
+        if (workspaceSwitching) {
+            console.log("正在切换工作区")
+            lastHistoryLength = 0
+            return
+        }
+
         // orca历史减少时（由关闭面板这一行为触发。虎鲸1.41版本新特性），不做处理。
         const currentLength = orca.state.panelBackHistory.length;
         if (currentLength < lastHistoryLength) return
 
-        // 切换工作区期间，只重置lastHistoryLength，不做其他处理。
-        if (workspaceSwitching) {
-            lastHistoryLength = 0
-            return
-        }
-    
         isFillSuspended ? isFillSuspended = false : fillCurrentAccess()
 
         // 更新tab信息
@@ -493,7 +517,7 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
         switch (panel.view) {
             case 'journal': currentBlockId = panel.viewArgs.date; break;
             case 'block': currentBlockId = panel.viewArgs.blockId; break;
-            default: currentBlockId = panel.view;
+            default: currentBlockId = PREFIX_PLUGIN_VIEW + panel.view;
         }
     }
     
@@ -545,9 +569,9 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
 /**
  * 切换标签页
  * @param {string} tabId - 标签页ID
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function switchTab(tabId) {
+async function switchTab(tabId) {
     const tab = tabs[tabId];
 
     // 不存在tab，不处理
@@ -570,13 +594,16 @@ function switchTab(tabId) {
         if (renderTabsCallback) renderTabsCallback()
         isFillSuspended = false
     } else {
-        const { currentBlockId } = tab
-        const isJournal = currentBlockId instanceof Date
-        const view = isJournal ? 'journal' : 'block'
-        const viewArgs = isJournal ? { date: currentBlockId } : { blockId: currentBlockId }
+        const {currentBlockId} = tab
+        let {view, viewArgs} = getViewAndViewArgs(currentBlockId)
+        if (view === "block" && !(await orca.invokeBackend("get-block", viewArgs.blockId))) {
+            orca.notify("info", `[tabsman] 目标块${viewArgs.blockId}已被删除，现重定向为今日日志`)
+            view = 'journal'
+            viewArgs = {date: new Date(new Date().toDateString())}
+        }
         originalGoTo(view, viewArgs, panelId)
+        // if (renderTabsCallback) renderTabsCallback()
     }
-
     // 目标tab从未打开过则填充一次当前历史
     if (tab.backStack.length === 0) fillCurrentAccess()
 }
@@ -918,23 +945,30 @@ async function openWorkspace(name = ""){
     // 清除旧的排序缓存
     sortedTabsByPanelId.clear()
     for (const tab of workspaceActiveTabsValue) {
-        const blockId = tab.currentBlockId
-        const isDate = blockId instanceof Date;
-        const viewpanel = {
-            view: isDate? "journal" : "block",
-            viewArgs: isDate? {date: blockId}:{blockId},
-            viewState: {}
+        const {view, viewArgs} = getViewAndViewArgs(tab.currentBlockId)
+        let viewpanel = { view, viewArgs, viewState: {} }
+        // 如果是block视图，确保block是存在的
+        if (view === "block") {
+            const {blockId} = viewArgs
+            const block = await orca.invokeBackend("get-block", blockId);
+            if (!block) {
+                orca.notify("info", `块${blockId}已被删除，现重定向至今日日志`)
+                const date = new Date(new Date().toDateString())
+                tab.currentBlockId = date
+                tab.name = date.toDateString()
+                viewpanel = {view: 'journal', viewArgs: {date}, viewState: {}}
+            }
         }
-
         // 调用原始的addTo，以确保不改变tabsman数据结构
         const newPanelId = originalAddTo(orca.state.activePanel, "left", viewpanel)
+
         newPanelIds.push(newPanelId)
         const oldPanelId = tab.panelId
 
         // 更新数据结构的面板id
         workspaceActiveTabs[newPanelId] = tab
         delete workspaceActiveTabs[oldPanelId]
-        workspaceTabIdSetByPanelId.set(newPanelId,workspaceTabIdSetByPanelId.get(oldPanelId))
+        workspaceTabIdSetByPanelId.set(newPanelId, workspaceTabIdSetByPanelId.get(oldPanelId))
         workspaceTabIdSetByPanelId.delete(oldPanelId)
 
         // 修改该面板所有tab对象的面板id

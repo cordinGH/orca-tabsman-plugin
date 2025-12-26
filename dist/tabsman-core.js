@@ -786,7 +786,7 @@ function getPanelScrollInfo() {
 async function saveWorkspace(name, onlyActiveTab = false){
     const sname = String(name)
     // 时间戳前缀用于排序（getDataKeys获取的数组是按照keys的码值排序的）
-    // 【变更】不再刻意重名，只禁止恶意重名：一个时间戳内连续生成相同name
+    // 只禁止恶意重名：一个时间戳内连续生成相同name
     const saveName = String(Date.now()) + "_" + sname
 
     const existName = await orca.plugins.getData('tabsman-workspace', saveName)
@@ -796,15 +796,6 @@ async function saveWorkspace(name, onlyActiveTab = false){
     }
 
     if (onlyActiveTab) {
-        // const currentBlockId = new Date(new Date().toDateString());
-        // const tabInfo = await generateTabNameAndIcon(currentBlockId);
-        // const tab = createTabObject(currentBlockId, "", tabInfo.icon, tabInfo.name);
-        // tab.isActive = true
-        // tab.backStack.push({
-        //     activePanel: "",
-        //     view: "journal",
-        //     viewArgs: { date: new Date(new Date().toDateString())}
-        // });
         const tab = activeTabs[orca.state.activePanel]
         const tabsNew = {}
         tabsNew[tab.id] = tab;
@@ -817,37 +808,20 @@ async function saveWorkspace(name, onlyActiveTab = false){
 
     orca.notify("success", "[tabsman]新工作区创建成功！");
     return saveName
-
-    // 【变更】不再禁止重名
-    // TODO const hasPrefix = sname.indexOf("_") === 13 
-    // const existName = await orca.plugins.getData('tabsman-workspace', sname)
-    // if (existName || existName === "tabsman-workspace-exit"){
-    //     orca.notify("info", "[tabsman]name已存在。另外，name不可使用tabsman-workspace-exit");
-    //     return 0
-    // }
-    // await orca.plugins.setData('tabsman-workspace', sname, JSON.stringify(tabs));
-    // orca.notify("success", "[tabsman]新工作区创建成功！");
-    // return 1
 }
 
 // 显示所有的工作空间name
 async function getAllWorkspace(){
     const keys = await orca.plugins.getDataKeys("tabsman-workspace")
-    // console.log("Stored tabsman-workspace names:", keys)
-
-    // 【变更】不再去除前缀
-    // const cleanKeys = keys.map(k => k.slice(k.indexOf('_') + 1));
 
     return keys
 }
 
 // 删除指定name的工作空间，返回值1用于删除时是否正处于该工作区
-// let lastWorkspaceName = ""
 async function deleteWorkspace(name) {
     const sname = String(name)
     await orca.plugins.removeData("tabsman-workspace", sname)
     await orca.plugins.removeData("tabsman-workspace-scroll", sname)
-    // if (lastWorkspaceName === sname) await orca.plugins.removeData("tabsman-workspace-feature", "last-workspace-name")
     orca.notify("success", "[tabsman]工作区删除成功");
     // 正在工作区就先退出
     if (workspaceNow === sname) {
@@ -863,7 +837,6 @@ function deleteAllWorkspace() {
     if (workspaceNow !== "") exitWorkspace()
     orca.plugins.clearData("tabsman-workspace")
     orca.plugins.clearData("tabsman-workspace-scroll")
-    // orca.plugins.clearData("tabsman-workspace-feature")
 }
 
 // 退出当前工作空间
@@ -878,7 +851,6 @@ let workspaceSwitching = false
 // 参数默认值为退出点
 async function openWorkspace(name = ""){
     const sname = String(name)
-    // console.log("1开始打开sname:", sname,"当前为：",workspaceNow)
     // 如果当前打开的就是目标工作区，则跳过。
     if (workspaceNow === sname) {
         orca.notify("info", "[tabsman]当前已在该工作空间")
@@ -892,19 +864,16 @@ async function openWorkspace(name = ""){
         return
     }
 
-    // console.log("2开始打开sname:", sname,"当前为：",workspaceNow)
     // 维护退出点数据
     if (workspaceNow === "") {
         await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
         await orca.plugins.setData('tabsman-workspace-scroll', "tabsman-workspace-exit", JSON.stringify(getPanelScrollInfo()));
-        // await orca.plugins.setData('tabsman-workspace-feature', "last-workspace-name", JSON.stringify(sname));
     } else if (sname === "") {
         // 丢弃过时的退出点
         await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
     } else if (sname) {
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
-        // await orca.plugins.setData('tabsman-workspace-feature', "last-workspace-name", JSON.stringify(sname));
     }
     workspaceNow = sname
 

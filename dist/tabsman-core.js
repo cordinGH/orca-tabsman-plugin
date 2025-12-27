@@ -78,7 +78,35 @@ let tabIdSetByPanelId = new Map();
 let sortedTabsByPanelId = new Map();
 
 
-function getViewAndViewArgs(currentBlockId) {
+// 确保tab有效，如果当前ID不存在，则重定向为今日日志
+async function makeValidatedTab(tab) {
+    const {currentBlockId} = tab
+    if (typeof currentBlockId === "number") {
+        const block = await orca.invokeBackend("get-block", currentBlockId)
+        if (!block) {
+            orca.notify("info",`[tabsman] 目标块${currentBlockId}已删除，现重定向为今日日志`)
+            const date = new Date(new Date().toDateString())
+            Object.assign(tab, {currentBlockId: date, name: date.toDateString(), currentIcon: 'ti ti-calendar-smile'})
+
+            const len = tab.backStack.length
+            if (len > 0) {
+                Object.assign(tab.backStack[len - 1], {icon: tab.currentIcon, name: tab.name, view: "journal", viewArgs: {date}})
+            }
+        }
+    }
+}
+// 根据view和viewArgs获取一个blockid
+function getBlockIdByViewAndViewArgs(view, viewArgs) {
+    let blockId = ""
+    switch (view) {
+        case "journal": blockId = viewArgs.date; break;
+        case "block": blockId = viewArgs.blockId; break;
+        default: blockId = PREFIX_PLUGIN_VIEW + view
+    }
+    return blockId
+}
+function getViewAndViewArgsByTab(tab) {
+    const {currentBlockId, backStack} = tab
     let view = ""
     let viewArgs = null
     if (currentBlockId instanceof Date) {
@@ -89,7 +117,7 @@ function getViewAndViewArgs(currentBlockId) {
     } else if (typeof currentBlockId === 'string' && currentBlockId.startsWith(PREFIX_PLUGIN_VIEW)) {
         // 2. 插件视图
         view = currentBlockId.slice(PREFIX_PLUGIN_VIEW.length);
-        viewArgs = {};
+        viewArgs = backStack[backStack.length - 1].viewArgs;
     } else if (typeof currentBlockId === 'number') {
         // 3. block视图
         view = 'block';
@@ -129,8 +157,8 @@ function getCurrentBlockIds() {
             }
         }
     }
-    // 从 orca.state.panels 开始处理
     processPanel(orca.state.panels);
+    // 从 orca.state.panels 开始处理
     
     return panelInfo;
 }
@@ -183,7 +211,7 @@ async function generateTabNameAndIcon(blockId) {
                 name = block.aliases[0];
             } else {
                 const {text} = block
-                const shortText = (text.length > 30) ? (text.slice(0, 30) + "...") : text
+                const shortText = (text?.length > 30) ? (text.slice(0, 30) + "...") : text
                 name = text ? shortText : blockType
             }
         } else {
@@ -241,24 +269,13 @@ async function updateTabProperties() {
     
     const activePanel = orca.nav.findViewPanel(activePanelId, orca.state.panels);
     // 第三方插件的视图以插件自己的panel.view作为当前块id
-    switch (activePanel.view) {
-        case 'journal': activeTab.currentBlockId = activePanel.viewArgs.date; break;
-        case 'block': activeTab.currentBlockId = activePanel.viewArgs.blockId; break;
-        default: activeTab.currentBlockId = PREFIX_PLUGIN_VIEW + activePanel.view;
-    }
+    activeTab.currentBlockId = getBlockIdByViewAndViewArgs(activePanel.view, activePanel.viewArgs)
     
     try {
-        // 等待获取名称和图标
-        let tabInfo = await generateTabNameAndIcon(activeTab.currentBlockId);
-
-        if (tabInfo === BLOCK_NOT_EXIST) {
-            // 如果没有获取到，就直接改为今日日志。
-            orca.notify("info", `[tabsman] 目标块${activeTab.name}已被删除，现重定向为今日日志`)
-            originalGoTo('journal', { date: new Date(new Date().toDateString()) }, activeTab.panelId)
-            tabInfo = await generateTabNameAndIcon(activeTab.currentBlockId)
-        }
-        activeTab.name = tabInfo.name;
-        activeTab.currentIcon = tabInfo.icon;
+        // 插件内部的Goto行为前已经确保了参数正确，所以这里不再需要make；外部官方的goto必然是有效的。
+        const {name, icon} = await generateTabNameAndIcon(activeTab.currentBlockId);
+        activeTab.name = name;
+        activeTab.currentIcon = icon;
         
         // 更新UI
         if (renderTabsCallback) renderTabsCallback();
@@ -349,10 +366,9 @@ function updateSortedTabsCache(panelId) {
  */
 function setupSubscription() {
     let lastHistoryLength = orca.state.panelBackHistory.length;
-    const backHistoryUnsubscribe = window.Valtio.subscribe(orca.state.panelBackHistory, () => {
+    const backHistoryUnsubscribe = window.Valtio.subscribe(orca.state.panelBackHistory, async () => {
         // 切换工作区期间，只重置lastHistoryLength，不做其他处理。
         if (workspaceSwitching) {
-            console.log("正在切换工作区")
             lastHistoryLength = 0
             return
         }
@@ -361,7 +377,7 @@ function setupSubscription() {
         const currentLength = orca.state.panelBackHistory.length;
         if (currentLength < lastHistoryLength) return
 
-        isFillSuspended ? isFillSuspended = false : fillCurrentAccess()
+        isFillSuspended ? isFillSuspended = false : await fillCurrentAccess()
 
         // 更新tab信息
         updateTabProperties()
@@ -382,32 +398,28 @@ function setupSubscription() {
 
 /**
  * 填充当前访问的历史记录到当前面板的活跃标签页
- * @returns {void}
  */
-function fillCurrentAccess() {
+async function fillCurrentAccess() {
     const activeTab = activeTabs[orca.state.activePanel];
     if (!activeTab) return;
     
-    const activePanel = orca.nav.findViewPanel(orca.state.activePanel, orca.state.panels);
-    
+    const {id, view, viewArgs} = orca.nav.findViewPanel(orca.state.activePanel, orca.state.panels)
+    const blockId = getBlockIdByViewAndViewArgs(view, viewArgs)
+    const {name, icon} = await generateTabNameAndIcon(blockId)
     // 创建历史item
-    const historyItem = {
-        activePanel: activePanel.id,
-        view: activePanel.view,
-        viewArgs: activePanel.viewArgs
-    };
+    const historyItem = {icon, name, activePanel: id, view, viewArgs}
 
     // 添加到tab的历史记录，如果满了先移除最旧的
     // 约束后退栈长度：如果达到最大值，先移除最早的第一条历史
     if (activeTab.backStack.length >= HISTORY_CONFIG.MAX_BACK_STACK) activeTab.backStack.shift()
     activeTab.backStack.push(historyItem);
-    activeTab.forwardStack.length = 0; // 清空前进栈
+    activeTab.forwardStack.length = 0
 
     // 如果是pinned标签页，就新开一个tab并跳转
     if (activeTab.isPinned === true && activeTab.backStack.length > 1) {
         navigateTabBack(activeTab)
         activeTab.backStack.pop()
-        activeTab.forwardStack = []
+        activeTab.forwardStack.length = 0
         createTab(Object.values(historyItem.viewArgs)[0], true);
     }
     
@@ -494,7 +506,7 @@ async function createTabForNewPanel(panelId) {
     // 创建默认标签页（使用当前面板内容）
     await createTab(0, false);
     // 填充访问历史
-    fillCurrentAccess();
+    await fillCurrentAccess()
 }
 
 /**
@@ -514,11 +526,7 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
         if (!panel) return
 
         // 第三方插件的视图以插件自己的panel.view作为当前块id
-        switch (panel.view) {
-            case 'journal': currentBlockId = panel.viewArgs.date; break;
-            case 'block': currentBlockId = panel.viewArgs.blockId; break;
-            default: currentBlockId = PREFIX_PLUGIN_VIEW + panel.view;
-        }
+        currentBlockId = getBlockIdByViewAndViewArgs(panel.view, panel.viewArgs)
     }
     
     // 如果是数字块ID，需要查询这个块是否是日志块，如果是日志块，则使用date替换currentBlockId，确保以journal视图跳转
@@ -534,8 +542,11 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
     }
     
     // 创建标签页对象
-    const tabInfo = await generateTabNameAndIcon(currentBlockId);
-    const tab = createTabObject(currentBlockId, panelId, tabInfo.icon, tabInfo.name);
+    const tab = createTabObject(currentBlockId, panelId, "", "")
+    await makeValidatedTab(tab)
+    const {name, icon} = await generateTabNameAndIcon(tab.currentBlockId);
+    tab.name = name
+    tab.currentIcon = icon
     
     // 登记标签页到扁平化结构
     tabs[tab.id] = tab;
@@ -552,8 +563,6 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
         tab.isActive = true;
         activeTabs[panelId] = tab;
     }
-    
-    console.log(`[tabsman] 标签页对象创建成功: （ID: ${tab.id}），(名称：${tab.name})`);
 
     // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
     if (needSwitch) {
@@ -588,24 +597,19 @@ async function switchTab(tabId) {
     activeTab.isActive = false
     tab.isActive = true
     activeTabs[panelId] = tab
+    // 使tab确保有效
+    await makeValidatedTab(tab)
 
     // 如果两个标签页内容一样，则仅刷新ui并清除填充挂起状态，反之则正常goTo
     if (activeTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf()) {
         if (renderTabsCallback) renderTabsCallback()
         isFillSuspended = false
     } else {
-        const {currentBlockId} = tab
-        let {view, viewArgs} = getViewAndViewArgs(currentBlockId)
-        if (view === "block" && !(await orca.invokeBackend("get-block", viewArgs.blockId))) {
-            orca.notify("info", `[tabsman] 目标块${viewArgs.blockId}已被删除，现重定向为今日日志`)
-            view = 'journal'
-            viewArgs = {date: new Date(new Date().toDateString())}
-        }
+        let {view, viewArgs} = getViewAndViewArgsByTab(tab)
         originalGoTo(view, viewArgs, panelId)
-        // if (renderTabsCallback) renderTabsCallback()
     }
     // 目标tab从未打开过则填充一次当前历史
-    if (tab.backStack.length === 0) fillCurrentAccess()
+    if (tab.backStack.length === 0) await fillCurrentAccess()
 }
 
 /**
@@ -662,7 +666,7 @@ async function deleteTab(tabId) {
         const view = isJournal ? 'journal' : 'block'
         const viewArgs = isJournal ? { date: currentBlockId } : { blockId: currentBlockId }
         originalGoTo(view, viewArgs, panelId)
-        if (tab.backStack.length === 0) fillCurrentAccess()
+        if (tab.backStack.length === 0) await fillCurrentAccess()
     }
 
     // 清理关闭的标签页数据并更新排序缓存，再次刷新UI
@@ -945,20 +949,9 @@ async function openWorkspace(name = ""){
     // 清除旧的排序缓存
     sortedTabsByPanelId.clear()
     for (const tab of workspaceActiveTabsValue) {
-        const {view, viewArgs} = getViewAndViewArgs(tab.currentBlockId)
-        let viewpanel = { view, viewArgs, viewState: {} }
-        // 如果是block视图，确保block是存在的
-        if (view === "block") {
-            const {blockId} = viewArgs
-            const block = await orca.invokeBackend("get-block", blockId);
-            if (!block) {
-                orca.notify("info", `块${blockId}已被删除，现重定向至今日日志`)
-                const date = new Date(new Date().toDateString())
-                tab.currentBlockId = date
-                tab.name = date.toDateString()
-                viewpanel = {view: 'journal', viewArgs: {date}, viewState: {}}
-            }
-        }
+        await makeValidatedTab(tab)
+        const {view, viewArgs} = getViewAndViewArgsByTab(tab)
+        const viewpanel = { view, viewArgs, viewState: {} }
         // 调用原始的addTo，以确保不改变tabsman数据结构
         const newPanelId = originalAddTo(orca.state.activePanel, "left", viewpanel)
 

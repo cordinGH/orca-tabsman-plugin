@@ -30,7 +30,7 @@ async function startRecentlyClosed(renderTabsByPanel) {
         ContextMenu,
         {
             children: (open) => createElement(
-                Button, {variant: "plain", onClick: open},
+                Button, {variant: "plugin-tabsman-fav-and-closed plain", onClick: open},
                 createElement("i", {className: "ti ti-stack-pop orca-headbar-icon"})
             ),
             menu: (close) => [
@@ -38,9 +38,10 @@ async function startRecentlyClosed(renderTabsByPanel) {
                 createElement(MenuText,
                     { title: "收藏的块列表",preIcon: "ti ti-star" },
                     createElement(Menu, {}, TabsmanPersistence.getFavoriteBlockArray().length === 0 ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无收藏的块列表") :
-                        TabsmanPersistence.getFavoriteBlockArray().map(block =>
-                            createElement(MenuText, {
-                                key: block.id,
+                        TabsmanPersistence.getFavoriteBlockArray().map(block => {
+                            let blockId = block.id;
+                            return createElement(MenuText, {
+                                key: blockId,
                                 preIcon: block.icon || 'ti ti-cube',
                                 className: 'plugin-tabsman-favorite-block-item',
                                 style: {cursor: 'default'},
@@ -53,11 +54,11 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                         className: "ti ti-x plugin-tabsman-delete-btn", style: {cursor: 'pointer', opacity: 0.6, marginLeft: '8px', flexShrink: 0},
                                         onClick: async (e) => {
                                             e.stopPropagation();
-                                            if (TabsmanPersistence.getFavoriteBlockArray().findIndex(item => item.id === block.id) === -1) {
+                                            if (TabsmanPersistence.getFavoriteBlockArray().findIndex(item => item.id === blockId) === -1) {
                                                 orca.notify("warn", "已经删除成功，无需再次删除");
                                                 return;
                                             }
-                                            await TabsmanPersistence.removeAndSaveFavoriteBlock(block.id);
+                                            await TabsmanPersistence.removeAndSaveFavoriteBlock(blockId);
                                             // 重新渲染侧边栏样式
                                             renderTabsByPanel();
                                         }
@@ -66,10 +67,10 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                 onClick: async () => {
                                     // 恢复收藏的块到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;
-                                    await TabsmanCore.createTab(block.id, false, currentPanelId);
+                                    await TabsmanCore.createTab(blockId, false, currentPanelId);
                                 }
                             })
-                        )
+                        })
                     )
                 ),
                 createElement(MenuText,

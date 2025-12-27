@@ -36,7 +36,6 @@ async function startbackforwardbutton() {
         backForwardMenu = document.createElement('div')
         backForwardMenu.className = 'orca-menu plugin-tabsman-history-menu'
     }
-    // backForwardMenu.addEventListener('click', handleHistoryItemClick);
 }
 
 
@@ -50,9 +49,6 @@ function stopbackforwardbutton() {
     forwardButton.removeEventListener('contextmenu', handleHistoryButtonRightClick);
     backButton.removeEventListener('click', handleBackButtonLeftClick);
     forwardButton.removeEventListener('click', handleForwardButtonLeftClick);
-    
-    // 移除headbar的事件监听器
-    backForwardMenu.removeEventListener('click', handleHistoryItemClick);
 
     // 恢复原始按钮
     backButton.replaceWith(orcaBackButton);
@@ -105,8 +101,18 @@ async function handleClosePopup(e) {
             const target = e.target.closest('.plugin-tabsman-history-item')
             if (target) {
                 const index = target.getAttribute('data-tabsman-history-item-index')
-                const view = target.getAttribute('data-tabsman-history-item-view')
-                orca.nav.goTo(view, stackItemInfoArrary[index].viewArgs)
+                let view = target.getAttribute('data-tabsman-history-item-view')
+                const stackItem = stackItemArrary[index]
+                if (view === "block") {
+                    const {blockId} = stackItem.viewArgs
+                    const block = await orca.invokeBackend("get-block", blockId)
+                    if (!block) {
+                        orca.notify("info",`[tabsman] 目标块${blockId}已删除，现重定向为今日日志`)
+                        const date = new Date(new Date().toDateString())
+                        Object.assign(stackItem, {icon: 'ti ti-calendar-smile', name: date.toDateString(), view: "journal", viewArgs: {date}})
+                    }
+                }
+                orca.nav.goTo(stackItem.view, stackItem.viewArgs)
             }
         }
 
@@ -118,26 +124,6 @@ async function handleClosePopup(e) {
             document.removeEventListener('keydown', handleClosePopup);
             document.removeEventListener('pointerdown', handleClosePopup);
         }
-    }
-}
-
-// ———————————————————————————————————————————————————————历史菜单项的左键item跳转———————————————————————————————————————————
-
-/**
- * 处理headbar左键点击事件
- * @param {Event} e - 事件对象
- * @returns {void}
- */
-function handleHistoryItemClick(e) {
-    // 检查是否点击到了具有 plugin-tabsman-history-item 的元素
-    const target = e.target.closest('.plugin-tabsman-history-item');
-    console.log(target)
-    if (target) {
-        const view = target.getAttribute('data-tabsman-history-item-view');
-        const index = target.getAttribute('data-tabsman-history-item-index');
-        // const viewArgs = target.getAttribute('data-tabsman-history-item-view-args');
-        console.log("检查单击item最终弹出的args：", stackItemInfoArrary[index].viewArgs)
-        orca.nav.goTo(view, stackItemInfoArrary[index].viewArgs)
     }
 }
 
@@ -194,7 +180,7 @@ async function handleHistoryButtonRightClick(e) {
  * @param {string} stackType - 栈类型 ('back' 或 'forward')
  * @returns {Promise<HTMLElement>} 返回菜单元素
  */
-let stackItemInfoArrary = []
+let stackItemArrary = []
 async function createBackForwardMenu(stackArrary, stackType) {
     // 创建菜单容器
     backForwardMenu.textContent = ''
@@ -206,30 +192,19 @@ async function createBackForwardMenu(stackArrary, stackType) {
         return backForwardMenu;
     }
 
-    stackItemInfoArrary.length = 0
+    stackItemArrary.length = 0
     // 获取栈，如果是后退栈，先弹出栈顶元素（当前块）
     let stack = stackType === 'back' ? stackArrary.slice(0, -1) : stackArrary;
     for (const stackItem of stack) {
         // 栈当前设计是越新的item index越大，越靠近站顶
-        const {view, viewArgs} = stackItem
-        // 第三方插件的视图以插件自己的panel.view作为当前块id
-        let blockId = ""
-        switch (view) {
-            case 'journal': blockId = viewArgs.date; break;
-            case 'block': blockId = viewArgs.blockId; break;
-            default: blockId = "插件视图：" + view;
-        }
-        // let blockId = itemView === 'journal' ? stackItem.viewArgs.date : stackItem.viewArgs.blockId;
-        let {name, icon} = await TabsmanCore.generateTabNameAndIcon(blockId);
-        stackItemInfoArrary.push({name, icon, view, viewArgs})
+        stackItemArrary.push(stackItem)
     }
 
-    if (stackType === 'back') {
-        stackItemInfoArrary.reverse();
-    }
+    if (stackType === 'back') stackItemArrary.reverse()
+
     // 创建菜单项
-    for (let i = 0; i < stackItemInfoArrary.length; i++) {
-        let stackItemInfo = stackItemInfoArrary[i];
+    for (let i = 0; i < stackItemArrary.length; i++) {
+        let stackItemInfo = stackItemArrary[i];
         let menuItem = createMenuItem(stackItemInfo, i);
         backForwardMenu.appendChild(menuItem); // 添加到菜单中
     }

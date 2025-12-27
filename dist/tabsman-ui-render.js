@@ -518,5 +518,6 @@ function handlePanelTitleFocusout(e) {
  * @returns {string} 面板标题
  */
 function getPanelTitle(panelId) {
-    return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId.slice(0, 5));
+    // return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId.slice(0, 5));
+    return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId);
 }

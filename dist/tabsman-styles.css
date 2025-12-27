@@ -175,3 +175,57 @@
     animation: orcaPopOut .2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     pointer-events: none;
 }
+
+/* tooltips，按钮 */
+.orca-button.plugin-tabsman-ws-exit,
+.orca-button.plugin-tabsman-ws-save,
+.orca-button.orca-headbar-back,
+.orca-button.orca-headbar-back+.orca-button{
+    position:relative;
+}
+
+.orca-button.plugin-tabsman-ws-exit::before,
+.orca-button.plugin-tabsman-ws-save::before,
+.orca-button.orca-headbar-back::before,
+.orca-button.orca-headbar-back+.orca-button::before{
+    padding: var(--orca-spacing-sm) var(--orca-spacing-md);
+    border-radius: var(--orca-radius-md);
+    background-color: var(--orca-color-text-1);
+    color: var(--orca-color-bg-1);
+    font-family: var(--orca-fontfamily-ui);
+    font-size: var(--orca-fontsize-2xs);
+    font-weight: var(--orca-fontweight-lg);
+    box-shadow: var(--orca-shadow-md);
+    pointer-events: none;
+    user-select: none;
+    width: max-content;
+    max-width: 260px;
+    overflow-wrap: break-word;
+
+    position: absolute;
+    bottom: -138%;
+    left: 60%;
+    transform: translateX(-50%); /* 居中对齐 */
+    opacity: 0;
+    transition: opacity .15s;
+    pointer-events: none; /* 防止遮挡鼠标事件 */
+}
+
+.orca-button.orca-headbar-back::before,
+.orca-button.orca-headbar-back+.orca-button::before{
+    content: "右键查看历史";
+}
+.orca-button.plugin-tabsman-ws-save::before{
+    content: "保存为新工作区";
+}
+.orca-button.plugin-tabsman-ws-exit::before{
+    content: "退出工作区";
+}
+
+.orca-button.plugin-tabsman-ws-exit:hover::before,
+.orca-button.plugin-tabsman-ws-save:hover::before,
+.orca-button.orca-headbar-back:hover::before,
+.orca-button.orca-headbar-back+.orca-button:hover::before{
+    transition: opacity .15s .15s;
+    opacity: 1;
+  }

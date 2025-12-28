@@ -612,11 +612,16 @@ async function switchTab(tabId) {
         if (renderTabsCallback) await renderTabsCallback()
         isFillSuspended = false
     } else {
-        let {view, viewArgs} = getViewAndViewArgsByTab(tab)
-        navOriginals.method.goTo.call(navOriginals.thisValue, view, viewArgs, panelId)
+        // 原始goto跳转，根据tab
+        navOriginalsGoToByTabAndPanelId(tab, panelId)
     }
     // 目标tab从未打开过则填充一次当前历史
     if (tab.backStack.length === 0) await fillCurrentAccess()
+}
+
+function navOriginalsGoToByTabAndPanelId(tab, panelId) {
+    let {view, viewArgs} = getViewAndViewArgsByTab(tab)
+    navOriginals.method.goTo.call(navOriginals.thisValue, view, viewArgs, panelId)
 }
 
 /**
@@ -668,11 +673,7 @@ async function deleteTab(tabId) {
 
         // goto
         isFillSuspended = true
-        const { currentBlockId } = newTab
-        const isJournal = currentBlockId instanceof Date
-        const view = isJournal ? 'journal' : 'block'
-        const viewArgs = isJournal ? { date: currentBlockId } : { blockId: currentBlockId }
-        navOriginals.method.goTo.call(navOriginals.thisValue, view, viewArgs, panelId)
+        navOriginalsGoToByTab(newTab, panelId)
         if (tab.backStack.length === 0) await fillCurrentAccess()
     }
 
@@ -695,45 +696,33 @@ async function moveTabToPanel(tabId, newPanelId) {
         return false;
     }
 
-    // 如果被移走的是active面板的active-tab，则先执行navPreviousTab
-    if (tab.panelId === orca.state.activePanel && tab.isActive) {
-        await switchToPreviousTab();
-
-    } else if (activeTabs[oldPanelId] === tab) {
-        // 否则，如果只是非active面板的active-tab，则切换到上一个标签页作为active-tab
+    // 如果被移走的是active面板的active-tab，则先执行navPreviousTab。
+    if (tab.isActive) {
         const tabIndex = getOneSortedTabs(oldPanelId).findIndex(tab => tab.id === tabId);
-        const prevTabIndex = tabIndex === 0 ? tabIndex + 1 : tabIndex - 1;
+        // 如果是0就给1，否则就给上一个
+        const prevTabIndex = tabIndex === 0 ? 1 : tabIndex - 1;
         const prevTab = getOneSortedTabs(oldPanelId)[prevTabIndex];
         tab.isActive = false;
         prevTab.isActive = true;
         activeTabs[oldPanelId] = prevTab;
-
         // 导航到新的前台标签页
         isFillSuspended = true;
-        const isJournal = prevTab.currentBlockId instanceof Date;
-        navOriginals.method.goTo.call(navOriginals.thisValue, 
-            isJournal ? 'journal' : 'block',
-            isJournal ? { date: prevTab.currentBlockId } : { blockId: prevTab.currentBlockId },
-            prevTab.panelId
-        );
-
-        // 如果新的前台标签页没有历史记录，则填充初始历史。
-        if (prevTab.backStack.length === 0) {
-            const prevPanel = orca.nav.findViewPanel(prevTab.panelId, orca.state.panels);
-            prevTab.backStack.push({
-                activePanel: prevPanel.id,
-                view: prevPanel.view,
-                viewArgs: prevPanel.viewArgs
-            });            
+        // 原始goto不会影响面板行为
+        navOriginalsGoToByTabAndPanelId(prevTab, prevTab.panelId)
+        // 单独填充历史
+        if (prevTab.backStack.length === 0){
+            const {id, view, viewArgs} = orca.nav.findViewPanel(oldPanelId, orca.state.panels)
+            const blockId = getBlockIdByViewAndViewArgs(view, viewArgs)
+            const {name, icon} = await generateTabNameAndIcon(blockId)
+            // 创建历史item
+            const historyItem = {icon, name, activePanel: id, view, viewArgs}
+            prevTab.backStack.push(historyItem)
         }
-
-        // 重置内部导航标志（不用重置，handle函数会自动重置
-        // isFillSuspended = false;
     }
 
     // 更新数据库，并通知ui刷新
-    tabIdSetByPanelId.get(oldPanelId).delete(tabId);
     tab.panelId = newPanelId;
+    tabIdSetByPanelId.get(oldPanelId).delete(tabId);
     tabIdSetByPanelId.get(newPanelId).add(tabId);
     updateSortedTabsCache(oldPanelId);
     updateSortedTabsCache(newPanelId);

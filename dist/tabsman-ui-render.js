@@ -237,6 +237,7 @@ async function renderTabsByPanel() {
             await createPanelItemElement(panelId, panelGroup);
 
             // 渲染该面板的标签页并加入面板分组容器
+            console.log(panelId,"面板，需要渲染多少个标签页：", panelTabs.length)
             for (const tab of panelTabs) {
                 const tabItem = await createTabElement(tab, panelId, panelGroup);
 
@@ -406,11 +407,13 @@ function handleTabDragOver(e) {
     e.preventDefault();   
 }
 
+// await会导致返回一个promise从而导致end触发，以至于panelGroupElement提前变为null值
+let isDroping = false
 // 处理drop事件，移动标签页到目标面板。
 async function handleTabDrop(e) {
+    isDroping = true
     e.preventDefault();
     await TabsmanCore.moveTabToPanel(dragTabId, panelGroupElement.getAttribute('data-tabsman-panel-id'));
-
     // 清理数据，因为drop到可拖拽区域是不会触发end事件的。
     panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
     panelGroupElement = null;
@@ -419,7 +422,7 @@ async function handleTabDrop(e) {
 
 // 确保任何情况都清理，例如没有触发drop事件时，也清理。
 async function handleTabDragEnd(e) {
-    if (panelGroupElement) {
+    if (!isDroping && panelGroupElement) {
         panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
         panelGroupElement = null;
         dragTabId = null;

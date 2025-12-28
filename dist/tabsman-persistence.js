@@ -4,7 +4,7 @@
  */
 
 // 导入 core 模块
-import * as Core from './tabsman-core.js';
+import * as TabsmanCore from './tabsman-core.js';
 
 /**
  * 配置常量
@@ -50,10 +50,8 @@ async function saveTabArray(tabType = "") {
  * @returns {Promise<void>} 返回Promise
  */
 async function addAndSaveTab(tab, tabType = "") {
-    // 创建 tab 对象的副本，避免修改原始对象
     const tabCopy = { ...tab };
     tabCopy.panelId = "";
-    tabCopy.isActive = false;
     
     // 根据不同tab类型修订一下属性再存入运行时内存和持久化内存
     switch (tabType) {
@@ -243,8 +241,6 @@ function getTabArray(tabType) {
 async function restoreTabs(rawTabArray, tabType) {
     if (!Array.isArray(rawTabArray) || rawTabArray.length === 0) return [];
 
-    const currentPanelId = orca.state.activePanel;
-
     // 唤醒标签页数据
     const tabArray = wakeTabArray(rawTabArray, tabType);
 
@@ -252,14 +248,8 @@ async function restoreTabs(rawTabArray, tabType) {
         case "pinned":
             // 持久化数据载入到模块内存对象
             pinnedTabArray = tabArray;
-            // 注册到core数据结构
-            for (const tab of tabArray) {
-                const nameAndIcon = await Core.generateTabNameAndIcon(tab.currentBlockId);
-                tab.name = nameAndIcon.name;
-                tab.currentIcon = nameAndIcon.icon
-                Core.getAllTabs()[tab.id] = tab;
-                Core.getTabIdSetByPanelId().get(currentPanelId).add(tab.id);
-            }
+            // 导入进core数据结构
+            TabsmanCore.importTabToActivePanel(pinnedTabArray);
             return pinnedTabArray;
         case "recently-closed":
             recentlyClosedTabArray = tabArray;

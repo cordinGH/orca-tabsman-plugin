@@ -2,40 +2,9 @@
 // 负责标签页列表的显示和实时更新
 
 // 创建命名空间对象，提供更直观的API
-import {
-    getTabIdSetByPanelId,
-    getAllTabs,
-    getActiveTabs,
-    getOneSortedTabs,
-    getAllSortedTabs,
-    createTab,
-    deleteTab,
-    switchTab,
-    pinTab,
-    unpinTab
-} from './tabsman-core.js';
+import * as TabsmanCore from './tabsman-core.js';
 import * as Persistence from './tabsman-persistence.js';
 import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.js';
-const TabsmanCore = {
-    // 数据访问层
-    data: {
-        getTabIdSetByPanelId,
-        getAllTabs,
-        getActiveTabs,
-        getOneSortedTabs,
-        getAllSortedTabs,
-    },
-
-    // 操作执行层
-    actions: {
-        createTab,
-        deleteTab,
-        switchTab,
-        pinTab,
-        unpinTab,
-    }
-};
-
 
 
 // 全局变量存储标签页容器元素
@@ -180,18 +149,18 @@ async function handleTabsmanClick(e) {
         if (!tabId || !panelId) return;
 
         // 确保有tab对象
-        const tab = TabsmanCore.data.getAllTabs()[tabId];
+        const tab = TabsmanCore.getTab(tabId);
         if (!tab) return;
 
         if (target.classList.contains('plugin-tabsman-tab-pin')) {
             // 根据当前置顶状态切换置顶状态
             if (tab.isPinned) {
-                await TabsmanCore.actions.unpinTab(tab.id);
+                await TabsmanCore.unpinTab(tab.id);
             } else {
-                await TabsmanCore.actions.pinTab(tab.id);
+                await TabsmanCore.pinTab(tab.id);
             }
         } else if (target.classList.contains('plugin-tabsman-tab-close')) {
-            await TabsmanCore.actions.deleteTab(tab.id);
+            await TabsmanCore.deleteTab(tab.id);
         } else if (target.classList.contains('plugin-tabsman-tab-icon')) {
             // 点击块图标切换收藏状态
             const isFavorite = target.classList.toggle('plugin-tabsman-tab-favorite');
@@ -209,7 +178,7 @@ async function handleTabsmanClick(e) {
                 if (is2DockedPanel && window.pluginDockpanel.isCollapsed) {
                     // 如果点击的是停靠面板Tab，且停靠面板是折叠，则切换到展开。
                     await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
-                } else if (is2DockedPanel && !window.pluginDockpanel.isCollapsed && tab.id === TabsmanCore.data.getActiveTabs()[panelId].id && orca.state.activePanel === dockedPanelId) {
+                } else if (is2DockedPanel && !window.pluginDockpanel.isCollapsed && tab.id === TabsmanCore.getActiveTabs()[panelId].id && orca.state.activePanel === dockedPanelId) {
                     // 如果点击的是停靠面板Tab，且停靠面板不是折叠，且点击的本就是停靠面板前台标签页且面板是active，则切换折叠。
                     await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
                 } else if (!is2DockedPanel && !window.pluginDockpanel.isCollapsed) {
@@ -219,7 +188,7 @@ async function handleTabsmanClick(e) {
             } 
 
             // 不存在停靠面板，则不做上述联动操作，直接切换到目标标签页
-            TabsmanCore.actions.switchTab(tab.id);
+            TabsmanCore.switchTab(tab.id);
         }
         
         return;
@@ -232,7 +201,7 @@ async function handleTabsmanClick(e) {
             // orca.notify('切换面板折叠状态');
         } else if (target.classList.contains('plugin-tabsman-panel-new-tab')) {
             const panelId = target.getAttribute('data-tabsman-panel-id')
-            if (panelId) TabsmanCore.actions.createTab(-1, false, panelId)
+            if (panelId) TabsmanCore.createTab(-1, false, panelId)
         }
     }
 }
@@ -253,7 +222,7 @@ async function renderTabsByPanel() {
     tabsmanTabsEle.innerHTML = '';
 
     // 获取所有面板的排序标签页列表（直接使用核心模块的排序缓存）
-    const allSortedTabs = TabsmanCore.data.getAllSortedTabs();
+    const allSortedTabs = TabsmanCore.getAllSortedTabs();
 
     if (allSortedTabs && allSortedTabs.size > 0) {
         // 直接遍历已排序的标签页列表，避免重复函数调用
@@ -272,7 +241,7 @@ async function renderTabsByPanel() {
                 const tabItem = await createTabElement(tab, panelId, panelGroup);
 
                 // 添加活跃状态样式并加入面板分组容器
-                const activeTabs = TabsmanCore.data.getActiveTabs();
+                const activeTabs = TabsmanCore.getActiveTabs();
                 if (activeTabs && activeTabs[panelId] === tab) {
                     tabItem.element.classList.add('active-tab-item');
                 }
@@ -440,7 +409,7 @@ function handleTabDragOver(e) {
 // 处理drop事件，移动标签页到目标面板。
 async function handleTabDrop(e) {
     e.preventDefault();
-    await window.pluginTabsman.moveTabToPanel(dragTabId, panelGroupElement.getAttribute('data-tabsman-panel-id'));
+    await TabsmanCore.moveTabToPanel(dragTabId, panelGroupElement.getAttribute('data-tabsman-panel-id'));
 
     // 清理数据，因为drop到可拖拽区域是不会触发end事件的。
     panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');

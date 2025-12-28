@@ -17,9 +17,25 @@ let isCreatingTab = false;
 let unsubscribeSettings = null;
 
 // 存储原始导航 API 函数
-let originalSwitchFocusTo = null;
-let originalFocusNext = null;
-let originalFocusPrev = null;
+let navOriginalFn = null
+
+// 组件元素的classlist
+// 注册开关侧边Tabs栏命令
+let sidebarTabOptionsClassList = null
+let tabOptionClassList = null
+let appClassList = null
+
+
+function bindHtmlElement() {
+    sidebarTabOptionsClassList = document.querySelector('.orca-sidebar-tab-options')?.classList;
+    tabOptionClassList = document.querySelector('.plugin-tabsman-tab-option')?.classList;
+    appClassList = document.body.querySelector(':scope > #app')?.classList;
+}
+function clearBindHtmlElement() {
+    sidebarTabOptionsClassList = null
+    tabOptionClassList = null
+    appClassList = null
+}
 
 /**
  * 清除所有持久化数据
@@ -38,53 +54,157 @@ async function clearAllData() {
     }
 }
 
+// 注册tabsman命令
+function registerTabsmanCommand(){
+    // 注册标签页导航命令
+    orca.commands.registerCommand(
+        'tabsman.goToNextTab',
+        async () => {
+            const success = await switchToNextTab();
+            if (success) orca.notify("success", "[tabsman] 已切换到下一个标签页")
+        },
+        '[tabsman] Go to next tab'
+    );
+    orca.commands.registerCommand(
+        'tabsman.goToPreviousTab',
+        async () => {
+            const success = await switchToPreviousTab();
+            if (success) orca.notify("success", "[tabsman] 已切换到上一个标签页")
+        },
+        '[tabsman] Go to previous tab'
+    );
+    
+    // 注册开关侧边Tabs栏命令
+    orca.commands.registerCommand(
+        'tabsman.toggleSidebarTabsman',
+        () => {
+            if (appClassList.contains('sidebar-closed')) {
+                orca.commands.invokeCommand('core.toggleSidebar');
+                sidebarTabOptionsClassList.add('plugin-tabsman-selected');
+                tabOptionClassList.add('orca-selected');
+            } else {
+                if (sidebarTabOptionsClassList.contains('plugin-tabsman-selected')) {
+                    orca.commands.invokeCommand('core.toggleSidebar');
+                } else {
+                    sidebarTabOptionsClassList.add('plugin-tabsman-selected');
+                    tabOptionClassList.add('orca-selected');
+                }
+            }
+        },
+        '[tabsman] 开启/关闭显示侧边Tabs栏'
+    );
+
+    // 注册清空数据的命令
+    if (orca.state.plugins[pluginName]?.settings?.enableClearData) {
+        orca.commands.registerCommand(
+            'tabsman.clearData',
+            clearAllData,
+            "[tabsman] 清空持久化数据"
+        );
+    }
+
+    // 订阅处理清理命令是否启用
+    const tabsmanPlugin = orca.state.plugins[pluginName]
+    unsubscribeSettings = window.Valtio.subscribe(tabsmanPlugin, () => {
+        const enableClearData = tabsmanPlugin.settings?.enableClearData;
+        if (enableClearData === false) {
+            orca.commands.unregisterCommand('tabsman.clearData');
+            orca.notify("success", "[tabsman] 清空持久化数据命令已禁用");
+        } else if (enableClearData === true) {
+            orca.commands.registerCommand(
+                'tabsman.clearData',
+                clearAllData,
+                "[tabsman]清空持久化数据"
+            );
+            orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
+        }
+    });
+}
+
+// 移除命令
+function unregisterTabsmanCommand() {
+    orca.commands.unregisterCommand('tabsman.goToNextTab');
+    orca.commands.unregisterCommand('tabsman.goToPreviousTab');
+    orca.commands.unregisterCommand('tabsman.toggleSidebarTabsman');
+
+    // 安全注销命令（即使可能未注册）
+    try {
+        orca.commands.unregisterCommand('tabsman.clearData');
+    } catch (e) { }
+
+    // 取消对清理命令启用状态的订阅
+    if (unsubscribeSettings) {
+        unsubscribeSettings();
+        unsubscribeSettings = null;
+    }
+}
+
+
+// 更新活跃面板样式
+function updateActivePanelStyle () {
+    // 移除所有活跃样式
+    let activePanel = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active');
+    if (activePanel) {
+        activePanel.classList.remove('plugin-tabsman-panel-group-active');
+    }
+    
+    // 为当前活跃面板添加样式
+    activePanel = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
+    if (activePanel) {
+        activePanel.classList.add('plugin-tabsman-panel-group-active');
+    }
+}
+
+// 处理活跃面板的更新
+function startActivePanelUpdateHandle() {
+    // 包装导航 API，使得每次切换面板都会变更.plugin-tabsman-panel-group-active元素
+    navOriginalFn = {
+        "focusNext": null,
+        "focusPrev": null,
+        "switchFocusTo": null
+    }
+    Object.keys(navOriginalFn).forEach(fnName => {
+        // 保存原函数
+        navOriginalFn[fnName] = orca.nav[fnName]
+
+        // 包装处理
+        orca.nav[fnName] = function(panelId) {
+            navOriginalFn[fnName].call(this, panelId)
+            if (orca.state.activePanel !== "_globalSearch") {
+                updateActivePanelStyle();
+            }
+        }
+    })
+
+    // 为面板切换命令注册 after hooks
+    orca.commands.registerAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
+    orca.commands.registerAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
+}
+
+function stopActivePanelUpdateHandle() {
+    Object.keys(navOriginalFn).forEach(fnName => {
+        const fn = navOriginalFn[fnName]
+        if (fn) orca.nav[fnName] = fn
+    })
+
+    orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
+    orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
+    navOriginalFn = null
+}
 
 /**
  * 插件加载
  * @param {string} name - 插件名称
- * @returns {Promise<void>} 返回Promise
+ * @returns {Promise<void>}
  */
 async function load(name) {
+    window.pluginTabsman = {}
+
     pluginName = name;
 
     // 注入样式文件
     orca.themes.injectCSSResource(`${pluginName}/dist/tabsman-styles.css`, pluginName);
-
-    // 包装导航 API，使得每次切换面板都会变更.plugin-tabsman-panel-group-active元素
-    originalSwitchFocusTo = orca.nav.switchFocusTo;
-    orca.nav.switchFocusTo = function(panelId) {
-        originalSwitchFocusTo.call(this, panelId);
-        if (panelId !== '_globalSearch') {
-            updateActivePanelStyle();
-        }
-    };
-
-    originalFocusNext = orca.nav.focusNext;
-    orca.nav.focusNext = async function() {
-        const result = await originalFocusNext.call(this);
-        if (orca.state.activePanel !== '_globalSearch') {
-            updateActivePanelStyle();
-        }
-        return result;
-    };
-
-    originalFocusPrev = orca.nav.focusPrev;
-    orca.nav.focusPrev = async function() {
-        const result = await originalFocusPrev.call(this);
-        if (orca.state.activePanel !== '_globalSearch') {
-            updateActivePanelStyle();
-        }
-        return result;
-    };
-
-    // 启动标签页渲染    
-    await startTabsRender();
-    // 启动标签页系统，传递UI更新回调
-    await start(renderTabsByPanel);
     
-    // 插件启动完成后，主动触发一次渲染通知
-    renderTabsByPanel();
-
     // 注册设置选项
     await orca.plugins.setSettingsSchema(pluginName, {
         defaultTabOption: {
@@ -100,105 +220,33 @@ async function load(name) {
             defaultValue: false
         }
     });
-    
-    // 注册标签页导航命令
-    orca.commands.registerCommand(
-        'tabsman.goToNextTab',
-        async () => {
-            const success = await switchToNextTab();
-            if (success) {
-                orca.notify("success", "[tabsman] 已切换到下一个标签页");
-            }
-        },
-        '[tabsman] Go to next tab'
-    );
-    orca.commands.registerCommand(
-        'tabsman.goToPreviousTab',
-        async () => {
-            const success = await switchToPreviousTab();
-            if (success) {
-                orca.notify("success", "[tabsman] 已切换到上一个标签页");
-            }
-        },
-        '[tabsman] Go to previous tab'
-    );
-    
-    // 注册开关侧边Tabs栏命令
-    const sidebarTabOptions = document.querySelector('.orca-sidebar-tab-options');
-    const tabOption = document.querySelector('.plugin-tabsman-tab-option');
-    const appDiv = document.body.querySelector(':scope > #app');
-    orca.commands.registerCommand(
-        'tabsman.toggleSidebarTabsman',
-        () => {
-            if (appDiv.classList.contains('sidebar-closed')) {
-                orca.commands.invokeCommand('core.toggleSidebar');
-                sidebarTabOptions.classList.add('plugin-tabsman-selected');
-                tabOption.classList.add('orca-selected');
-            } else {
-                if (sidebarTabOptions.classList.contains('plugin-tabsman-selected')) {
-                    orca.commands.invokeCommand('core.toggleSidebar');
-                } else {
-                    sidebarTabOptions.classList.add('plugin-tabsman-selected');
-                    tabOption.classList.add('orca-selected');
-                }
-            }
-        },
-        '[tabsman] 开启/关闭显示侧边Tabs栏'
-    );
 
-
-        
-    // 监听设置变化，动态控制清空持久化数据命令的可用性
-    unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
-        const enableClearData = orca.state.plugins[pluginName]?.settings?.enableClearData;
-        if (enableClearData === false) {
-            // 禁用命令
-            try {
-                orca.commands.unregisterCommand('tabsman.clearData');
-                orca.notify("success", "[tabsman] 清空持久化数据命令已禁用");
-            } catch (e) { /* 忽略错误 */ }
-        } else if (enableClearData === true) {
-            // 启用命令
-            try {
-                orca.commands.registerCommand(
-                    'tabsman.clearData',
-                    clearAllData,
-                    "[tabsman]清空持久化数据"
-                );
-                orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
-            } catch (e) { /* 忽略错误 */ }
-        }
-    });
-
-    
     // 检查设置，如果启用默认显示Tabs栏
-    const settings = orca.state.plugins[pluginName]?.settings;
-    if (settings?.defaultTabOption) {
-        if (sidebarTabOptions) {
-            sidebarTabOptions.classList.add('plugin-tabsman-selected');
-        }
-        if (tabOption) {
-            tabOption.classList.add('orca-selected');
-        }
+    if (orca.state.plugins[pluginName]?.settings?.defaultTabOption) {
+        sidebarTabOptionsClassList?.add('plugin-tabsman-selected')
+        tabOptionClassList?.add('orca-selected')
     }
-    if (settings?.enableClearData) {
-        orca.commands.registerCommand(
-            'tabsman.clearData',
-            clearAllData,
-            "[tabsman]清空持久化数据"
-        );
-    }
-    
 
-    // 对于orca.state.activePanel 的面板group，注入 .plugin-tabsman-panel-group-active    
-    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
-    if (activePanelGroup) {
-        activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
-    }
+    // 启动标签页渲染    
+    await startTabsRender();
+    // 启动标签页系统，传递UI更新回调
+    await start(renderTabsByPanel);
     
-    // 为面板切换命令注册 after hooks
-    orca.commands.registerAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
-    orca.commands.registerAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
+    // 插件启动完成后，主动触发一次渲染通知
+    await renderTabsByPanel();
+
+    // 绑定所需的html元素
+    bindHtmlElement()
+
+    // 注册命令
+    registerTabsmanCommand()
+
+    // 为orca.state.activePanel面板group，注入激活样式
+    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
+    if (activePanelGroup) activePanelGroup.classList.add('plugin-tabsman-panel-group-active')
+
+    // 处理活跃面板更新（样式）
+    startActivePanelUpdateHandle()
     
     // 启动最近关闭标签页模块
     await startRecentlyClosed(renderTabsByPanel);
@@ -208,77 +256,37 @@ async function load(name) {
 }
 
 
-
-// 更新活跃面板样式的辅助函数
-function updateActivePanelStyle() {
-    // 移除所有活跃样式
-    let activePanel = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active');
-    if (activePanel) {
-        activePanel.classList.remove('plugin-tabsman-panel-group-active');
-    }
-    
-    // 为当前活跃面板添加样式
-    activePanel = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
-    if (activePanel) {
-        activePanel.classList.add('plugin-tabsman-panel-group-active');
-    }
-}
-
-
-
-
-
 /**
  * 插件卸载
- * @returns {Promise<void>} 返回Promise
+ * @returns {Promise<void>}
  */
 async function unload() {
     console.log(`=== ${pluginName} 卸载中 ===`);
     
     // 停止功能模块（先停止依赖模块）
     stopRecentlyClosed();
-    
-    // 停止UI渲染（停止UI层）
-    stopTabsRender();
-    
     stopbackforwardbutton();
-    // 清理核心系统（最后清理核心）
+    
+    // 停止对当前面板更新的处理
+    stopActivePanelUpdateHandle()
+    
+    // 命令注销
+    unregisterTabsmanCommand()
+
+    // 清空变量绑定
+    clearBindHtmlElement()
+
+    // 清理Core
     destroy();
     
-    // 注销命令和样式（清理注册）
-    orca.commands.unregisterAfterCommand('core.switchToNextPanel', updateActivePanelStyle);
-    orca.commands.unregisterAfterCommand('core.switchToPreviousPanel', updateActivePanelStyle);
-    
-    // 恢复原始导航 API 函数
-    if (originalSwitchFocusTo) {
-        orca.nav.switchFocusTo = originalSwitchFocusTo;
-        originalSwitchFocusTo = null;
-    }
-    if (originalFocusNext) {
-        orca.nav.focusNext = originalFocusNext;
-        originalFocusNext = null;
-    }
-    if (originalFocusPrev) {
-        orca.nav.focusPrev = originalFocusPrev;
-        originalFocusPrev = null;
-    }
-    
-    // 清理设置监听
-    if (unsubscribeSettings) {
-        unsubscribeSettings();
-        unsubscribeSettings = null;
-    }
-    
-    // 安全注销命令（即使可能未注册）
-    try {
-        orca.commands.unregisterCommand('tabsman.clearData');
-    } catch (e) { /* 忽略错误 */ }
-    
-    orca.commands.unregisterCommand('tabsman.goToNextTab');
-    orca.commands.unregisterCommand('tabsman.goToPreviousTab');
-    orca.commands.unregisterCommand('tabsman.toggleSidebarTabsman');
+    // 停止UI渲染
+    stopTabsRender();
+
     orca.themes.removeCSSResources(pluginName);
     
+    // 清理全局命名空间
+    if (window.pluginTabsman) delete window.pluginTabsman
+
     console.log(`${pluginName} 已卸载`);
 }
 

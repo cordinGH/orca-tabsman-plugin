@@ -101,24 +101,14 @@ async function startRecentlyClosed(renderTabsByPanel) {
                                     })]
                                 ),
                                 onClick: async () => {
-                                    // 恢复关闭的标签页到core的数据结构里
-                                    const currentPanelId = orca.state.activePanel;
-                                    
+                                    // 点击恢复关闭的标签页，重新导入到core的数据结构
                                     // 判断 tab.id 是否已经存在于core数据结构，如果已存在则弹通知并返回
-                                    if (TabsmanCore.getAllTabs()[tab.id]) {
+                                    if (TabsmanCore.getTab(tab.id)) {
                                         orca.notify("warn", "该标签页已被恢复");
                                         return;
                                     }
-                                    
-                                    // 创建 tab 对象的副本，避免引用持久化数据
-                                    const tabCopy = { ...tab };
-                                    tabCopy.panelId = currentPanelId;
-                                    
-                                    // 注册到core数据结构
-                                    TabsmanCore.getAllTabs()[tab.id] = tabCopy;
-                                    TabsmanCore.getTabIdSetByPanelId().get(currentPanelId).add(tab.id);
-                                    // 更新排序缓存，并刷新左侧栏渲染
-                                    TabsmanCore.updateSortedTabsCache(currentPanelId);
+                                    // 导入进core数据结构
+                                    TabsmanCore.importTabToActivePanel(tab)
                                     renderTabsByPanel();
                                     
                                     // 从持久化数据中移除（会自动更新数组引用）

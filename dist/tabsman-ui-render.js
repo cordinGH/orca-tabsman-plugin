@@ -237,7 +237,6 @@ async function renderTabsByPanel() {
             await createPanelItemElement(panelId, panelGroup);
 
             // 渲染该面板的标签页并加入面板分组容器
-            console.log(panelId,"面板，需要渲染多少个标签页：", panelTabs.length)
             for (const tab of panelTabs) {
                 const tabItem = await createTabElement(tab, panelId, panelGroup);
 

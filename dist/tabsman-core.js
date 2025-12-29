@@ -673,7 +673,7 @@ async function deleteTab(tabId) {
 
         // goto
         isFillSuspended = true
-        navOriginalsGoToByTab(newTab, panelId)
+        navOriginalsGoToByTabAndPanelId(newTab, panelId)
         if (tab.backStack.length === 0) await fillCurrentAccess()
     }
 

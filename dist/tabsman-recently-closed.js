@@ -8,11 +8,9 @@ import * as TabsmanCore from './tabsman-core.js';
 import * as TabsmanPersistence from './tabsman-persistence.js';
 
 
-/**
- * 停止最近关闭标签页模块
- * @returns {Promise<void>} 返回Promise
- */
-async function stopRecentlyClosed() {
+
+ // 停止最近关闭标签页模块
+function stopRecentlyClosed() {
     // 注销顶部栏按钮
     orca.headbar.unregisterHeadbarButton('tabsman.recently-closed');
     console.log('最近关闭标签页模块已停止');
@@ -21,10 +19,9 @@ async function stopRecentlyClosed() {
 /**
  * 启动最近关闭标签页模块
  * @param {Function} renderTabsByPanel - UI渲染函数
- * @returns {Promise<void>} 返回Promise
  * @description 数据恢复已在 tabsman-core.js 的 start() 中统一完成
  */
-async function startRecentlyClosed(renderTabsByPanel) {
+function startRecentlyClosed(renderTabsByPanel) {
     // 注册顶部栏按钮
     orca.headbar.registerHeadbarButton("tabsman.recently-closed", () => createElement(
         ContextMenu,

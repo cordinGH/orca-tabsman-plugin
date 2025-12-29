@@ -16,7 +16,7 @@ let backForwardMenu = null
  * 启动后退前进按钮模块
  * @returns {Promise<void>}
  */
-async function startbackforwardbutton() {
+function startbackforwardbutton() {
     backButton.disabled = false;
     forwardButton.disabled = false;
     

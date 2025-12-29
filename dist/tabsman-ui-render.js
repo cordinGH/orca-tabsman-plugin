@@ -10,10 +10,8 @@ import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.
 // 全局变量存储标签页容器元素
 let tabsmanTabsEle = null;
 
-let unsubscribeDockedPanel = null
 let unsubscribeDockedPanelWaiter = null;
 let pluginDockPanelReady = false
-let dockedPanelId = null;
 
 let rendering = false;
 
@@ -100,6 +98,7 @@ async function createPanelItemElement(panelId, panelGroupEle) {
     // 折叠图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
     const collapseIcon = createDomWithClass("i", 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font', panelItemElement)
+    const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
     if (panelId !== dockedPanelId) {
         collapseIcon.className += ' ti ti-chevron-down';
     } else {
@@ -172,6 +171,7 @@ async function handleTabsmanClick(e) {
             renderTabsByPanel();
         } else {
             // 存在停靠面板，则联动dockpanel插件，切换停靠面板的折叠状态。
+            const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
             if (dockedPanelId) {
                 const is2DockedPanel = (panelId === dockedPanelId);
 
@@ -287,6 +287,7 @@ async function startTabsRender() {
         tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
         // 订阅插件列表变化，为停靠面板的id绑定订阅
+        dockedpanelSubscribe()
         unsubscribeDockedPanelWaiter = window.Valtio.subscribe(orca.state.plugins, () => dockedpanelSubscribe())
 
         return true;
@@ -312,7 +313,6 @@ function stopTabsRender() {
     cleanupTabsmanShell();
     
     // 清理订阅
-    unsubscribeDockedPanel = cleanupSubscription(unsubscribeDockedPanel);
     unsubscribeDockedPanelWaiter = cleanupSubscription(unsubscribeDockedPanelWaiter);
 }
 
@@ -331,8 +331,11 @@ function dockedpanelSubscribe() {
 
     const pluginInfoArray = Object.values(orca.state.plugins)
     for (const pluginInfo of pluginInfoArray) {
+
         if (!pluginInfo.settings) continue
+
         if (!Object.hasOwn(pluginInfo.settings, "pluginDockPanelDefaultBlockId")) continue
+        
         // 先重置，防止用户关闭了停靠面板插件
         pluginDockPanelReady = false
         if (Object.hasOwn(pluginInfo, "module")) {
@@ -340,18 +343,6 @@ function dockedpanelSubscribe() {
             break
         }
     }
-
-    // 审查变化后如果停靠面板依旧未就位，就清理可能存在的过时订阅（如用户关闭了停靠面板插件）
-    if (!pluginDockPanelReady) {
-        cleanupSubscription(unsubscribeDockedPanel)
-        return
-    }
-
-    // 订阅停靠面板id，更新时重新刷新tabs栏
-    unsubscribeDockedPanel = window.Valtio.subscribe(window.pluginDockpanel.panel, () => {
-        dockedPanelId = window.pluginDockpanel.panel.id;
-        renderTabsByPanel();
-    });
 }
 
 
@@ -490,5 +481,6 @@ function handlePanelTitleFocusout(e) {
  */
 function getPanelTitle(panelId) {
     // return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId.slice(0, 5));
+    const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
     return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId);
 }

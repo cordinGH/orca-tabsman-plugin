@@ -1167,6 +1167,7 @@ function cleanCommandInterception(){
 
 // 包装所需要的nav函数
 function setupNavWrappers() {
+    // 初始化
     navOriginals = {
         thisValue: orca.nav,
         method: {
@@ -1268,7 +1269,7 @@ async function start(callback = null) {
     setupNavWrappers()
 
     // 为启动时的初始面板创建标签页
-    createTabsForInitialPanels()
+    await createTabsForInitialPanels()
     
     // 设置面板后退历史
     subscribePanelBackHistory();
@@ -1277,7 +1278,7 @@ async function start(callback = null) {
     setupCommandInterception();
 
     // 恢复所有持久化数据（置顶标签页、收藏块、最近关闭标签页）
-    restorePersistedData()
+    await restorePersistedData()
 
     // 暴露 get 函数到全局（调试）
     window.pluginTabsman.getActiveTabs = getActiveTabs;

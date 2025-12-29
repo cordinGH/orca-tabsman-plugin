@@ -221,12 +221,7 @@ async function load(name) {
         }
     });
 
-    // 检查设置，如果启用默认显示Tabs栏
-    if (orca.state.plugins[pluginName]?.settings?.defaultTabOption) {
-        sidebarTabOptionsClassList?.add('plugin-tabsman-selected')
-        tabOptionClassList?.add('orca-selected')
-    }
-
+    
     // 启动标签页渲染    
     await startTabsRender();
     // 启动标签页系统，传递UI更新回调
@@ -234,10 +229,15 @@ async function load(name) {
     
     // 插件启动完成后，主动触发一次渲染通知
     await renderTabsByPanel();
-
+    
     // 绑定所需的html元素
     bindHtmlElement()
-
+    
+    // 检查设置，如果启用默认显示Tabs栏
+    if (orca.state.plugins[pluginName]?.settings?.defaultTabOption) {
+        sidebarTabOptionsClassList.add('plugin-tabsman-selected')
+        tabOptionClassList.add('orca-selected')
+    }
     // 注册命令
     registerTabsmanCommand()
 

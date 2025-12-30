@@ -175,15 +175,11 @@ async function handleTabsmanClick(e) {
             if (dockedPanelId) {
                 const is2DockedPanel = (panelId === dockedPanelId);
 
-                if (is2DockedPanel && window.pluginDockpanel.isCollapsed) {
-                    // 如果点击的是停靠面板Tab，且停靠面板是折叠，则切换到展开。
-                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
-                } else if (is2DockedPanel && !window.pluginDockpanel.isCollapsed && tab.id === TabsmanCore.getActiveTabs()[panelId].id && orca.state.activePanel === dockedPanelId) {
-                    // 如果点击的是停靠面板Tab，且停靠面板不是折叠，且点击的本就是停靠面板前台标签页且面板是active，则切换折叠。
-                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
-                } else if (!is2DockedPanel && !window.pluginDockpanel.isCollapsed) {
-                    // 如果点击的是不是停靠面板Tab，且停靠面板不是折叠，则先切换到折叠。
-                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanelCollapse");
+                // 如果点击的是停靠面板Tab，且停靠面板是折叠，则切换到展开。
+                const toggleCase1 = is2DockedPanel && window.pluginDockpanel.isCollapsed
+                // const toggleCase2 = !is2DockedPanel && !window.pluginDockpanel.isCollapsed
+                if (toggleCase1) {
+                    await orca.commands.invokeCommand("dockpanel.toggleDockedPanel");
                 }
             } 
 

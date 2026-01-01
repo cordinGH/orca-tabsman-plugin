@@ -136,10 +136,8 @@ function getViewAndViewArgsByTab(tab) {
     return {view, viewArgs}
 }
 
-/**
- * 获取所有面板的当前内容ID
- * @returns {Object} 面板ID到当前内容ID的映射对象
- */
+
+// 获取所有面板的当前内容ID
 async function createTabsForInitialPanels() {
     const panelIds = []
     const processPanel = (panel) => {

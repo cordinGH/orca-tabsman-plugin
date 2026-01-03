@@ -49,6 +49,7 @@ let unsubscribePanelBackHistory = null
 
 // 拦截器函数引用
 let beforeCommandHooks = null
+let afterCommandHooks = null
 
 // ==================== 状态管理变量 ====================
 
@@ -1101,8 +1102,6 @@ function setupCommandInterception() {
         navigateTabForward(activeTab);
         return false; // 阻止原始命令执行
     };
-    orca.commands.registerBeforeCommand('core.goForward', beforeCommandHooks.goForward);
-
     
     // 3. 拦截 core.closePanel 命令（关闭当前面板）
     beforeCommandHooks.closePanel = async () => {       
@@ -1121,12 +1120,8 @@ function setupCommandInterception() {
         delete activeTabs[activePanelId];
         sortedTabsByPanelId.delete(activePanelId);
 
-        // 通知UI更新
-        if (renderTabsCallback) await renderTabsCallback();
-
         return true;
     };
-    orca.commands.registerBeforeCommand('core.closePanel', beforeCommandHooks.closePanel);
     
     // 4. 拦截 core.closeOtherPanels 命令（关闭除当前面板外的所有面板）
     beforeCommandHooks.closeOtherPanels = async () => {
@@ -1145,23 +1140,28 @@ function setupCommandInterception() {
             }
         }
         
-        // 通知UI更新
-        if (renderTabsCallback) await renderTabsCallback();
-        
         return true; // 允许命令继续执行
     };
-    orca.commands.registerBeforeCommand('core.closeOtherPanels', beforeCommandHooks.closeOtherPanels);
+
+    Object.keys(beforeCommandHooks).forEach(name=>orca.commands.registerBeforeCommand(`core.${name}`, beforeCommandHooks[name]))
+
+
+    afterCommandHooks = {
+        async closePanel(){ if (renderTabsCallback) await renderTabsCallback()},
+        async closeOtherPanels(){ if (renderTabsCallback) await renderTabsCallback()}
+    }
+    Object.keys(afterCommandHooks).forEach(name=>orca.commands.registerAfterCommand(`core.${name}`, afterCommandHooks[name]))
 }
 
 // 清理命令拦截
 function cleanCommandInterception(){
-    Object.keys(beforeCommandHooks).forEach(hookName => {
-        const commandName = "core." + hookName
-        orca.commands.unregisterBeforeCommand(commandName, beforeCommandHooks[hookName])
-    })
+    Object.keys(beforeCommandHooks).forEach(name => orca.commands.unregisterBeforeCommand(`core.${name}`, beforeCommandHooks[hookName]))
+    Object.keys(afterCommandHooks).forEach(name=>orca.commands.unregisterAfterCommand(`core.${name}`, afterCommandHooks[name]))
 
     beforeCommandHooks = null
+    afterCommandHooks = null
 }
+
 
 // 包装所需要的nav函数
 function setupNavWrappers() {

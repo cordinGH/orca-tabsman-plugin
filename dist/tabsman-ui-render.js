@@ -264,7 +264,7 @@ async function startTabsRender() {
         // 订阅插件列表变化，为停靠面板的id绑定订阅
         pluginDockpanelSubscribe()
         pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, () => pluginDockpanelSubscribe())
-        dockedPanelIdUnSubscribe = window.Valtio.subscribe(window.pluginDockpanel.panel,  () => renderTabsByPanel())
+        if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe(window.pluginDockpanel.panel,  () => renderTabsByPanel())
 
         return true;
 

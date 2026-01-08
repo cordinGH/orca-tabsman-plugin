@@ -3,6 +3,7 @@
 let tabsmanShell = null;
 const createDomWithClass = window.pluginTabsman.createDomWithClass
 let commandInterceptHandler = null
+let handleSidebarTabOptionsClick = null
 
 /**
  * 创建并注入可隐藏容器到目标元素
@@ -53,24 +54,8 @@ async function injectTabsmanShell() {
         const hideableContainer = injectHideableContainer(sidebarTabsEl);
         const tabOptionEl = createDomWithClass("div", 'orca-segmented-item plugin-tabsman-tab-option', sidebarTabOptionsEl)
         tabOptionEl.textContent = 'Tabs';
-
-        // 监听点击tab-option事件
-        sidebarTabOptionsEl.addEventListener('click', (e) => {
-            // 如果tab-option已选中，则取消选中
-            if (e.target.classList.contains('plugin-tabsman-tab-option')) {
-                if (!sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) {
-                    sidebarTabOptionsEl.classList.add('plugin-tabsman-selected');
-                    tabOptionEl.classList.add('orca-selected');
-                }
-            } else {
-                if (sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) {
-                    sidebarTabOptionsEl.classList.remove('plugin-tabsman-selected');
-                    tabOptionEl.classList.remove('orca-selected');
-                }
-            }
-        });
         
-        // 保存完整的外壳对象（支持链式调用）到全局变量并返回
+        // 保存完整的外壳对象
         tabsmanShell = {
             parentElement: sidebarTabOptionsEl,
             tabOptionEl: tabOptionEl,
@@ -78,9 +63,25 @@ async function injectTabsmanShell() {
             tabsmanContainerEl: hideableContainer.tabsmanContainer.element,
             tabsmanTabsEl: hideableContainer.tabsmanContainer.tabsmanTabs.element,
         };
+
+
+        handleSidebarTabOptionsClick = (e) => {
+            if (e.target.classList.contains('plugin-tabsman-tab-option')) {
+                // 本就选中则不操作
+                if (sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) return
+                sidebarTabOptionsEl.classList.add('plugin-tabsman-selected');
+                tabOptionEl.classList.add('orca-selected');
+            } else {              
+                if (!sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) return
+                sidebarTabOptionsEl.classList.remove('plugin-tabsman-selected');
+                tabOptionEl.classList.remove('orca-selected');
+            }
+        }
+
+        // 监听点击tab-option事件
+        sidebarTabOptionsEl.addEventListener('click', handleSidebarTabOptionsClick);
         
         // 设置Orca命令拦截
-        createCommandInterceptHandler()
         setOrcaCommandIntercept();
         
     } catch (error) {
@@ -111,15 +112,19 @@ function cleanupTabsmanShell() {
     if (tabOptionEl?.parentNode) {
         tabOptionEl.parentNode.removeChild(tabOptionEl);
     }
+
+    if (tabsmanShell.parentElement && handleSidebarTabOptionsClick) {
+        tabsmanShell.parentElement.removeEventListener('click', handleSidebarTabOptionsClick);
+    }
     
     // 清理Orca命令拦截
     cleanupOrcaCommandIntercept();
     
-    // 清理全局变量
     tabsmanShell = null;
 }
 
-function createCommandInterceptHandler() {
+/** 设置Orca命令拦截 */
+function setOrcaCommandIntercept() {
     commandInterceptHandler = {
         removeFn: (optionName) => {
             const bodyApp = document.querySelector("body>#app");
@@ -139,10 +144,6 @@ function createCommandInterceptHandler() {
         goTags: () => commandInterceptHandler.removeFn("tags"),
         goPages: () => commandInterceptHandler.removeFn("pages")
     }
-}
-
-/** 设置Orca命令拦截 */
-function setOrcaCommandIntercept() {
     orca.commands.registerBeforeCommand("core.sidebar.goFavorites", commandInterceptHandler.goFavorites);
     orca.commands.registerBeforeCommand("core.sidebar.goTags", commandInterceptHandler.goTags);
     orca.commands.registerBeforeCommand("core.sidebar.goPages", commandInterceptHandler.goPages);

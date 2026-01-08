@@ -112,7 +112,23 @@ export async function startWSRender() {
 }
 
 export function stopWSRender(){
-    wsTools.remove()
+    wsTools?.remove()
+    if (confirmPopup?.isConnected) {
+        document.removeEventListener('pointerdown', handleCancelConfirmPopup)
+        document.removeEventListener('keydown', handleCancelConfirmPopup)
+    }
+    if (savePopup?.isConnected) {
+        document.removeEventListener('pointerdown', handleCancelSavePopup)
+        document.removeEventListener('keydown', handleCancelSavePopup)
+    }
+    wsTools = null
+    saveButton = null
+    exitButton = null
+    wsItems = null
+    confirmPopup = null
+    savePopup = null
+    wsItemSelected = null
+    wsItemsObj = {}
 }
 
 // 工具函数，移除选中样式和选中元素记录

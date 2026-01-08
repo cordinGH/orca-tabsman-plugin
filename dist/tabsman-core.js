@@ -93,16 +93,16 @@ function importTabToActivePanel(tabInput) {
 async function makeValidatedTab(tab) {
     const {currentBlockId} = tab
     if (typeof currentBlockId === "number") {
-        const block = await orca.invokeBackend("get-block", currentBlockId)
-        if (!block) {
-            orca.notify("info",`[tabsman] 目标块${currentBlockId}已删除，现重定向为今日日志`)
-            const date = new Date(new Date().toDateString())
-            Object.assign(tab, {currentBlockId: date, name: date.toDateString(), currentIcon: 'ti ti-calendar-smile'})
+        // 存在块不处理
+        if (await orca.invokeBackend("get-block", currentBlockId)) return
 
-            const len = tab.backStack.length
-            if (len > 0) {
-                Object.assign(tab.backStack[len - 1], {icon: tab.currentIcon, name: tab.name, view: "journal", viewArgs: {date}})
-            }
+        orca.notify("info",`[tabsman] 目标块${currentBlockId}已删除，现重定向为今日日志`)
+        const date = new Date(new Date().toDateString())
+        Object.assign(tab, {currentBlockId: date, name: date.toDateString(), currentIcon: 'ti ti-calendar-smile'})
+
+        const len = tab.backStack.length
+        if (len > 0) {
+            Object.assign(tab.backStack[len - 1], {icon: tab.currentIcon, name: tab.name, view: "journal", viewArgs: {date}})
         }
     }
 }
@@ -286,19 +286,21 @@ async function updateTabProperties() {
     activeTab.currentBlockId = getBlockIdByViewAndViewArgs(activePanel.view, activePanel.viewArgs)
     
     try {
-        // 插件内部在Goto前已经确保了参数正确，所以这里不再需要make；外部官方的goto必然是有效的。
+        // 插件内部函数Goto前已经确保了参数正确，所以这里不再需要make；外部官方的goto必然是有效的id。
         const {name, icon} = await generateTabNameAndIcon(activeTab.currentBlockId);
         activeTab.name = name;
         activeTab.currentIcon = icon;
         
         // 更新UI
-        if (renderTabsCallback) await renderTabsCallback();
+        if (renderTabsCallback) await renderTabsCallback("update", activeTab);
+        // if (renderTabsCallback) await renderTabsCallback();
     } catch (error) {
         console.error('[tabsman] 更新标签页属性失败:', error);
         // 设置默认值
         activeTab.name = '新标签页';
         activeTab.currentIcon = 'ti ti-cube';
-        if (renderTabsCallback) await renderTabsCallback();
+        if (renderTabsCallback) await renderTabsCallback("update", activeTab);
+        // if (renderTabsCallback) await renderTabsCallback();
     }
 }
 
@@ -570,12 +572,11 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
         activeTabs[panelId] = tab;
     }
 
+    if (renderTabsCallback) await renderTabsCallback();
+    
     // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
     if (needSwitch) {
         switchTab(tab.id);
-    } else {
-        // 通知UI渲染
-        if (renderTabsCallback) await renderTabsCallback();
     }
 
     return tab;
@@ -590,26 +591,34 @@ async function switchTab(tabId) {
     const tab = tabs[tabId];
 
     // 不存在tab，不处理
-    if (!tab) return 
+    if (!tab) return
+
     // tab就是当前面板的活跃tab，也不处理。
-    if (activeTabs[orca.state.activePanel] === tab) return
+    const activePanelId = orca.state.activePanel
+    if (activeTabs[activePanelId] === tab) return
 
     // 挂起历史填充（内部导航，不需要填充历史）
     isFillSuspended = true
     // 重新标记活跃tab
     const {panelId} = tab
-    orca.nav.switchFocusTo(panelId)
     const activeTab = activeTabs[panelId]
     activeTab.isActive = false
     tab.isActive = true
     activeTabs[panelId] = tab
+    
+    if (panelId !== activePanelId) orca.nav.switchFocusTo(panelId);
+
     // 使tab确保有效
     await makeValidatedTab(tab)
 
+    if (renderTabsCallback) await renderTabsCallback("switch", tab , activeTab);
     // 如果两个标签页内容一样，则仅刷新ui并清除填充挂起状态，反之则正常goTo
-    if (activeTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf()) {
-        if (renderTabsCallback) await renderTabsCallback()
+    const isSameBlockId = activeTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf()
+    if (isSameBlockId) {
+        // 清除挂起
         isFillSuspended = false
+        // 更新前后的tab信息
+        await updateTabProperties()
     } else {
         // 原始goto跳转，根据tab
         navOriginalsGoToByTabAndPanelId(tab, panelId)
@@ -618,7 +627,12 @@ async function switchTab(tabId) {
     if (tab.backStack.length === 0) await fillCurrentAccess()
 }
 
+// 提供内插件内部调用，3处调用都是挂起状态，不会产生历史填充
 function navOriginalsGoToByTabAndPanelId(tab, panelId) {
+
+    // 确保目标panelId是当前面板
+    if (panelId !== orca.state.activePanel) orca.nav.switchFocusTo(panelId);
+
     let {view, viewArgs} = getViewAndViewArgsByTab(tab)
     navOriginals.method.goTo.call(navOriginals.thisValue, view, viewArgs, panelId)
 }
@@ -672,15 +686,17 @@ async function deleteTab(tabId) {
 
         // goto
         isFillSuspended = true
+        // 使tab确保有效
+        await makeValidatedTab(tab)
         navOriginalsGoToByTabAndPanelId(newTab, panelId)
-        if (tab.backStack.length === 0) await fillCurrentAccess()
+        if (newTab.backStack.length === 0) await fillCurrentAccess()
     }
 
     // 清理关闭的标签页数据并更新排序缓存，再次刷新UI
     delete tabs[tabId]
     tabIdSet.delete(tabId)
     updateSortedTabsCache(panelId)
-    if (renderTabsCallback) await renderTabsCallback()
+    if (renderTabsCallback) await renderTabsCallback("delete", activeTabs[panelId], tab)
 }
 
 // 移动tab到其他面板
@@ -707,6 +723,8 @@ async function moveTabToPanel(tabId, newPanelId) {
         // 导航到新的前台标签页
         isFillSuspended = true;
         // 原始goto不会影响面板行为
+        // 使tab确保有效
+        await makeValidatedTab(prevTab)
         navOriginalsGoToByTabAndPanelId(prevTab, prevTab.panelId)
         // 单独填充历史
         if (prevTab.backStack.length === 0){
@@ -1155,7 +1173,7 @@ function setupCommandInterception() {
 
 // 清理命令拦截
 function cleanCommandInterception(){
-    Object.keys(beforeCommandHooks).forEach(name => orca.commands.unregisterBeforeCommand(`core.${name}`, beforeCommandHooks[hookName]))
+    Object.keys(beforeCommandHooks).forEach(name => orca.commands.unregisterBeforeCommand(`core.${name}`, beforeCommandHooks[name]))
     Object.keys(afterCommandHooks).forEach(name=>orca.commands.unregisterAfterCommand(`core.${name}`, afterCommandHooks[name]))
 
     beforeCommandHooks = null
@@ -1255,8 +1273,8 @@ async function start(callback = null) {
     
     // 设置UI渲染回调函数
     // 2025年11月23日 适配工作区的更新
-    renderTabsCallback = async function (){
-        callback();
+    renderTabsCallback = async (type, currentTab, previousTab) => {
+        callback(type, currentTab, previousTab);
         // 进入具体工作空间后每次刷新ui都更新数据
         if (workspaceNow !== ""){
             await orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));

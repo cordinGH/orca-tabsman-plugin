@@ -7,8 +7,11 @@ import * as Persistence from './tabsman-persistence.js';
 import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.js';
 
 
-// 全局变量存储标签页容器元素
+// 标签页容器元素
 let tabsmanTabsEle = null;
+
+let allTabEle = null
+let allPanelGroupEle = null
 
 let pluginDockpanelUnSubscribe = null;
 let dockedPanelIdUnSubscribe = null;
@@ -184,53 +187,105 @@ async function handleTabsmanClick(e) {
 
 
  // 按面板分组渲染所有标签页列表
-function renderTabsByPanel() {
+function renderTabsByPanel(type, currentTab, previousTab) {
     // 防止重复渲染
     if (rendering) return;
 
     rendering = true;
+
     if (!tabsmanTabsEle) {
         orca.notify("info", '[tabsman] 标签页容器元素不存在，无法渲染标签页列表');
         return;
     }
 
-    // 清空现有内容
-    tabsmanTabsEle.innerHTML = '';
-
-    // 获取所有面板的排序标签页列表（直接使用核心模块的排序缓存）
-    const allSortedTabs = TabsmanCore.getAllSortedTabs();
-
-    if (allSortedTabs?.size > 0) {
-        // 直接遍历已排序的标签页列表，避免重复函数调用
-        for (const [panelId, panelTabs] of allSortedTabs) {
-            if (panelTabs.length === 0) continue;
-            // 创建面板分组容器
-            // ⭐️⭐️⭐️借用fav-item样式，性质是相同的。
-            const panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
-            panelGroup.setAttribute('data-tabsman-panel-id', panelId);
-
-            // 创建面板标题项
-            createPanelItemElement(panelId, panelGroup);
-
-            // 渲染该面板的标签页并加入面板分组容器
-            for (const tab of panelTabs) {
-                const tabItem = createTabElement(tab, panelId, panelGroup);
-                // 添加活跃状态样式并加入面板分组容器
-                const activeTabs = TabsmanCore.getActiveTabs();
-                if (activeTabs && activeTabs[panelId] === tab) {
-                    tabItem.element.classList.add('active-tab-item');
-                }
-            }
-        }
-
-        // 在所有面板组都添加到DOM后，为当前活跃面板添加class plugin-tabsman-panel-group-active
-        const activePanel = orca.state.activePanel;
-        const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${activePanel}"]`);
-        if (activePanelGroup) {
-            activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
-        }
+    switch (type) {
+        case "delete":
+            renderDelete(currentTab, previousTab);
+            break;
+        case "switch":
+            renderSwitch(currentTab, previousTab);
+            break;
+        case "update":
+            renderUpdate(currentTab);
+            break;
+        default:
+            renderAll();
+            break;
+    }
+    
+    
+    // 在所有面板组都添加到DOM后，为当前活跃面板添加class plugin-tabsman-panel-group-active
+    const activePanel = orca.state.activePanel;
+    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${activePanel}"]`);
+    if (activePanelGroup) {
+        activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
     }
     rendering = false;
+}
+
+// update更新单个标签页（活跃标签页），轻量渲染
+// currentTab => 需要被处理的标签页
+function renderUpdate (tab) {
+    const {id, panelId} = tab
+    const tabElement = allTabEle[id]
+    const panelGroupEle = allPanelGroupEle[panelId]
+    const newTabEle = createTabElement(tab, panelId, panelGroupEle).element
+
+    newTabEle.classList.add('active-tab-item');
+    allTabEle[id] = newTabEle
+    tabElement.replaceWith(newTabEle)
+    tabElement.remove()
+}
+
+// delete轻量渲染
+// currentTab => 当前活跃的tab，pre是被删除的tab
+function renderDelete (currentTab, previousTab) {
+    allTabEle[currentTab.id].classList.add('active-tab-item');
+    allTabEle[previousTab.id].remove()
+    delete allTabEle[previousTab.id]
+}
+
+// switch轻量渲染
+function renderSwitch (currentTab, previousTab) {
+    allTabEle[previousTab.id].classList.remove('active-tab-item');
+    allTabEle[currentTab.id].classList.add('active-tab-item');
+}
+
+// 全部渲染
+function renderAll() {
+    // 清空现有内容
+    tabsmanTabsEle.innerHTML = '';
+    allTabEle = {}
+    allPanelGroupEle = {}
+
+    // 获取所有面板的排序标签页列表
+    const allSortedTabs = TabsmanCore.getAllSortedTabs();
+
+    if (!allSortedTabs || allSortedTabs.size < 1) return;
+
+    for (const [panelId, panelTabs] of allSortedTabs) {
+        if (panelTabs.length === 0) continue;
+
+        // 创建面板分组容器
+        // ⭐️⭐️⭐️借用fav-item样式，性质是相同的。
+        const panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
+        panelGroup.setAttribute('data-tabsman-panel-id', panelId);
+        allPanelGroupEle[panelId] = panelGroup
+
+        // 创建面板标题项
+        createPanelItemElement(panelId, panelGroup);
+
+        // 渲染该面板的标签页并加入面板分组容器
+        for (const tab of panelTabs) {
+            const tabEle = createTabElement(tab, panelId, panelGroup).element;
+            allTabEle[tab.id] = tabEle
+            // 添加活跃状态样式并加入面板分组容器
+            const activeTabs = TabsmanCore.getActiveTabs();
+            if (activeTabs && activeTabs[panelId] === tab) {
+                tabEle.classList.add('active-tab-item');
+            }
+        }
+    }
 }
 
 
@@ -266,6 +321,8 @@ async function startTabsRender() {
         pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, () => pluginDockpanelSubscribe())
         if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe(window.pluginDockpanel.panel,  () => renderTabsByPanel())
 
+        allTabEle = {};
+        allPanelGroupEle = {};
         return true;
 
     } catch (error) {
@@ -291,6 +348,8 @@ function stopTabsRender() {
     // 清理订阅
     cleanupSubscription(pluginDockpanelUnSubscribe);
     cleanupSubscription(dockedPanelIdUnSubscribe);
+    allTabEle = null;
+    allPanelGroupEle = null;
 }
 
 // 导出模块接口

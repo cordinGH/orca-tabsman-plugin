@@ -679,8 +679,8 @@ async function deleteTab(tabId) {
     if (activeTabs[panelId] === tab) {
         const sortedTabs = getOneSortedTabs(panelId)
         const currentIndex = sortedTabs.findIndex(item => item.id === tabId)
-        // 删除的tab排在第一个，那下一个活跃面板就是第二个，否则全都切为第一个。
-        const newIndex = currentIndex === 0 ? 1 : 0
+        // 最后一个则-1，否贼+1
+        const newIndex = currentIndex === sortedTabs.length - 1 ? currentIndex - 1 : currentIndex + 1
         const newTab = sortedTabs[newIndex]
         tab.isActive = false
         newTab.isActive = true

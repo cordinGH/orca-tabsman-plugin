@@ -231,19 +231,26 @@ function renderCreate(tab) {
     let panelGroup = allPanelGroupEle[panelId]
     if (!panelGroup) {
         const panelTabs = TabsmanCore.getOneSortedTabs(panelId)
+
+        // 该case是在第一次创建面板时构建初始tab，因此panelTabs期望长度应当是1
+        if (panelTabs.length !== 1) {
+            orca.notify("info", "[tabsman] renderCreate期望值为1，请检查逻辑是否有误")
+            return
+        }
+
         panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
         panelGroup.setAttribute('data-tabsman-panel-id', panelId);
         allPanelGroupEle[panelId] = panelGroup
 
         // 创建面板标题项
         createPanelItemElement(panelId, panelGroup);
+        const tab = panelTabs[0]
 
-        // 渲染该面板的标签页并加入面板分组容器
-        for (const tab of panelTabs) {
-            const tabElement = createTabElement(tab, panelId, panelGroup);
-            allTabEle[tab.id] = tabElement;
-        }
-
+        // 渲染标签页并加入面板分组容器
+        const tabElement = createTabElement(tab, panelId, panelGroup);
+        allTabEle[tab.id] = tabElement;
+        tabElement.element.classList.add('active-tab-item');
+        
         return
     }
 

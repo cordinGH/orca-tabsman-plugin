@@ -1247,7 +1247,8 @@ function setupNavWrappers() {
         navOriginals.method.openInLastPanel.call(this, view, viewArgs);
         
         // 如果还没有这个面板的标签页，则初始化一份默认的标签页
-        if (!tabIdSetByPanelId.has(orca.state.activePanel)) createTabForNewPanel();
+        const newPanelId = orca.state.activePanel;
+        if (!tabIdSetByPanelId.has(newPanelId)) createTabForNewPanel(newPanelId);
     };
 }
 

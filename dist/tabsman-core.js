@@ -276,9 +276,9 @@ async function generateTabNameAndIcon(blockId) {
  * 更新当前活跃标签页的属性（块ID、名称、图标）
  * @returns {Promise<void>}
  */
-async function updateTabProperties() {
-    const activePanelId = orca.state.activePanel;
-    const activeTab = activeTabs[activePanelId];
+async function updateTabProperties(tab, activePanelId = orca.state.activePanel) {
+    // 2026年1月9日新增对所有tab的渲染
+    let activeTab = tab ? tab : activeTabs[activePanelId];
     if (!activeTab) return;
     
     const activePanel = orca.nav.findViewPanel(activePanelId, orca.state.panels);
@@ -595,9 +595,13 @@ async function switchTab(tabId) {
     // 不存在tab，不处理
     if (!tab) return
 
-    // tab就是当前面板的活跃tab，也不处理。
+    // tab就是当前面板的当前tab，也不处理。
     const activePanelId = orca.state.activePanel
-    if (activeTabs[activePanelId] === tab) return
+    const currentTab = activeTabs[activePanelId]
+    if (currentTab === tab) return
+
+    // 更新当前tab
+    await updateTabProperties(currentTab, activePanelId)
 
     // 挂起历史填充（内部导航，不需要填充历史）
     isFillSuspended = true
@@ -613,7 +617,9 @@ async function switchTab(tabId) {
     // 使tab确保有效
     await makeValidatedTab(tab)
 
+    // 切换tab
     if (renderTabsCallback) await renderTabsCallback("switch", tab , activeTab);
+
     // 如果两个标签页内容一样，则仅刷新ui并清除填充挂起状态，反之则正常goTo
     const isSameBlockId = activeTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf()
     if (isSameBlockId) {
@@ -625,6 +631,7 @@ async function switchTab(tabId) {
         // 原始goto跳转，根据tab
         navOriginalsGoToByTabAndPanelId(tab, panelId)
     }
+    
     // 目标tab从未打开过则填充一次当前历史
     if (tab.backStack.length === 0) await fillCurrentAccess()
 }

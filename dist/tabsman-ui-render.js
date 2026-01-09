@@ -178,11 +178,67 @@ async function handleTabsmanClick(e) {
     if (target.closest('.plugin-tabsman-panel-item')) {
         if (target.classList.contains('plugin-tabsman-panel-new-tab')) {
             const panelId = target.getAttribute('data-tabsman-panel-id')
-            if (panelId) TabsmanCore.createTab({ currentBlockId: -1, needSwitch: false, panelId })
+            let info = null
+            let needCreateTab = true
+            if (window.event.altKey) {
+                const {newBlockId, isNewBlock} = await createNewBlockToToday()
+                needCreateTab = isNewBlock
+                info = {currentBlockId: newBlockId, needSwitch: true, panelId}
+            } else {
+                info = {currentBlockId: -1, needSwitch: false, panelId}
+            }
+            if (!needCreateTab) {
+                orca.notify("info", "[tabsman] 日志末尾已存在空块，直接使用")
+            }
+            if (panelId) TabsmanCore.createTab(info)
         } else if (target.classList.contains('plugin-tabsman-panel-collapse-icon')) {
             // TODO: 实现折叠/展开功能（暂时感觉没啥用）
         }
     }
+}
+
+// 在今日日志末尾获取一个空块（若连续2个空块，则不新建，直接采用最后一个）
+async function createNewBlockToToday(){
+    const todayDate = new Date()
+    const today = await orca.invokeBackend("get-journal-block", todayDate)
+    let newBlockId = null;
+    const todayChildren = today.children
+
+    // 需要插入的新空块数量
+    let newBlockNumber = 0
+    let isNew
+
+    if (todayChildren === 0) {
+        newBlockNumber = 1
+    } else {
+        const lastChildrenId = todayChildren[todayChildren.length - 1]
+        const lastBlock = await orca.invokeBackend("get-block", lastChildrenId)
+        const isEmptyTextBlock = lastBlock.text === null && lastBlock.properties.find(p => p.name === '_repr').value.type === "text"
+        if (isEmptyTextBlock) {
+            const last2ChildrenId = todayChildren[todayChildren.length - 1]
+            const last2Block = await orca.invokeBackend("get-block", last2ChildrenId)
+            const isEmptyTextBlock = last2Block.text === null && last2Block.properties.find(p => p.name === '_repr').value.type === "text"
+            isEmptyTextBlock ? newBlockId = lastChildrenId : newBlockNumber = 1
+        } else {
+            newBlockNumber = 2
+        }
+    }
+    if (newBlockNumber > 0) {
+        await orca.commands.invokeGroup(async () => {
+            for (let i = 0; i < newBlockNumber; i++) {
+            newBlockId = await orca.commands.invokeEditorCommand(
+                "core.editor.insertBlock",
+                null,
+                await orca.invokeBackend("get-journal-block", todayDate),
+                "lastChild",
+                null, // block.text === null ，使得内容为空。如果需要自定义内容，则 [{ t: "t", v: "自定义文本内容" }]
+                { type: "text" },
+                )
+            }
+        })
+        return {newBlockId, isNewBlock: true}
+    }
+    return {newBlockId, isNewBlock: false}
 }
 
 
@@ -215,10 +271,8 @@ function renderTabsByPanel(type, currentTab, previousTab) {
             renderAll();break;
     }
     
-    
-    // 在所有面板组都添加到DOM后，为当前活跃面板添加class plugin-tabsman-panel-group-active
-    const activePanel = orca.state.activePanel;
-    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${activePanel}"]`);
+    // 确保当前面板的active样式
+    const activePanelGroup = allPanelGroupEle[orca.state.activePanel]
     if (activePanelGroup) {
         activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
     }

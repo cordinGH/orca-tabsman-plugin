@@ -64,7 +64,7 @@ function startRecentlyClosed(renderTabsByPanel) {
                                 onClick: async () => {
                                     // 恢复收藏的块到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;
-                                    await TabsmanCore.createTab(blockId, false, currentPanelId);
+                                    await TabsmanCore.createTab({ currentBlockId: blockId, needSwitch: false, panelId: currentPanelId });
                                 }
                             })
                         })

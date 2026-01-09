@@ -138,7 +138,7 @@ function getViewAndViewArgsByTab(tab) {
 }
 
 
-// 获取所有面板的当前内容ID
+// 为启动时的初始面板渲染一份基础tab
 async function createTabsForInitialPanels() {
     const panelIds = []
     const processPanel = (panel) => {
@@ -152,7 +152,7 @@ async function createTabsForInitialPanels() {
     processPanel(orca.state.panels)
 
     for (const panelId of panelIds) {
-        await createTabForNewPanel(panelId);
+        await createTabForNewPanel(panelId, false);
     }
 }
 
@@ -428,7 +428,7 @@ async function fillCurrentAccess() {
         navigateTabBack(activeTab)
         activeTab.backStack.pop()
         activeTab.forwardStack.length = 0
-        createTab(Object.values(historyItem.viewArgs)[0], true);
+        createTab({ currentBlockId: Object.values(historyItem.viewArgs)[0], needSwitch: true });
     }
     
     // console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
@@ -504,15 +504,16 @@ async function navigateTabForward(tab) {
 /**
  * 为新面板创建初始标签页和访问历史
  * @param {string} [panelId] - 面板ID，可选，默认当前活跃面板
+ * @param {boolean} [needRender] - 是否需要立刻渲染
  * @returns {Promise<void>}
  */
-async function createTabForNewPanel(panelId) {
+async function createTabForNewPanel(panelId, needRender = true) {
     if (panelId) {
         // 如果指定了面板ID，先切换过去
         orca.nav.switchFocusTo(panelId);
     }
     // 创建默认标签页（使用当前面板内容）
-    await createTab(0, false);
+    await createTab({ currentBlockId: 0, needSwitch: false, needRender });
     // 填充访问历史
     await fillCurrentAccess()
 }
@@ -522,9 +523,10 @@ async function createTabForNewPanel(panelId) {
  * @param {string|number|Date|0|-1} [currentBlockId=0] - 初始块ID（可选），传0则自动获取当前面板的块ID，传-1则创建今日日志标签页
  * @param {boolean} [needSwitch=true] - 是否切换到新创建的标签页（可选，默认切换）
  * @param {string} [panelId] - 面板ID（可选，默认当前活跃面板）
+ * @param {boolean} [needRender] - 是否需要立刻渲染
  * @returns {Promise<Object>} 返回新创建的标签页对象
  */
-async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.state.activePanel) {
+async function createTab({ currentBlockId = 0, needSwitch = true, panelId = orca.state.activePanel, needRender = true } = {}) {
     // 如果传入-1，创建今日日志标签页，转一下字符串以确保从0点0分0秒开始
     if (currentBlockId === -1) currentBlockId = new Date(new Date().toDateString());
 
@@ -572,7 +574,7 @@ async function createTab(currentBlockId = 0, needSwitch = true, panelId = orca.s
         activeTabs[panelId] = tab;
     }
 
-    if (renderTabsCallback) await renderTabsCallback();
+    if (renderTabsCallback && needRender) await renderTabsCallback("create", tab);
     
     // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
     if (needSwitch) {
@@ -768,7 +770,7 @@ async function pinTab(tabId) {
     updateSortedTabsCache(tab.panelId);
 
     // 通知UI更新（置顶标签页会改变排序，需要重新渲染标签页列表）
-    if (renderTabsCallback) await renderTabsCallback();
+    if (renderTabsCallback) await renderTabsCallback("pin", tab);
     
     // 持久化
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
@@ -1204,8 +1206,8 @@ function setupNavWrappers() {
             // 如果去往的面板不在当前tabs面板内（例如'_globalSearch'，或者是没填），则在当前activetab里打开
             if (!Object.hasOwn(activeTabs, panelId)) {
                 const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-                createTab(targetBlockId, false, activePanelId);
-            } else { createTab(targetBlockId, false) }
+                createTab({ currentBlockId: targetBlockId, needSwitch: false, panelId: activePanelId });
+            } else { createTab({ currentBlockId: targetBlockId, needSwitch: false }) }
 
             orca.notify("success", "[tabsman] 已创建后台标签页");
             return;
@@ -1234,8 +1236,8 @@ function setupNavWrappers() {
             const targetBlockId = view === 'journal' ? viewArgs.date : viewArgs.blockId;
             if (!Object.hasOwn(activeTabs, orca.state.activePanel)) {
                 const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-                createTab(targetBlockId, true, activePanelId);
-            } else { createTab(targetBlockId, true) }
+                createTab({ currentBlockId: targetBlockId, needSwitch: true, panelId: activePanelId });
+            } else { createTab({ currentBlockId: targetBlockId, needSwitch: true }) }
 
             orca.notify("success", "[tabsman] 已创建前台标签页");
             return;

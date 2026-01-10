@@ -206,9 +206,8 @@ async function createNewBlockToToday(){
 
     // 需要插入的新空块数量
     let newBlockNumber = 0
-    let isNew
 
-    if (todayChildren === 0) {
+    if (todayChildren.length === 0) {
         newBlockNumber = 1
     } else {
         const lastChildrenId = todayChildren[todayChildren.length - 1]

@@ -142,7 +142,7 @@ async function handleTabsmanClick(e) {
     const target = e.target
     const tabElement = target.closest('.plugin-tabsman-tab-item');
 
-    // 处理tab的icon点击事件，[废弃方案，统一pointer吧]click，好处是click可以“反悔”长按移开即可不触发
+    // 处理tab的icon点击事件
     if (tabElement) {
         const tabId = tabElement.getAttribute('data-tabsman-tab-id');
         const panelId = tabElement.getAttribute('data-tabsman-panel-id');
@@ -449,7 +449,7 @@ async function startTabsRender() {
         }
 
         // 注册监听器
-        tabsmanTabsEle.addEventListener('pointerdown', handleTabsmanClick);
+        tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
         setUpTabDragAndDrop();
         tabsmanTabsEle.addEventListener('focusout', handlePanelTitleFocusout);
         tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
@@ -475,7 +475,7 @@ async function startTabsRender() {
  * @returns {void}
  */
 function stopTabsRender() {
-    tabsmanTabsEle.removeEventListener('pointerdown', handleTabsmanClick);
+    tabsmanTabsEle.removeEventListener('click', handleTabsmanClick);
     cleanupTabDragAndDrop();
     tabsmanTabsEle.removeEventListener('focusout', handlePanelTitleFocusout);
     tabsmanTabsEle.removeEventListener('keydown', handlePanelTitleEnter);

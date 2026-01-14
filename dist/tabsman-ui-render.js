@@ -242,7 +242,7 @@ async function createNewBlockToToday(){
 
 
  // 按面板分组渲染所有标签页列表
-function renderTabsByPanel(type, currentTab, previousTab) {
+function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
     // 防止重复渲染
     if (rendering) return;
 
@@ -266,6 +266,8 @@ function renderTabsByPanel(type, currentTab, previousTab) {
             renderFavorite(currentTab);break;
         case "create":
             renderCreate(currentTab);break;
+        case "closePanel":
+            renderClosePanel(panelId);break;
         default:
             renderAll();break;
     }
@@ -276,6 +278,22 @@ function renderTabsByPanel(type, currentTab, previousTab) {
         activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
     }
     rendering = false;
+}
+
+// 关闭面板，轻量渲染
+function renderClosePanel(panelId) {
+    const panelGroupEle = allPanelGroupEle[panelId]
+    
+    // 不重复清理
+    if (!panelGroupEle) return;
+
+    panelGroupEle.remove()
+    const tabIdSet = TabsmanCore.getTabIdSetByPanelId(panelId)
+    for (const tabId of tabIdSet) {
+        delete allTabEle[tabId]
+    }
+
+    delete allPanelGroupEle[panelId]
 }
 
 // 创建tab时渲染，轻量渲染
@@ -402,7 +420,7 @@ function renderAll() {
             allTabEle[tab.id] = tabElement;
             // 添加活跃状态样式并加入面板分组容器
             const activeTabs = TabsmanCore.getActiveTabs();
-            if (activeTabs && activeTabs[panelId] === tab) {
+            if (activeTabs && activeTabs[panelId].id === tab.id) {
                 tabElement.element.classList.add('active-tab-item');
             }
         }

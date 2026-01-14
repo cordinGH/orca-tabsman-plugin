@@ -228,7 +228,7 @@ async function load(name) {
     await start(renderTabsByPanel);
     
     // 插件启动完成后，主动触发一次渲染通知
-    await renderTabsByPanel();
+    renderTabsByPanel();
     
     // 绑定所需的html元素
     bindHtmlElement()
@@ -241,15 +241,11 @@ async function load(name) {
     // 注册命令
     registerTabsmanCommand()
 
-    // 为orca.state.activePanel面板group，注入激活样式
-    const activePanelGroup = document.querySelector(`.plugin-tabsman-panel-group[data-tabsman-panel-id="${orca.state.activePanel}"]`);
-    if (activePanelGroup) activePanelGroup.classList.add('plugin-tabsman-panel-group-active')
-
     // 处理活跃面板更新（样式）
     startActivePanelUpdateHandle()
     
     // 启动最近关闭标签页模块
-    await startRecentlyClosed(renderTabsByPanel);
+    startRecentlyClosed(renderTabsByPanel);
     
     // 启动前进后退按钮模块
     startbackforwardbutton();

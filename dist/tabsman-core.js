@@ -292,14 +292,14 @@ async function updateTabProperties(tab, activePanelId = orca.state.activePanel) 
         activeTab.currentIcon = icon;
         
         // 更新UI
-        if (renderTabsCallback) await renderTabsCallback("update", activeTab);
+        if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: activeTab});
         // if (renderTabsCallback) await renderTabsCallback();
     } catch (error) {
         console.error('[tabsman] 更新标签页属性失败:', error);
         // 设置默认值
         activeTab.name = '新标签页';
         activeTab.currentIcon = 'ti ti-cube';
-        if (renderTabsCallback) await renderTabsCallback("update", activeTab);
+        if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: activeTab});
         // if (renderTabsCallback) await renderTabsCallback();
     }
 }
@@ -574,7 +574,7 @@ async function createTab({ currentBlockId = 0, needSwitch = true, panelId = orca
         activeTabs[panelId] = tab;
     }
 
-    if (renderTabsCallback && needRender) await renderTabsCallback("create", tab);
+    if (renderTabsCallback && needRender) await renderTabsCallback({type:"create", currentTab: tab});
     
     // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
     if (needSwitch) {
@@ -618,7 +618,7 @@ async function switchTab(tabId) {
     await makeValidatedTab(tab)
 
     // 切换tab
-    if (renderTabsCallback) await renderTabsCallback("switch", tab , activeTab);
+    if (renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: tab , previousTab: activeTab});
 
     // 如果两个标签页内容一样，则仅刷新ui并清除填充挂起状态，反之则正常goTo
     const isSameBlockId = activeTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf()
@@ -672,13 +672,13 @@ async function deleteTab(tabId) {
     const {panelId} = tab
     const tabIdSet = tabIdSetByPanelId.get(panelId)
     if (tabIdSet.size === 1) {
-        orca.nav.close(panelId) // orca全局历史订阅回调已处理：关闭行为而触发的orca全局历史减少，不会引起tab历史填充。
+        navOriginals.method.close.call(navOriginals.thisValue, panelId) // orca全局历史订阅回调已处理：关闭行为而触发的orca全局历史减少，不会引起tab历史填充。
         delete tabs[tabId]
         tabIdSetByPanelId.delete(panelId)
         delete activeTabs[panelId]
         sortedTabsByPanelId.delete(panelId)
 
-        if (renderTabsCallback) await renderTabsCallback()
+        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId})
         return
     }
 
@@ -705,7 +705,7 @@ async function deleteTab(tabId) {
     delete tabs[tabId]
     tabIdSet.delete(tabId)
     updateSortedTabsCache(panelId)
-    if (renderTabsCallback) await renderTabsCallback("delete", activeTabs[panelId], tab)
+    if (renderTabsCallback) await renderTabsCallback({type: "delete", currentTab: activeTabs[panelId], previousTab: tab})
 }
 
 // 移动tab到其他面板
@@ -777,7 +777,7 @@ async function pinTab(tabId) {
     updateSortedTabsCache(tab.panelId);
 
     // 通知UI更新（置顶标签页会改变排序，需要重新渲染标签页列表）
-    if (renderTabsCallback) await renderTabsCallback("pin", tab);
+    if (renderTabsCallback) await renderTabsCallback({type: "pin", currentTab: tab});
     
     // 持久化
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
@@ -1012,7 +1012,7 @@ async function openWorkspace(name = ""){
         }
     }
 
-    orca.nav.close(tmp)
+    navOriginals.method.close.call(navOriginals.thisValue, tmp)
 
     if (renderTabsCallback) await renderTabsCallback();
 
@@ -1115,7 +1115,6 @@ function setupCommandInterception() {
         navigateTabBack(activeTab);
         return false; // 阻止原始命令执行
     };
-    orca.commands.registerBeforeCommand('core.goBack', beforeCommandHooks.goBack);
     
     // 2. 拦截前进命令
     beforeCommandHooks.goForward = (cmdId, ...args) => {
@@ -1130,25 +1129,7 @@ function setupCommandInterception() {
         return false; // 阻止原始命令执行
     };
     
-    // 3. 拦截 core.closePanel 命令（关闭当前面板）
-    beforeCommandHooks.closePanel = async () => {       
-        if (tabIdSetByPanelId.size === 1) {
-            // orca.notify("info", "[tabsman] 当前仅剩一个面板，无法关闭关闭面板");
-            return false;
-        }
-        
-        const activePanelId = orca.state.activePanel;
-        // 清理当前面板的标签页数据
-        const tabIdSet = tabIdSetByPanelId.get(activePanelId);
-        tabIdSet.forEach(tabId => {
-            delete tabs[tabId];
-        });
-        tabIdSetByPanelId.delete(activePanelId);
-        delete activeTabs[activePanelId];
-        sortedTabsByPanelId.delete(activePanelId);
-
-        return true;
-    };
+    // 【废弃，已对nav.close进行了包装】3. 拦截 core.closePanel 命令（关闭当前面板）
     
     // 4. 拦截 core.closeOtherPanels 命令（关闭除当前面板外的所有面板）
     beforeCommandHooks.closeOtherPanels = async () => {
@@ -1174,7 +1155,7 @@ function setupCommandInterception() {
 
 
     afterCommandHooks = {
-        async closePanel(){ if (renderTabsCallback) await renderTabsCallback()},
+        // async closePanel(){ if (renderTabsCallback) await renderTabsCallback()},
         async closeOtherPanels(){ if (renderTabsCallback) await renderTabsCallback()}
     }
     Object.keys(afterCommandHooks).forEach(name=>orca.commands.registerAfterCommand(`core.${name}`, afterCommandHooks[name]))
@@ -1227,15 +1208,15 @@ function setupNavWrappers() {
     };
     
     // 包装 addTo API
-    navOriginals.method.addTo = orca.nav.addTo.bind(orca.nav);
+    navOriginals.method.addTo = orca.nav.addTo;
     orca.nav.addTo = function(id, dir, src) {
         const newPanelId = navOriginals.method.addTo.call(this, id, dir, src);
         if (newPanelId) createTabForNewPanel(newPanelId);
         return newPanelId;
     };
     
-    // 包装 openInLastPanel API（同步函数，返回void）
-    navOriginals.method.openInLastPanel = orca.nav.openInLastPanel.bind(orca.nav);
+    // 包装 openInLastPanel API（空返回）
+    navOriginals.method.openInLastPanel = orca.nav.openInLastPanel;
     orca.nav.openInLastPanel = function(view, viewArgs) {
         // 处理 Ctrl+Shift+Click：创建前台标签页
         if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
@@ -1257,6 +1238,15 @@ function setupNavWrappers() {
         const newPanelId = orca.state.activePanel;
         if (!tabIdSetByPanelId.has(newPanelId)) createTabForNewPanel(newPanelId);
     };
+
+    // 包装orca.nav.close，转交给delete完成
+    navOriginals.method.close = orca.nav.close;
+    orca.nav.close = async function (id) {
+        const tab = activeTabs[id];
+        if (!tab) return
+
+        deleteTab(tab.id)
+    }
 }
 
 // 重置被包装的nav函数
@@ -1283,8 +1273,8 @@ async function start(callback = null) {
     
     // 设置UI渲染回调函数
     // 2025年11月23日 适配工作区的更新
-    renderTabsCallback = async (type, currentTab, previousTab) => {
-        callback(type, currentTab, previousTab);
+    renderTabsCallback = async (options) => {
+        callback(options);
         // 进入具体工作空间后每次刷新ui都更新数据
         if (workspaceNow !== ""){
             await orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));

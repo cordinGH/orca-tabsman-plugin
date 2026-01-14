@@ -578,7 +578,9 @@ let isDroping = false
 async function handleTabDrop(e) {
     isDroping = true
     e.preventDefault();
-    await TabsmanCore.moveTabToPanel(dragTabId, panelGroupElement.getAttribute('data-tabsman-panel-id'));
+    const newPanelId = panelGroupElement.getAttribute('data-tabsman-panel-id')
+    await TabsmanCore.moveTabToPanel(dragTabId, newPanelId);
+    orca.nav.switchFocusTo(newPanelId)
     // 清理数据，因为drop到可拖拽区域是不会触发end事件的。
     panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
     panelGroupElement = null;

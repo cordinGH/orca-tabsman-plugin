@@ -152,7 +152,8 @@ async function createTabsForInitialPanels() {
     processPanel(orca.state.panels)
 
     for (const panelId of panelIds) {
-        await createTabForNewPanel(panelId, false);
+        const tab = await createTabForNewPanel(panelId, false);
+        switchTab(tab.id)
     }
 }
 
@@ -327,6 +328,7 @@ function createTabObject(currentBlockId = null, panelId, icon = 'ti ti-cube', na
         panelId: panelId,
         name: name,
         createdAt: now,
+        lastAccessedTs: 0, 
         isActive: false,
 
         // 当前显示块ID和图标
@@ -367,7 +369,7 @@ function updateSortedTabsCache(panelId) {
             if (!a.isPinned && b.isPinned) return 1;
             
             // 两个都没被置顶：越晚创建的索引越靠后，越靠近底部。
-            return new Date(a.createdAt) - new Date(b.createdAt);
+            return a.createdAt - b.createdAt;
         });
     
     // 更新缓存
@@ -505,7 +507,7 @@ async function navigateTabForward(tab) {
  * 为新面板创建初始标签页和访问历史
  * @param {string} [panelId] - 面板ID，可选，默认当前活跃面板
  * @param {boolean} [needRender] - 是否需要立刻渲染
- * @returns {Promise<void>}
+ * @returns {Promise<Object>} - 返回创建的tab
  */
 async function createTabForNewPanel(panelId, needRender = true) {
     if (panelId) {
@@ -513,9 +515,11 @@ async function createTabForNewPanel(panelId, needRender = true) {
         orca.nav.switchFocusTo(panelId);
     }
     // 创建默认标签页（使用当前面板内容）
-    await createTab({ currentBlockId: 0, needSwitch: false, needRender });
+    const tab = await createTab({ currentBlockId: 0, needSwitch: false, needRender });
     // 填充访问历史
     await fillCurrentAccess()
+
+    return tab
 }
 
 /**
@@ -558,7 +562,7 @@ async function createTab({ currentBlockId = 0, needSwitch = true, panelId = orca
     tab.name = name
     tab.currentIcon = icon
     
-    // 登记标签页到扁平化结构
+    // 记录到core数据结构
     tabs[tab.id] = tab;
     if (!tabIdSetByPanelId.has(panelId)) {
         tabIdSetByPanelId.set(panelId, new Set());
@@ -595,9 +599,12 @@ async function switchTab(tabId) {
     // 不存在tab，不处理
     if (!tab) return
 
-    // tab就是当前面板的当前tab，也不处理。
+    // 存在就更新访问时间
     const activePanelId = orca.state.activePanel
     const currentTab = activeTabs[activePanelId]
+    tab.lastAccessedTs = Date.now()
+
+    // tab就是当前面板的当前tab，则无需其他处理
     if (currentTab === tab) return
 
     // 更新当前tab
@@ -634,6 +641,16 @@ async function switchTab(tabId) {
     
     // 目标tab从未打开过则填充一次当前历史
     if (tab.backStack.length === 0) await fillCurrentAccess()
+}
+
+
+// 切换到上一个activeTab
+function switchPreviousActiveTab(panelId) {
+    const sorted = [...getOneSortedTabs(panelId)].sort((a, b) => a.lastAccessedTs - b.lastAccessedTs)
+    const tab = sorted[sorted.length - 2]
+    if (tab.lastAccessedTs === 0) return false
+    switchTab(tab.id)
+    return true
 }
 
 // 提供内插件内部调用，3处调用都是挂起状态，不会产生历史填充
@@ -682,13 +699,10 @@ async function deleteTab(tabId) {
         return
     }
 
-    // 如果删的是活跃tab，就先切换到下一个tab
+    // 如果删的是活跃tab，就先切换到上一个activeTab
     if (activeTabs[panelId] === tab) {
-        const sortedTabs = getOneSortedTabs(panelId)
-        const currentIndex = sortedTabs.findIndex(item => item.id === tabId)
-        // 最后一个则-1，否贼+1
-        const newIndex = currentIndex === sortedTabs.length - 1 ? currentIndex - 1 : currentIndex + 1
-        const newTab = sortedTabs[newIndex]
+        const sorted = [...getOneSortedTabs(panelId)].sort((a, b) => a.lastAccessedTs - b.lastAccessedTs)
+        const newTab = sorted[sorted.length - 2]
         tab.isActive = false
         newTab.isActive = true
         activeTabs[panelId] = newTab
@@ -945,6 +959,7 @@ async function openWorkspace(name = ""){
         // 准备activeTabs
         if (tab.isActive) {
             workspaceActiveTabs[tabPanelId] = tab
+            tab.lastAccessedTs = Date.now()
         }
 
         // 准备TabIdSetByPanelId
@@ -1055,7 +1070,6 @@ async function switchToNextTab() {
     const nextIndex = (currentIndex + 1) % panelTabs.length;
     const nextTab = panelTabs[nextIndex];
     
-    console.log(`[tabsman] 切换到下一个标签页: ${nextTab.name} (${nextTab.id})`);
     return switchTab(nextTab.id);
 }
 
@@ -1088,8 +1102,7 @@ async function switchToPreviousTab() {
     // 计算上一个标签页的索引（循环到最后一个）
     const prevIndex = currentIndex === 0 ? panelTabs.length - 1 : currentIndex - 1;
     const prevTab = panelTabs[prevIndex];
-    
-    console.log(`[tabsman] 切换到上一个标签页: ${prevTab.name} (${prevTab.id})`);
+
     return switchTab(prevTab.id);
 }
 
@@ -1413,6 +1426,7 @@ export {
     // 标签页导航函数
     switchToNextTab,
     switchToPreviousTab,
+    switchPreviousActiveTab,
     // 外部API，外部使用它导入tab进Core数据结构
     importTabToActivePanel
 };

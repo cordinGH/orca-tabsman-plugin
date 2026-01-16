@@ -332,7 +332,7 @@ function renderCreate(tab) {
 function renderPin(panelId){
     const newPanelGroupEle = _renderOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
     allPanelGroupEle[panelId].replaceWith(newPanelGroupEle)
-    delete allPanelGroupEle[panelId]
+    allPanelGroupEle[panelId].remove()
     allPanelGroupEle[panelId] = newPanelGroupEle
 }
 

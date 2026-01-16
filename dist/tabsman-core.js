@@ -788,10 +788,11 @@ async function pinTab(tabId) {
     tab.pinOrder = Date.now();
     
     // 更新排序缓存
-    updateSortedTabsCache(tab.panelId);
+    const {panelId} = tab
+    updateSortedTabsCache(panelId);
 
     // 通知UI更新（置顶标签页会改变排序，需要重新渲染标签页列表）
-    if (renderTabsCallback) await renderTabsCallback({type: "pin", currentTab: tab});
+    if (renderTabsCallback) await renderTabsCallback({type: "pin", panelId});
     
     // 持久化
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
@@ -820,11 +821,12 @@ async function unpinTab(tabId) {
     tab.isPinned = false;
     tab.pinOrder = 0;
     
+    const {panelId} = tab
     // 更新排序缓存
-    updateSortedTabsCache(tab.panelId);
+    updateSortedTabsCache(panelId);
 
     // 通知UI更新（取消置顶标签页会改变排序，需要重新渲染标签页列表）
-    if (renderTabsCallback) await renderTabsCallback();
+    if (renderTabsCallback) await renderTabsCallback({type: "pin", panelId});
     
     // 移除对应数据
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
@@ -924,10 +926,10 @@ async function openWorkspace(name = ""){
         return
     }
     
-    // 读取工作空间数据，包括滚动信息
-    const workspaceRaw = await orca.plugins.getData('tabsman-workspace', sname ? sname : "tabsman-workspace-exit");
-    if (!workspaceRaw) {
-        orca.notify("info", "[tabsman]目标工作空间数据不存在")
+    // 读取目标工作区的tabs的JSON数据
+    const workspaceTabsJSON = await orca.plugins.getData('tabsman-workspace', sname ? sname : "tabsman-workspace-exit");
+    if (!workspaceTabsJSON) {
+        orca.notify("info", "[tabsman]目标工作区数据不存在")
         return
     }
 
@@ -948,21 +950,21 @@ async function openWorkspace(name = ""){
     let workspaceTabs = {};
     let workspaceActiveTabs = {};
     let workspaceTabIdSetByPanelId = new Map();
-    const workspaceValue = TabsmanPersistence.wakeTabArray(Object.values(JSON.parse(workspaceRaw)), "workspace");
-    for (const tab of workspaceValue) {
+    const workspaceTabsValue = TabsmanPersistence.wakeTabArray(Object.values(JSON.parse(workspaceTabsJSON)), "workspace");
+    for (const tab of workspaceTabsValue) {
         const tabId = tab.id
         const tabPanelId = tab.panelId
 
-        // 准备tabs
+        // 构建工作区tabs
         workspaceTabs[tabId] = tab
 
-        // 准备activeTabs
+        // 构建工作区activeTabs
         if (tab.isActive) {
             workspaceActiveTabs[tabPanelId] = tab
             tab.lastAccessedTs = Date.now()
         }
 
-        // 准备TabIdSetByPanelId
+        // 构建工作区TabIdSetByPanelId
         if (!workspaceTabIdSetByPanelId.has(tabPanelId)) {
             workspaceTabIdSetByPanelId.set(tabPanelId, new Set())
         }
@@ -973,36 +975,35 @@ async function openWorkspace(name = ""){
     tabIdSetByPanelId = workspaceTabIdSetByPanelId
 
 
-    // 新建新的面板
     // 临时面板, 用作创建新面板的坐标
     workspaceSwitching = true
     const tmp = navOriginals.method.addTo.call(navOriginals.thisValue, orca.state.activePanel, "right")
     orca.nav.closeAllBut(tmp)
 
     // 遍历activetab以准备新面板
-    const workspaceActiveTabsValue = Object.values(workspaceActiveTabs);
-    const workspaceTabsValue = Object.values(workspaceTabs);
+    const activeTabsValue = Object.values(activeTabs);
+    const tabsValue = Object.values(tabs);
     const newPanelIds = []
     // 清除旧的排序缓存
     sortedTabsByPanelId.clear()
-    for (const tab of workspaceActiveTabsValue) {
+    for (const tab of activeTabsValue) {
         await makeValidatedTab(tab)
+
+        // 准备新面板
         const {view, viewArgs} = getViewAndViewArgsByTab(tab)
         const viewpanel = { view, viewArgs, viewState: {} }
-        // 调用原始的addTo，以确保不改变tabsman数据结构
         const newPanelId = navOriginals.method.addTo.call(navOriginals.thisValue, orca.state.activePanel, "left", viewpanel)
-
         newPanelIds.push(newPanelId)
+        
+        // 将数据结构中旧面板id更新为新面板
         const oldPanelId = tab.panelId
+        activeTabs[newPanelId] = tab
+        delete activeTabs[oldPanelId]
+        tabIdSetByPanelId.set(newPanelId, tabIdSetByPanelId.get(oldPanelId))
+        tabIdSetByPanelId.delete(oldPanelId)
 
-        // 更新数据结构的面板id
-        workspaceActiveTabs[newPanelId] = tab
-        delete workspaceActiveTabs[oldPanelId]
-        workspaceTabIdSetByPanelId.set(newPanelId, workspaceTabIdSetByPanelId.get(oldPanelId))
-        workspaceTabIdSetByPanelId.delete(oldPanelId)
-
-        // 修改该面板所有tab对象的面板id
-        workspaceTabsValue.forEach(tab => {
+        // 更新该面板所有tab对象的面板id
+        tabsValue.forEach(tab => {
             if (tab.panelId === oldPanelId) tab.panelId = newPanelId
         })
 
@@ -1010,9 +1011,9 @@ async function openWorkspace(name = ""){
         updateSortedTabsCache(newPanelId)
 
         // 滚动到上次打开的位置
-        const workspaceScrollRaw = await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit")
-        if (workspaceScrollRaw) {
-            const workspaceScroll = JSON.parse(workspaceScrollRaw)
+        const workspaceScrollJSON = await orca.plugins.getData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit")
+        if (workspaceScrollJSON) {
+            const workspaceScroll = JSON.parse(workspaceScrollJSON)
             const topValue = workspaceScroll[oldPanelId]
             if (topValue){
                 const selector = ".orca-panel[data-panel-id='" + newPanelId + "']>.orca-hideable>.orca-block-editor"
@@ -1389,7 +1390,7 @@ function getAllSortedTabs() {
 }
 
 /**
- * 获取指定面板的一个排序标签页列表（从缓存中获取，性能更好）
+ * 获取指定面板的一个排序标签页列表
  * @param {string} panelId
  * @returns {Array} 排序后的标签页列表
  */

@@ -10,10 +10,7 @@ import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backfor
 
 let pluginName;
 
-// 防重复执行标志，代表正在创建标签页
-let isCreatingTab = false;
-
-// 设置取消订阅
+// 取消订阅
 let unsubscribeSettings = null;
 
 // 存储原始导航 API 函数
@@ -25,6 +22,7 @@ let sidebarTabOptionsClassList = null
 let tabOptionClassList = null
 let appClassList = null
 
+let commands = null
 
 function bindHtmlElement() {
     sidebarTabOptionsClassList = document.querySelector('.orca-sidebar-tab-options')?.classList;
@@ -56,53 +54,55 @@ async function clearAllData() {
 
 // 注册tabsman命令
 function registerTabsmanCommand(){
-    // 注册标签页导航命令
-    orca.commands.registerCommand(
-        'tabsman.goToNextTab',
-        async () => {
-            const success = await switchToNextTab();
-            if (success) orca.notify("success", "[tabsman] 已切换到下一个标签页")
+
+    commands = [
+        {
+            name: "tabsman.goToNextTab",
+            async fn() {
+                const success = await switchToNextTab();
+                if (success) orca.notify("success", "[tabsman] 已切换到下一个标签页")   
+            },
+            description: '[tabsman] Go to next tab'
         },
-        '[tabsman] Go to next tab'
-    );
-    orca.commands.registerCommand(
-        'tabsman.goToPreviousTab',
-        async () => {
-            const success = await switchToPreviousTab();
-            if (success) orca.notify("success", "[tabsman] 已切换到上一个标签页")
+        {
+            name: "tabsman.goToPreviousTab",
+            async fn() {
+                const success = await switchToPreviousTab();
+                if (success) orca.notify("success", "[tabsman] 已切换到上一个标签页")   
+            },
+            description: '[tabsman] Go to previous tab'
         },
-        '[tabsman] Go to previous tab'
-    );
-    orca.commands.registerCommand(
-        'tabsman.goToPreviousActiveTab',
-        () => {
-            const success = switchPreviousActiveTab(orca.state.activePanel)
-            if (!success) orca.notify("info", "[tabsman] 其他标签页暂未访问过")
+        {
+            name: 'tabsman.goToPreviousActiveTab',
+            fn() {
+                const success = switchPreviousActiveTab(orca.state.activePanel)
+                if (!success) orca.notify("info", "[tabsman] 其他标签页暂未访问过")   
+            },
+            description: '[tabsman] Go to previous active tab'
         },
-        '[tabsman] Go to previous active tab'
-    );
-    
-    // 注册开关侧边Tabs栏命令
-    orca.commands.registerCommand(
-        'tabsman.toggleSidebarTabsman',
-        () => {
-            if (appClassList.contains('sidebar-closed')) {
-                orca.commands.invokeCommand('core.toggleSidebar');
-                sidebarTabOptionsClassList.add('plugin-tabsman-selected');
-                tabOptionClassList.add('orca-selected');
-            } else {
-                if (sidebarTabOptionsClassList.contains('plugin-tabsman-selected')) {
+        {
+            name: 'tabsman.toggleSidebarTabsman',
+            fn () {
+                if (appClassList.contains('sidebar-closed')) {
                     orca.commands.invokeCommand('core.toggleSidebar');
-                } else {
                     sidebarTabOptionsClassList.add('plugin-tabsman-selected');
                     tabOptionClassList.add('orca-selected');
+                } else {
+                    if (sidebarTabOptionsClassList.contains('plugin-tabsman-selected')) {
+                        orca.commands.invokeCommand('core.toggleSidebar');
+                    } else {
+                        sidebarTabOptionsClassList.add('plugin-tabsman-selected');
+                        tabOptionClassList.add('orca-selected');
+                    }
                 }
-            }
+            },
+            description: '[tabsman] 开启/关闭显示侧边Tabs栏'
         },
-        '[tabsman] 开启/关闭显示侧边Tabs栏'
-    );
+    ]
 
-    // 注册清空数据的命令
+    commands.forEach(({name,fn,description}) => orca.commands.registerCommand(name, fn, description))
+
+    // 选择性注册清空数据的命令
     if (orca.state.plugins[pluginName]?.settings?.enableClearData) {
         orca.commands.registerCommand(
             'tabsman.clearData',
@@ -131,20 +131,21 @@ function registerTabsmanCommand(){
 
 // 移除命令
 function unregisterTabsmanCommand() {
-    orca.commands.unregisterCommand('tabsman.goToNextTab');
-    orca.commands.unregisterCommand('tabsman.goToPreviousTab');
-    orca.commands.unregisterCommand('tabsman.toggleSidebarTabsman');
 
+    commands.forEach(({name}) => orca.commands.unregisterCommand(name))
+    
     // 安全注销命令（即使可能未注册）
     try {
         orca.commands.unregisterCommand('tabsman.clearData');
     } catch (e) { }
-
+    
     // 取消对清理命令启用状态的订阅
     if (unsubscribeSettings) {
         unsubscribeSettings();
         unsubscribeSettings = null;
     }
+    
+    commands = null
 }
 
 

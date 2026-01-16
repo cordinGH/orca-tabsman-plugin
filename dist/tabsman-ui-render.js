@@ -159,6 +159,7 @@ async function handleTabsmanClick(e) {
             // 点击块图标切换收藏状态
             const isFavorite = target.classList.toggle('plugin-tabsman-tab-favorite');
             isFavorite ? await Persistence.addAndSaveFavoriteBlock({id: tab.currentBlockId, icon: tab.currentIcon, title: tab.name}) : await Persistence.removeAndSaveFavoriteBlock(tab.currentBlockId);
+            // renderTabsByPanel({type: "favorite", panelId});
             renderTabsByPanel();
         } else {
             // 存在停靠面板则先联动dockpanel插件=>切换停靠面板的折叠状态。
@@ -261,9 +262,7 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
         case "update":
             renderUpdate(currentTab);break;
         case "pin":
-            renderPin(currentTab);break;
-        case "favorite":
-            renderFavorite(currentTab);break;
+            renderPin(panelId);break;
         case "create":
             renderCreate(currentTab);break;
         case "closePanel":
@@ -329,34 +328,35 @@ function renderCreate(tab) {
     allTabEle[tab.id] = tabElement;
 }
 
-// 收藏住时更新，轻量渲染
-function renderFavorite(tab){
-    // 判断是否为收藏块
-    const isFavorite = Persistence.getFavoriteBlockArray().findIndex(item => item.id.toString() === tab.currentBlockId.toString()) !== -1;
-    Object.values(allTabEle).forEach(tabEle => {
-        
-    });
-    const oldTab = allTabEle[tab.id]
-    const tabElement = oldTab.element
-    const newBlockIcon = createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`, tabElement)
-    newBlockIcon.setAttribute('data-tabsman-tab-id', tab.id);
-    newBlockIcon.setAttribute('data-tabsman-panel-id', tab.panelId);
-
-    const oldBlockIcon = oldTab.blockIcon
-    oldBlockIcon.replaceWith(newBlockIcon)
-    oldBlockIcon.remove();
-    oldTab.blockIcon = newBlockIcon;
+// pin住时更新整个面板，轻量渲染
+function renderPin(panelId){
+    const newPanelGroupEle = _renderOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
+    allPanelGroupEle[panelId].replaceWith(newPanelGroupEle)
+    delete allPanelGroupEle[panelId]
+    allPanelGroupEle[panelId] = newPanelGroupEle
 }
 
-// pin住时更新，轻量渲染
-function renderPin(tab){
-    const oldTab = allTabEle[tab.id]
-    const tabElement = oldTab.element
-    const newPinIcon = createDomWithClass("i", `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`, tabElement)
-    const oldIcon = oldTab.pinIcon
-    oldIcon.replaceWith(newPinIcon)
-    oldIcon.remove();
-    oldTab.pinIcon = newPinIcon;
+// 渲染单个group，返回渲染结果
+function _renderOnePanelGroup(panelId, panelTabs) {
+    // 创建面板分组容器
+    const panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
+    panelGroup.setAttribute('data-tabsman-panel-id', panelId);
+    
+    // 创建面板标题项
+    createPanelItemElement(panelId, panelGroup);
+    
+    // 渲染该面板的标签页并加入面板分组容器
+    for (const tab of panelTabs) {
+        const tabElement = createTabElement(tab, panelId, panelGroup);
+        allTabEle[tab.id] = tabElement;
+        // 添加活跃状态样式并加入面板分组容器
+        const activeTabs = TabsmanCore.getActiveTabs();
+        if (activeTabs && activeTabs[panelId].id === tab.id) {
+            tabElement.element.classList.add('active-tab-item');
+        }
+    }
+
+    return panelGroup
 }
 
 // update更新单个标签页（活跃标签页），轻量渲染
@@ -404,26 +404,7 @@ function renderAll() {
 
     for (const [panelId, panelTabs] of allSortedTabs) {
         if (panelTabs.length === 0) continue;
-
-        // 创建面板分组容器
-        // ⭐️⭐️⭐️借用fav-item样式，性质是相同的。
-        const panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
-        panelGroup.setAttribute('data-tabsman-panel-id', panelId);
-        allPanelGroupEle[panelId] = panelGroup
-
-        // 创建面板标题项
-        createPanelItemElement(panelId, panelGroup);
-
-        // 渲染该面板的标签页并加入面板分组容器
-        for (const tab of panelTabs) {
-            const tabElement = createTabElement(tab, panelId, panelGroup);
-            allTabEle[tab.id] = tabElement;
-            // 添加活跃状态样式并加入面板分组容器
-            const activeTabs = TabsmanCore.getActiveTabs();
-            if (activeTabs && activeTabs[panelId].id === tab.id) {
-                tabElement.element.classList.add('active-tab-item');
-            }
-        }
+        allPanelGroupEle[panelId] = _renderOnePanelGroup(panelId, panelTabs)
     }
 }
 

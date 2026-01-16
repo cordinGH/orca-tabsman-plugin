@@ -3,7 +3,7 @@
 
 
 import "./tabsman-utils.js";
-import { start, destroy, switchToNextTab, switchToPreviousTab } from './tabsman-core.js';
+import { start, destroy, switchToNextTab, switchToPreviousTab, switchPreviousActiveTab } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
@@ -72,6 +72,11 @@ function registerTabsmanCommand(){
             if (success) orca.notify("success", "[tabsman] 已切换到上一个标签页")
         },
         '[tabsman] Go to previous tab'
+    );
+    orca.commands.registerCommand(
+        'tabsman.goToPreviousActiveTab',
+        () => switchPreviousActiveTab(orca.state.activePanel),
+        '[tabsman] Go to previous active tab'
     );
     
     // 注册开关侧边Tabs栏命令

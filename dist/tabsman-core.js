@@ -725,13 +725,20 @@ async function deleteTab(tabId) {
 // 移动tab到其他面板
 async function moveTabToPanel(tabId, newPanelId) {
     const tab = tabs[tabId];
-    if (tab.panelId === newPanelId) {
-        return false;
-    }
+    if (tab.panelId === newPanelId) return false;
+
     const oldPanelId = tab.panelId;
     if (tabIdSetByPanelId.get(oldPanelId).size === 1) {
-        orca.notify("warn", "[tabsman] 当前面板只有一个标签页，无法移动");
-        return false;
+        // orca.notify("warn", "[tabsman] 当前面板只有一个标签页，无法移动");
+        // 更新数据库，并通知ui刷新
+        tab.panelId = newPanelId;
+        tabIdSetByPanelId.get(newPanelId).add(tabId);
+        tabIdSetByPanelId.delete(oldPanelId);
+        sortedTabsByPanelId.delete(oldPanelId);
+        updateSortedTabsCache(newPanelId);
+        navOriginals.method.close.call(navOriginals.thisValue, oldPanelId)
+        if (renderTabsCallback) await renderTabsCallback();
+        return true;
     }
 
     // 如果被移走的是active面板的active-tab，则先执行navPreviousTab。

@@ -98,6 +98,14 @@ function registerTabsmanCommand(){
             },
             description: '[tabsman] 开启/关闭显示侧边Tabs栏'
         },
+        {
+            name: 'tabsman.quickNoteByFoucs',
+            fn () {
+                const activePanel = document.querySelector('.plugin-tabsman-panel-group-active');
+                window.pluginTabsman.createQuickNoteTab(activePanel.dataset.tabsmanPanelId)
+            },
+            description: '[tabsman] 在今日日志中快速记录（聚焦打开新Tab）'
+        },
     ]
 
     commands.forEach(({name,fn,description}) => orca.commands.registerCommand(name, fn, description))
@@ -152,7 +160,7 @@ function unregisterTabsmanCommand() {
 // 更新活跃面板样式
 function updateActivePanelStyle () {
     // 移除所有活跃样式
-    let activePanel = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active');
+    let activePanel = document.querySelector('.plugin-tabsman-panel-group-active');
     if (activePanel) {
         activePanel.classList.remove('plugin-tabsman-panel-group-active');
     }

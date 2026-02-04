@@ -1043,7 +1043,68 @@ async function openWorkspace(name = ""){
 }
 
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
-/* —————————————————————————————————————————————————————————————————————————————————————————————————— */
+
+// 创建快速记录Tab
+async function createQuickNoteTab(panelId) {
+    const {quickNoteBlockId, isNewBlock} = await getQuickNoteBlockId()
+    if (!isNewBlock) orca.notify("info", "[tabsman] 日志末尾已存在空块，直接使用");
+    if (panelId) createTab({currentBlockId: quickNoteBlockId, needSwitch: true, panelId});
+}
+
+// 在今日日志末尾获取一个空块id（若连续2个空块，则不新建，直接采用最后一个）
+async function getQuickNoteBlockId(){
+    const todayDate = new Date()
+    const today = await orca.invokeBackend("get-journal-block", todayDate)
+    const todayChildren = today.children
+
+    // 需要插入的新空块数量
+    let newBlockNumber;
+
+    const todayChildrenLen = todayChildren.length
+    if (todayChildrenLen === 0) {
+        newBlockNumber = 1
+    } else {
+        // last空块检查
+        const lastChildrenId = todayChildren[todayChildrenLen - 1]
+        const lastBlock = await orca.invokeBackend("get-block", lastChildrenId)
+        const isEmptyTextBlock = lastBlock.text === null && lastBlock.properties.find(p => p.name === '_repr').value.type === "text"
+
+        if (!isEmptyTextBlock) {
+            newBlockNumber = 2
+        } else if (todayChildrenLen === 1) {
+            newBlockNumber = 0
+            return {quickNoteBlockId: lastChildrenId, isNewBlock: false}
+        } else {
+            // 倒数第二个空块检查
+            const last2ChildrenId = todayChildren[todayChildrenLen - 2]
+            const last2Block = await orca.invokeBackend("get-block", last2ChildrenId)
+            const isEmptyTextBlock = last2Block.text === null && last2Block.properties.find(p => p.name === '_repr').value.type === "text"
+            
+            if (isEmptyTextBlock) {
+                newBlockNumber = 0
+                return {quickNoteBlockId: lastChildrenId, isNewBlock: false}
+            } else {
+                newBlockNumber = 1
+            }
+        }
+    }
+    
+    let quickNoteBlockId;
+    await orca.commands.invokeGroup(async () => {
+        for (let i = 0; i < newBlockNumber; i++) {
+            console.log(today)
+            quickNoteBlockId = await orca.commands.invokeEditorCommand(
+                "core.editor.insertBlock",
+                null,
+                await orca.invokeBackend("get-journal-block", todayDate), // 必须重新查询，不然插入位置是过时的
+                "lastChild",
+                null, // 用于 block.text = null ，使得内容为空。如果需要自定义内容，则 [{ t: "t", v: "自定义文本内容" }]
+                { type: "text" },
+            )}
+        })
+    return {quickNoteBlockId, isNewBlock: true}
+}
+
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
 
 
@@ -1328,6 +1389,7 @@ async function start(callback = null) {
     window.pluginTabsman.saveWS = saveWorkspace
     window.pluginTabsman.openWS = openWorkspace
     window.pluginTabsman.exitWS = exitWorkspace
+    window.pluginTabsman.createQuickNoteTab = createQuickNoteTab
 
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点

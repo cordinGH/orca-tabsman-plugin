@@ -227,12 +227,12 @@ async function generateTabNameAndIcon(blockId) {
             } else {
                 const {text} = block
                 const shortText = (text?.length > 30) ? (text.slice(0, 30) + "...") : text
-                name = text ? shortText : blockType
+                name = text ? shortText : `(${blockType})`
             }
         } else {
             // 非可编辑文本块，如果存在caption，则显示caption作为name
             const blockCap = blockRepr.value.cap
-            name = blockCap ? blockCap : blockType
+            name = blockCap ? blockCap : `(${blockType})`
         }
 
         // 生成图标

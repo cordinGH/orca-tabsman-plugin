@@ -106,7 +106,7 @@ async function makeValidatedTab(tab) {
         }
     }
 }
-// 根据view和viewArgs获取一个blockid
+// 根据view和viewArgs获取tabsman所需的blockid
 function getBlockIdByViewAndViewArgs(view, viewArgs) {
     let blockId = ""
     switch (view) {
@@ -116,6 +116,8 @@ function getBlockIdByViewAndViewArgs(view, viewArgs) {
     }
     return blockId
 }
+
+// 获取tab当前的view和viewArgs
 function getViewAndViewArgsByTab(tab) {
     const {currentBlockId, backStack} = tab
     let view = ""
@@ -283,7 +285,6 @@ async function updateTabProperties(tab, activePanelId = orca.state.activePanel) 
     if (!activeTab) return;
     
     const activePanel = orca.nav.findViewPanel(activePanelId, orca.state.panels);
-    // 第三方插件的视图以插件自己的panel.view作为当前块id
     activeTab.currentBlockId = getBlockIdByViewAndViewArgs(activePanel.view, activePanel.viewArgs)
     
     try {
@@ -398,7 +399,7 @@ function subscribePanelBackHistory() {
         isFillSuspended ? isFillSuspended = false : await fillCurrentAccess()
 
         // 更新tab信息
-        updateTabProperties()
+        await updateTabProperties()
         
         // 更新最后一次历史长度
         lastHistoryLength = currentLength;
@@ -425,12 +426,10 @@ async function fillCurrentAccess() {
     activeTab.backStack.push(historyItem);
     activeTab.forwardStack.length = 0
 
-    // 如果是pinned标签页，就新开一个tab并跳转
-    if (activeTab.isPinned === true && activeTab.backStack.length > 1) {
-        navigateTabBack(activeTab)
-        activeTab.backStack.pop()
-        activeTab.forwardStack.length = 0
-        createTab({ currentBlockId: Object.values(historyItem.viewArgs)[0], needSwitch: true });
+    // 如果是非日志&&block视图（表示是自定义视图），或者当前填充发生在置顶tab内（所以后退栈至少变成了2：当前+新入）
+    if (view !== "journal" && view !== "block" || activeTab.isPinned && activeTab.backStack.length >= 2) {
+        const newTab = await createTab({ currentBlockId: blockId, needSwitch: true });
+        newTab.backStack = [activeTab.backStack.pop()]
     }
     
     // console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
@@ -534,8 +533,8 @@ async function createTab({ currentBlockId = 0, needSwitch = true, panelId = orca
     // 如果传入-1，创建今日日志标签页，转一下字符串以确保从0点0分0秒开始
     if (currentBlockId === -1) currentBlockId = new Date(new Date().toDateString());
 
-    // 如果传入0，自动获取指定面板的显示内容ID
-    if (currentBlockId === 0) {
+    // 如果是0（默认值），自动获取指定面板的显示内容ID
+    else if (currentBlockId === 0) {
         const panel = orca.nav.findViewPanel(panelId, orca.state.panels);
         if (!panel) return
 
@@ -544,7 +543,7 @@ async function createTab({ currentBlockId = 0, needSwitch = true, panelId = orca
     }
     
     // 如果是数字块ID，需要查询这个块是否是日志块，如果是日志块，则使用date替换currentBlockId，确保以journal视图跳转
-    if (typeof currentBlockId === 'number' && currentBlockId > 0) {
+    else if (typeof currentBlockId === 'number' && currentBlockId > 0) {
         const block = await orca.invokeBackend("get-block", currentBlockId);
         // 查找_repr属性来判断是否为日志块
         if (block && block.properties) {
@@ -580,7 +579,7 @@ async function createTab({ currentBlockId = 0, needSwitch = true, panelId = orca
 
     if (renderTabsCallback && needRender) await renderTabsCallback({type:"create", currentTab: tab});
     
-    // 如果需要切换，则切换到新标签页，后续刷新也交给switch触发历史更新来刷新
+    // 如果需要切换，则切换到新标签页，后续新tab历史记录的更新也交给switch
     if (needSwitch) {
         switchTab(tab.id);
     }
@@ -606,9 +605,6 @@ async function switchTab(tabId) {
 
     // tab就是当前面板的当前tab，则无需其他处理
     if (currentTab === tab) return
-
-    // 更新当前tab
-    await updateTabProperties(currentTab, activePanelId)
 
     // 挂起历史填充（内部导航，不需要填充历史）
     isFillSuspended = true

@@ -179,7 +179,7 @@ async function handleTabsmanClick(e) {
     if (target.closest('.plugin-tabsman-panel-item')) {
         if (target.classList.contains('plugin-tabsman-panel-new-tab')) {
             const panelId = target.getAttribute('data-tabsman-panel-id')
-            window.event.altKey ? window.pluginTabsman.createQuickNoteTab(panelId) : TabsmanCore.createTab({currentBlockId: -1, needSwitch: false, panelId});
+            window.event.altKey ? window.pluginTabsman.createQuickNoteTab(panelId) : window.pluginTabsman.createTodayJournalTab(panelId);
         }
         // else if (target.classList.contains('plugin-tabsman-panel-collapse-icon')) {
         //     // TODO: 实现折叠/展开功能（暂时感觉没啥用）

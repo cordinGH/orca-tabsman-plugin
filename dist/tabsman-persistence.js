@@ -202,6 +202,91 @@ async function restorePersistedData() {
 }
 
 
+// 3.0.0，更新持久化数据中的Tab对象字段版本，以适配TabsmanCore中Tab对象结构的变更
+async function updatePersistedTabData() {
+
+    // 处理过时的标签页数据结构
+    function updateTabDate(tab) {
+        const tabKeys = Object.keys(tab);
+
+        // 当前版本，无需变更，直接返回
+        if (tabKeys.length === 12 && tab.hasOwnProperty("pinTs")) return;
+
+        // 上个版本(2.10.0)，更名即可。
+        if (tabKeys.length === 12 && tab.hasOwnProperty("lasAccessedTs")) {
+
+            tab.isPinned ? tab.pinTs = tab.pinOrder : tab.pinTs = 0;
+            delete tab.pinOrder;
+
+            for (const item of tab.backStack) {
+                if (!item.sourcePanelId && item.activePanel) {
+                    item.sourcePanelId = item.activePanel;
+                    delete item.activePanel;
+                }
+            }
+            for (const item of tab.forwardStack) {
+                if (!item.sourcePanelId && item.activePanel) {
+                    item.sourcePanelId = item.activePanel;
+                    delete item.activePanel;
+                }
+            }
+        }
+    
+        // 早期版本，缺少 lastAccessedTs 字段
+        if (tabKeys.length === 11 || !tab.hasOwnProperty("lastAccessedTs")) {
+
+            tab.lastAccessedTs = 0;
+            tab.isPinned ? tab.pinTs = new Date(tab.createdAt).getTime() : tab.pinTs = 0;
+            delete tab.pinOrder;
+
+            // 历史条目清除，只保留当前访问条目。
+            const historyItems = {
+                icon: tab.currentIcon,
+                name: tab.name,
+                sourcePanelId: tab.activePanel,
+                view: tab.view,
+                viewArgs: tab.viewArgs
+            }
+            tab.backStack = [historyItems]
+            tab.forwardStack.length = 0;
+        }
+    }
+
+
+    const wsDataKeys = await orca.plugins.getDataKeys("tabsman-workspace");
+    for (const key of wsDataKeys) {
+        const wsTabsJSON = await orca.plugins.getData('tabsman-workspace', key);
+        const parsedTabs = JSON.parse(wsTabsJSON);
+
+        // 当前版本3.0.0，backStack和forwardStack的item中，将activePanel 改名为了 sourcePanelId
+        // 当前版本3.0.0，将pinOrder改名为了pinTs，根据isPinned布尔值决定，是true就改为当前时间戳。
+        // ✅2.8.1 新增了 lastAccessedTs 字段，如果缺失则补上。11个字段变成了12个
+        // ✅2.2.0 backStack 和 forwardStack 的item中，追加了icon + name 字段。如果缺失则补上
+        const tabs = Object.values(parsedTabs);
+        for (const tab of tabs) {
+            updateTabDate(tab);
+        }
+        await orca.plugins.setData('tabsman-workspace', key, JSON.stringify(parsedTabs));
+    }
+
+    for (const tab of pinnedTabArray) {
+        updateTabDate(tab);
+    }
+    for (const tab of recentlyClosedTabArray) {
+        updateTabDate(tab);
+    }
+    for (const tab of favoriteTabArray) {
+        updateTabDate(tab);
+    }
+
+    await saveTabArray("pinned");
+    await saveTabArray("recently-closed");
+    await saveTabArray("favorite");
+
+    orca.notify("success", "[tabsman] 3.0.0标签页数据结构更新完成")
+}
+
+window.updatePersistedTabData = updatePersistedTabData;
 
 /**
  * 获取指定类型的标签页数组
@@ -222,5 +307,6 @@ export {
     restoreTabs,
     getTabArray,
     wakeTabArray,
-    restorePersistedData
+    restorePersistedData,
+    updatePersistedTabData
 };

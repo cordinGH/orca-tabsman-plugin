@@ -8,6 +8,8 @@ import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
 
+import { updatePersistedTabData } from "./tabsman-persistence.js";
+
 let pluginName;
 
 // 取消订阅
@@ -105,6 +107,14 @@ function registerTabsmanCommand(){
                 window.pluginTabsman.createQuickNoteTab(activePanel.dataset.tabsmanPanelId)
             },
             description: '[tabsman] 在今日日志中快速记录（聚焦打开新Tab）'
+        },
+        {
+            name: 'tabsman.updatePersistedTabData',
+            fn () {
+                updatePersistedTabData();
+                orca.notify("success", "[tabsman] 老版本过时数据已更新，请立即CTRL+R刷新一次");
+            },
+            description: '[tabsman] 更新老版本的过时数据（适配3.0.0版本）'
         },
     ]
 

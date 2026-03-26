@@ -565,6 +565,7 @@ async function createTab({ currentBlockId, panelId = orca.state.activePanel, nee
     // 如果该面板只有一个标签页，自动设置为活跃状态
     if (tabIdSetByPanelId.get(panelId).size === 1) {
         tab.isActive = true;
+        tab.lastAccessedTs = Date.now();
         activeTabs[panelId] = tab;
     }
 

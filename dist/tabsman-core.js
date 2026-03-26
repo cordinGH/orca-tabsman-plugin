@@ -167,34 +167,6 @@ async function createTabsForInitialPanels() {
 }
 
 
-// 恢复所有持久化数据（置顶标签页、收藏块、最近关闭标签页）
-async function restorePersistedData() {
-    try {
-        // 1. 恢复置顶标签页
-        const pinnedTabsData = await orca.plugins.getData('tabsman', 'pinned-tabs-data');
-        if (pinnedTabsData) {
-            const pinnedTabs = await TabsmanPersistence.restoreTabs(JSON.parse(pinnedTabsData), "pinned");
-            console.log(`[tabsman] 恢复置顶标签页完成，共恢复 ${pinnedTabs.length} 个标签页`);
-        }
-
-        // 2. 恢复收藏块数据
-        const favoriteBlocksData = await orca.plugins.getData('tabsman', 'favorite-blocks-data');
-        if (favoriteBlocksData) {
-            TabsmanPersistence.restoreFavoriteBlocks(JSON.parse(favoriteBlocksData));
-            console.log(`[tabsman] 恢复收藏块数据完成，共恢复 ${TabsmanPersistence.getFavoriteBlockArray().length} 个收藏块`);
-        }
-
-        // 3. 恢复最近关闭标签页
-        const recentlyClosedData = await orca.plugins.getData('tabsman', 'recently-closed-tabs-data');
-        if (recentlyClosedData) {
-            const closedTabs = await TabsmanPersistence.restoreTabs(JSON.parse(recentlyClosedData), "recently-closed");
-            console.log(`[tabsman] 恢复最近关闭标签页完成，共恢复 ${closedTabs.length} 个标签页`);
-        }
-    } catch (error) {
-        console.error('[tabsman] 恢复持久化数据失败:', error);
-    }
-}
-
 // ==================== 标签页信息生成和更新 ====================
 
 /**
@@ -693,7 +665,7 @@ async function deleteTab(tabId) {
     // 【持久化处理】保存删除的标签页到最近关闭
     await TabsmanPersistence.addAndSaveTab(tab, "recently-closed");    
     // 【持久化处理】如果是置顶标签页，且不在工作区，则从持久化数据中移除
-    if (tab.isPinned && workspaceNow === "") await TabsmanPersistence.removeAndSaveTab(tabId, "pinned")
+    if (tab.isPinned && workspaceNow === "") await TabsmanPersistence.removeAndSaveTab(tab, "pinned")
 
     // 如果即将删除的tab所处面板只有一个标签页，直接关闭面板并刷新ui
     const {panelId} = tab
@@ -847,7 +819,7 @@ async function unpinTab(tabId) {
     
     // 移除对应数据
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
-    if (workspaceNow === "") await TabsmanPersistence.removeAndSaveTab(tabId, "pinned")
+    if (workspaceNow === "") await TabsmanPersistence.removeAndSaveTab(tab, "pinned")
     return true;
 }
 
@@ -1404,7 +1376,7 @@ async function start(callback = null) {
     setupCommandInterception();
 
     // 恢复所有持久化数据（置顶标签页、收藏块、最近关闭标签页）
-    await restorePersistedData()
+    await TabsmanPersistence.restorePersistedData()
 
     // 暴露 get 函数到全局（调试）
     window.pluginTabsman.getActiveTabs = getActiveTabs;

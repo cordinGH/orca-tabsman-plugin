@@ -33,29 +33,32 @@ function startRecentlyClosed(renderTabsByPanel) {
             menu: (close) => [
                 // 收藏的块列表
                 createElement(MenuText,
-                    { title: "收藏的块列表",preIcon: "ti ti-star" },
-                    createElement(Menu, {}, TabsmanPersistence.getFavoriteBlockArray().length === 0 ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无收藏的块列表") :
-                        TabsmanPersistence.getFavoriteBlockArray().map(block => {
-                            let blockId = block.id;
+                    { title: "收藏的标签页",preIcon: "ti ti-star" },
+                    createElement(Menu, {}, 
+                        TabsmanPersistence.getTabArray("favorite").length === 0
+                        ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无收藏的标签页")
+                        : TabsmanPersistence.getTabArray("favorite").map(tab => {
+                            const blockId = tab.currentBlockId;
                             return createElement(MenuText, {
                                 key: blockId,
-                                preIcon: block.icon || 'ti ti-cube',
+                                preIcon: tab.currentIcon || 'ti ti-cube',
                                 className: 'plugin-tabsman-favorite-block-item',
                                 style: {cursor: 'default'},
                                 title: createElement("div",
                                     {style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }},
                                     [createElement("span",
                                         { style: {fontFamily: 'var(--orca-fontfamily-code)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '20em', flex: 1}},
-                                        block.title),
+                                        tab.name),
                                     createElement("i", {
                                         className: "ti ti-x plugin-tabsman-delete-btn", style: {cursor: 'pointer', opacity: 0.6, marginLeft: '8px', flexShrink: 0},
                                         onClick: async (e) => {
                                             e.stopPropagation();
-                                            if (TabsmanPersistence.getFavoriteBlockArray().findIndex(item => item.id === blockId) === -1) {
+                                            const isAlreadyDeleted = TabsmanPersistence.getTabArray("favorite").find(tab => tab.currentBlockId.toString() === blockId.toString())
+                                            if (!isAlreadyDeleted) {
                                                 orca.notify("warn", "已经删除成功，无需再次删除");
                                                 return;
                                             }
-                                            await TabsmanPersistence.removeAndSaveFavoriteBlock(blockId);
+                                            await TabsmanPersistence.removeAndSaveTab(tab, "favorite");
                                             // 重新渲染侧边栏样式
                                             renderTabsByPanel();
                                         }
@@ -64,16 +67,19 @@ function startRecentlyClosed(renderTabsByPanel) {
                                 onClick: async () => {
                                     // 恢复收藏的块到core的数据结构里
                                     const currentPanelId = orca.state.activePanel;
-                                    await TabsmanCore.createTab({ currentBlockId: blockId, needSwitch: false, panelId: currentPanelId });
+                                    const {view, viewArgs} = tab.backStack.at(-1);
+                                    await TabsmanCore.createTab({ currentBlockId: blockId, panelId: currentPanelId, initHistoryInfo: { view, viewArgs }});
                                 }
                             })
                         })
                     )
                 ),
                 createElement(MenuText,
-                    { title: "关闭的标签页", preIcon: "ti ti-progress-x" },
-                    createElement(Menu, {}, TabsmanPersistence.getTabArray("recently-closed").length === 0 ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无关闭的标签页") :
-                        TabsmanPersistence.getTabArray("recently-closed").map(tab =>
+                    { title: "最近关闭的标签页", preIcon: "ti ti-progress-x" },
+                    createElement(Menu, {},
+                        TabsmanPersistence.getTabArray("recently-closed").length === 0
+                        ? createElement("div", { className: 'plugin-tabsman-empty-state', style: { textAlign: 'center' } }, "暂无关闭的标签页")
+                        : TabsmanPersistence.getTabArray("recently-closed").map(tab =>
                             createElement(MenuText, {
                                 key: tab.id,
                                 preIcon: tab.currentIcon || 'ti ti-cube',
@@ -104,12 +110,11 @@ function startRecentlyClosed(renderTabsByPanel) {
                                         orca.notify("warn", "该标签页已被恢复");
                                         return;
                                     }
-                                    // 导入进core数据结构
-                                    TabsmanCore.importTabToActivePanel(tab)
-                                    renderTabsByPanel();
-                                    
-                                    // 从持久化数据中移除（会自动更新数组引用）
-                                    await TabsmanPersistence.removeAndSaveTab(tab.id, "recently-closed");
+                                    // 恢复到core的数据结构里
+                                    const currentPanelId = orca.state.activePanel;
+                                    const {view, viewArgs} = tab.backStack.at(-1);
+                                    await TabsmanCore.createTab({ currentBlockId: tab.currentBlockId, panelId: currentPanelId, initHistoryInfo: { view, viewArgs }});
+                                    await TabsmanPersistence.removeAndSaveTab(tab, "recently-closed");
                                 }
                             })
                         )

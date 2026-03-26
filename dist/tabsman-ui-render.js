@@ -45,7 +45,8 @@ function cleanupSubscription(unsubscribeFn) {
 function createTabElement(tab, panelId, panelGroupEle) {
     // 判断是否为收藏块
     let isFavorite = false;
-    if (Persistence.getFavoriteBlockArray().findIndex(item => item.id.toString() === tab.currentBlockId.toString()) !== -1) {
+    const isFavoriteBlock = Persistence.getTabArray("favorite").find(favoriteTab => favoriteTab.currentBlockId.toString() === tab.currentBlockId.toString())
+    if (isFavoriteBlock) {
         isFavorite = true;
     }
 
@@ -158,7 +159,7 @@ async function handleTabsmanClick(e) {
         } else if (target.classList.contains('plugin-tabsman-tab-icon')) {
             // 点击块图标切换收藏状态
             const isFavorite = target.classList.toggle('plugin-tabsman-tab-favorite');
-            isFavorite ? await Persistence.addAndSaveFavoriteBlock({id: tab.currentBlockId, icon: tab.currentIcon, title: tab.name}) : await Persistence.removeAndSaveFavoriteBlock(tab.currentBlockId);
+            isFavorite ? await Persistence.addAndSaveTab(tab, "favorite") : await Persistence.removeAndSaveTab(tab, "favorite");
             // renderTabsByPanel({type: "favorite", panelId});
             renderTabsByPanel();
         } else {

@@ -115,16 +115,18 @@ async function removeAndSaveTab(tab, tabType = "") {
 function wakeTabArray(rawTabArray, tabType = "") {
 
     const currentPanelId = orca.state.activePanel;
-    if (tabType === "workspace") {
-        // 工作区的id需要保持不变，以便正确恢复到对应面板；非工作区的id则不需要，恢复时直接放在当前活跃面板即可
-        rawTab.panelId = currentPanelId;
-    }
-
+    
     for (const rawTab of rawTabArray) {
+        
+        if (tabType === "workspace") {
+            // 工作区的id需要保持不变，以便正确恢复到对应面板；非工作区的id则不需要，恢复时直接放在当前活跃面板即可
+            rawTab.panelId = currentPanelId;
+        }
+
         // 转换 backStack，只处理日志视图，block视图不用处理
         for (const item of rawTab.backStack) {
             if (item.view === "journal") item.viewArgs.date = new Date(item.viewArgs.date)
-        }
+            }
 
         // 转换 forwardStack，只处理日志视图，block视图不用处理
         for (const item of rawTab.forwardStack) {

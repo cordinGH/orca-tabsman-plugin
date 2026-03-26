@@ -107,14 +107,7 @@ function registerTabsmanCommand(){
                 window.pluginTabsman.createQuickNoteTab(activePanel.dataset.tabsmanPanelId)
             },
             description: '[tabsman] 在今日日志中快速记录（聚焦打开新Tab）'
-        },
-        {
-            name: 'tabsman.updatePersistedTabData',
-            fn () {
-                updatePersistedTabData();
-            },
-            description: '[tabsman] 一键升级过时数据，以适配3.0.0版本的变更'
-        },
+        }
     ]
 
     commands.forEach(({name,fn,description}) => orca.commands.registerCommand(name, fn, description))
@@ -247,7 +240,7 @@ async function load(name) {
         }
     });
 
-    
+
     // 启动标签页渲染    
     await startTabsRender();
     // 启动标签页系统，传递UI更新回调

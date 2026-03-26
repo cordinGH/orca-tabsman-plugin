@@ -322,7 +322,7 @@ function createTabObject(currentBlockId = null, panelId, icon = 'ti ti-cube', na
 
         // Pin功能相关属性
         isPinned: false,        // 是否置顶
-        pinOrder: 0,            // 置顶顺序（0表示未置顶，数字越大越靠顶部）
+        pinTs: 0,            // 置顶时间戳
 
 
         // 新设计：使用双栈结构管理历史记录
@@ -347,7 +347,7 @@ function updateSortedTabsCache(panelId) {
     const panelTabs = Array.from(tabIdSet).map(tabId => tabs[tabId]).sort((a, b) => {
             // 负数说明a索引更小更靠前，正数说明b索引更小更靠前
             // 返回pinOrder差值，越晚置顶的索引越靠前，越靠近顶部。
-            if (a.isPinned && b.isPinned) return b.pinOrder - a.pinOrder;
+            if (a.isPinned && b.isPinned) return b.pinTs - a.pinTs;
             
             // 置顶的标签页排在前面
             if (a.isPinned && !b.isPinned) return -1;
@@ -416,6 +416,7 @@ async function fillCurrentAccess() {
         activeTab.backStack.pop()
         const newTab = await createTab({ currentBlockId: blockId, panelId: activePanelId, initHistoryInfo: {view, viewArgs} });
         newTab.isActive = true
+        newTab.lastAccessedTs = Date.now();
         activeTab.isActive = false
         activeTabs[id] = newTab
         if (renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: newTab , previousTab: activeTab});
@@ -775,7 +776,7 @@ async function pinTab(tabId) {
     
     // 设置置顶状态
     tab.isPinned = true;
-    tab.pinOrder = Date.now();
+    tab.pinTs = Date.now();
     
     // 更新排序缓存
     const {panelId} = tab
@@ -809,7 +810,7 @@ async function unpinTab(tabId) {
     
     // 取消置顶状态
     tab.isPinned = false;
-    tab.pinOrder = 0;
+    tab.pinTs = 0;
     
     const {panelId} = tab
     // 更新排序缓存

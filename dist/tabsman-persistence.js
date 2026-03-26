@@ -201,56 +201,109 @@ async function restorePersistedData() {
     } catch (error) {
         console.error('[tabsman] 恢复持久化数据失败:', error);
     }
+
+    // 版本3.0.1开始，检查数据版本并更新（如果需要）
+    const isUpdated = await orca.plugins.getData('tabsman-update', "ok?") === "1"
+    if (!isUpdated) {
+        await updatePersistedTabData();
+        await orca.plugins.setData('tabsman-update', "ok?", JSON.stringify(1));
+    }
 }
 
 
-// 3.0.0，更新持久化数据中的Tab对象字段版本，以适配TabsmanCore中Tab对象结构的变更
+// 3.0.1，更新持久化数据中的Tab对象字段版本，以适配TabsmanCore中Tab对象结构的变更
 async function updatePersistedTabData() {
 
-    // 处理过时的标签页数据结构
+    // 处理过时的标签页数据结构，返回结果信息 更新完成或者重定向 {result: "updated"} 或 {result: "redirected"}，如果是重定向则需要用户确认后才进行数据更新
     function updateTabDate(tab) {
+        
+        // 当前版本3.0.0
+        // 版本字段特征：
+        // - 12条字段，backStack和forwardStack的item中，将activePanel 改名为了 sourcePanelId
+        // - pinOrder改名为了pinTs，根据isPinned布尔值决定，是true就改为当前时间戳。
+
         const tabKeys = Object.keys(tab);
+        
 
-        // 当前版本，无需变更，直接返回
-        if (tabKeys.length === 12 && tab.hasOwnProperty("pinTs")) return;
-
-        // 上个版本(2.10.0)，更名即可。
-        if (tabKeys.length === 12 && tab.hasOwnProperty("lasAccessedTs")) {
-
-            tab.isPinned ? tab.pinTs = tab.pinOrder : tab.pinTs = 0;
-            delete tab.pinOrder;
-
-            for (const item of tab.backStack) {
-                if (!item.sourcePanelId && item.activePanel) {
-                    item.sourcePanelId = item.activePanel;
-                    delete item.activePanel;
-                }
-            }
-            for (const item of tab.forwardStack) {
-                if (!item.sourcePanelId && item.activePanel) {
-                    item.sourcePanelId = item.activePanel;
-                    delete item.activePanel;
-                }
-            }
+        let {currentIcon: icon, name, panelId: sourcePanelId, currentBlockId, backStack, forwardStack, createdAt} = tab;
+        let view, viewArgs, historyItem;
+        // 通用适配
+        // 3.0.0之前的版本中 block 和 journal 以外的视图，全部重定向为日志视图 并清空历史栈
+        // 并重新填充一次当前访问，因为3.0.0之前历史栈均可能为0长度
+        if ( typeof currentBlockId === 'number') {
+            view = "block";
+            viewArgs = {blockId: currentBlockId};
+        } else if (icon === 'ti ti-calendar-smile') {
+            view = "journal";
+            viewArgs = {date: currentBlockId};
+        } else {
+            view = "journal";
+            const date = new Date(createdAt);
+            date.setHours(0, 0, 0, 0);
+            viewArgs = {date};
+            // 重定向并清空历史栈
+            Object.assign(tab, { currentBlockId: date, name: date.toDateString(), currentIcon: 'ti ti-calendar-smile' });
+            backStack.length = 0;
+            forwardStack.length = 0;
         }
-    
-        // 早期版本，缺少 lastAccessedTs 字段
-        if (tabKeys.length === 11 || !tab.hasOwnProperty("lastAccessedTs")) {
+        historyItem = {icon, name, sourcePanelId, view, viewArgs};
+        if (backStack.length !== 0) backStack.pop();
+        backStack.push(historyItem);
 
+
+        // 适配 1.1.0
+        // 1.1.0版本特征，12个字段、具有lastAccessed字段、pinOrder值是已废弃的旧方案。
+        if (tab.hasOwnProperty("lastAccessed")) {
             tab.lastAccessedTs = 0;
             tab.isPinned ? tab.pinTs = new Date(tab.createdAt).getTime() : tab.pinTs = 0;
             delete tab.pinOrder;
+            delete tab.lastAccessed;
+            backStack = [backStack.at(-1)];
+            forwardStack.length = 0;
+            return;
+        }
 
-            // 历史条目清除，只保留当前访问条目。
-            const historyItems = {
-                icon: tab.currentIcon,
-                name: tab.name,
-                sourcePanelId: tab.activePanel,
-                view: tab.view,
-                viewArgs: tab.viewArgs
+
+        // 适配 1.2.0- 2.8.0的版本
+        // 版本特征：11条字段，缺少 lastAccessedTs 字段，pinOrder值是当前方案（时间戳）。
+        // 由于2.2.0版本更改了历史记录的字段封装，且距离3.0.0已经接近3个月，太久了，故不再保留历史记录。
+        if (!tab.hasOwnProperty("lastAccessedTs")) {
+            tab.lastAccessedTs = 0;
+            tab.isPinned ? tab.pinTs = tab.pinOrder : tab.pinTs = 0;
+            delete tab.pinOrder;
+            backStack = [backStack.at(-1)];
+            forwardStack.length = 0;
+            return;
+        }
+
+
+        // 适配2.8.1 -3.0.1的版本
+        // 字段已定型，故只需pinOrder 更名为 pinTs即可。
+        // 修复，3.0.0版本的失误代码==> view = tab.view。
+        // 同时删除掉block 和 journal以外的历史记录（3.0.0之前的封装逻辑有误）。
+        // 同时更新activePanel - sourcePanelId
+        for (let index = 0; index < backStack.length - 1; index++) {
+            const historyItem = backStack[index]
+            const view = historyItem.view
+            // 存在，且不是block也不是journal
+            if (!view && view !== "block" && view !== "journal") {
+                backStack.splice(index,1);
             }
-            tab.backStack = [historyItems]
-            tab.forwardStack.length = 0;
+            historyItem.sourcePanelId = tab.panelId
+            delete historyItem.activePanel
+        }
+        for (let index = 0; index < forwardStack.length; index++) {
+            const historyItem = forwardStack[index]
+            const view = historyItem.view
+            if (!view && view !== "block" && view !== "journal") {
+                backStack.splice(index,1);
+            }
+            historyItem.sourcePanelId = tab.panelId
+            delete historyItem.activePanel
+        }
+        if (tabKeys.length === 12 && tab.hasOwnProperty("lastAccessedTs") && tab.hasOwnProperty("pinOrder") ) {
+            tab.isPinned ? tab.pinTs = tab.pinOrder : tab.pinTs = 0;
+            delete tab.pinOrder;
         }
     }
 
@@ -260,10 +313,6 @@ async function updatePersistedTabData() {
         const wsTabsJSON = await orca.plugins.getData('tabsman-workspace', key);
         const parsedTabs = JSON.parse(wsTabsJSON);
 
-        // 当前版本3.0.0，backStack和forwardStack的item中，将activePanel 改名为了 sourcePanelId
-        // 当前版本3.0.0，将pinOrder改名为了pinTs，根据isPinned布尔值决定，是true就改为当前时间戳。
-        // ✅2.8.1 新增了 lastAccessedTs 字段，如果缺失则补上。11个字段变成了12个
-        // ✅2.2.0 backStack 和 forwardStack 的item中，追加了icon + name 字段。如果缺失则补上
         const tabs = Object.values(parsedTabs);
         for (const tab of tabs) {
             updateTabDate(tab);
@@ -285,7 +334,7 @@ async function updatePersistedTabData() {
     await saveTabArray("recently-closed");
     await saveTabArray("favorite");
 
-    orca.notify("success", "[tabsman] 过时数据已升级完毕，请立即CTRL+R刷新一次");
+    orca.notify("success", "[tabsman] 过时数据已升级完毕");
 }
 
 window.updatePersistedTabData = updatePersistedTabData;

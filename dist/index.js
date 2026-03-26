@@ -112,9 +112,8 @@ function registerTabsmanCommand(){
             name: 'tabsman.updatePersistedTabData',
             fn () {
                 updatePersistedTabData();
-                orca.notify("success", "[tabsman] 老版本过时数据已更新，请立即CTRL+R刷新一次");
             },
-            description: '[tabsman] 更新老版本的过时数据（适配3.0.0版本）'
+            description: '[tabsman] 一键升级过时数据，以适配3.0.0版本的变更'
         },
     ]
 

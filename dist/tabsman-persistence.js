@@ -285,7 +285,7 @@ async function updatePersistedTabData() {
     await saveTabArray("recently-closed");
     await saveTabArray("favorite");
 
-    orca.notify("success", "[tabsman] 3.0.0标签页数据结构更新完成")
+    orca.notify("success", "[tabsman] 过时数据已升级完毕，请立即CTRL+R刷新一次");
 }
 
 window.updatePersistedTabData = updatePersistedTabData;

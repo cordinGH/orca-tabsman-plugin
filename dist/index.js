@@ -121,20 +121,18 @@ function registerTabsmanCommand(){
         );
     }
 
-    // 订阅处理清理命令是否启用
-    const tabsmanPlugin = orca.state.plugins[pluginName]
-    unsubscribeSettings = window.Valtio.subscribe(tabsmanPlugin, () => {
-        const enableClearData = tabsmanPlugin.settings?.enableClearData;
+    // 订阅处理清理命令是否启用的设置变更
+    unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
+        const enableClearData = orca.state.plugins[pluginName].settings?.enableClearData;
         if (enableClearData === false) {
             orca.commands.unregisterCommand('tabsman.clearData');
-            orca.notify("success", "[tabsman] 清空持久化数据命令已禁用");
         } else if (enableClearData === true) {
             orca.commands.registerCommand(
                 'tabsman.clearData',
                 clearAllData,
                 "[tabsman]清空持久化数据"
             );
-            orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
+            // orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
         }
     });
 }
@@ -237,6 +235,12 @@ async function load(name) {
             description: "启用后可以在命令面板中使用清空持久化数据功能",
             type: "boolean",
             defaultValue: false
+        },
+        enableQuickNotePrefix: {
+            label: "快速记录时追加日期前缀",
+            description: "启用后，快速记录时会自动追加日期前缀，例如20260331",
+            type: "boolean",
+            defaultValue: false
         }
     });
 
@@ -244,7 +248,7 @@ async function load(name) {
     // 启动标签页渲染    
     await startTabsRender();
     // 启动标签页系统，传递UI更新回调
-    await start(renderTabsByPanel);
+    await start(renderTabsByPanel, pluginName);
     
     // 插件启动完成后，主动触发一次渲染通知
     renderTabsByPanel();

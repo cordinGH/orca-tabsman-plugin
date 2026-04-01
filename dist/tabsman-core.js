@@ -48,6 +48,7 @@ let navOriginals = null
 
 // 订阅取消函数
 let unsubscribePanelBackHistory = null
+let unsubscribeSettings = null
 
 // 拦截器函数引用
 let beforeCommandHooks = null
@@ -57,6 +58,9 @@ let afterCommandHooks = null
 
 /** @type {boolean} 标记填充功能是否被挂起，即不需要理会orca历史变化。*/
 let isFillSuspended = false;
+
+/** @type {boolean} 标记是否启用快速笔记前缀 */
+let enableQuickNotePrefix = false
 
 // ==================== 全局数据存储 ====================
 
@@ -361,8 +365,34 @@ function updateSortedTabsCache(panelId) {
     sortedTabsByPanelId.set(panelId, panelTabs);
 }
 
+/**
+ * 设置设置变更监听器
+ */
+function subscribeSettings(pluginName) {
+    enableQuickNotePrefix = orca.state.plugins[pluginName]?.settings.enableQuickNotePrefix
+    unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
+        const settings = orca.state.plugins[pluginName]?.settings;
+        if (!settings) {
+            console.log("[tabsman] 设置选项加载失败")
+            return
+        }
+        enableQuickNotePrefix = settings.enableQuickNotePrefix
+    }
+  )
+}
 
 // ==================== 标签页历史记录管理 ====================
+
+function unsubscribeAll() {
+    if (unsubscribeSettings) {
+        unsubscribeSettings();
+        unsubscribeSettings = null;
+    } 
+    if (unsubscribePanelBackHistory) {
+        unsubscribePanelBackHistory();
+        unsubscribePanelBackHistory = null;
+    }
+}
 
 /**
  * 订阅orca后退历史变化，用于填充历史并更新当前tab对象的信息。已拦截了前进后退命令统一为了Goto，以确保后退历史始终是增长的。
@@ -1044,6 +1074,31 @@ async function createQuickNoteTab(panelId) {
     if (!isNewBlock) orca.notify("info", "[tabsman] 日志末尾已存在空块，直接使用");
     const newTab = await createTab({currentBlockId: quickNoteBlockId, panelId, initHistoryInfo: {view: "block", viewArgs: {blockId: quickNoteBlockId}}})
     await switchTab(newTab.id)
+
+    if (enableQuickNotePrefix) {
+        const date = new Date();
+        const y = date.getFullYear()
+        const m = String(date.getMonth() + 1).padStart(2, '0')
+        const d = String(date.getDate()).padStart(2, '0')
+
+        
+        const updates = [
+            { id: quickNoteBlockId, content: [{ t: "t", v: y + m + d}] }
+        ]
+        await orca.commands.invokeEditorCommand(
+            "core.editor.setBlocksContent",
+            null,
+            updates,
+            false,
+        )
+        
+        setTimeout(() => {
+            const selection = window.getSelection();
+            const cursorData = orca.utils.getCursorDataFromSelection(selection);
+            cursorData.anchor.offset = 8 // 光标移动到日期前缀后面
+            orca.utils.setSelectionFromCursorData(cursorData);
+        }, 0);
+    }
 }
 
 // 在今日日志末尾获取一个空块id（若连续2个空块，则不新建，直接采用最后一个）
@@ -1094,8 +1149,9 @@ async function getQuickNoteBlockId(){
                 "lastChild",
                 null, // 用于 block.text = null ，使得内容为空。如果需要自定义内容，则 [{ t: "t", v: "自定义文本内容" }]
                 { type: "text" },
-            )}
-        })
+            )
+        }
+    })
     return {quickNoteBlockId, isNewBlock: true}
 }
 
@@ -1352,7 +1408,7 @@ function cleanNavWrappers() {
  * 启动标签页系统
  * 初始化历史订阅、命令拦截和当前面板的标签页
  */
-async function start(callback = null) {
+async function start(callback = null, pluginName) {
     // console.log('\n=== [tabsman] tabsman管理器启动 ===');
     
     // 设置UI渲染回调函数
@@ -1379,6 +1435,8 @@ async function start(callback = null) {
 
     // 恢复所有持久化数据（置顶标签页、收藏块、最近关闭标签页）
     await TabsmanPersistence.restorePersistedData()
+
+    subscribeSettings(pluginName)
 
     // 暴露 get 函数到全局（调试）
     window.pluginTabsman.getActiveTabs = getActiveTabs;
@@ -1410,10 +1468,7 @@ async function start(callback = null) {
  */
 function destroy() {
     // 清理订阅
-    if (unsubscribePanelBackHistory) {
-        unsubscribePanelBackHistory()
-        unsubscribePanelBackHistory = null;
-    }
+    unsubscribeAll()
 
     // 清理全局状态
     tabs = {};

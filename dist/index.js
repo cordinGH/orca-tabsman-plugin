@@ -238,9 +238,21 @@ async function load(name) {
         },
         enableQuickNotePrefix: {
             label: "快速记录时追加日期前缀",
-            description: "启用后，快速记录时会自动追加日期前缀，例如20260331",
+            description: "启用后，快速记录时会自动追加今日日期前缀，如260331。命令面板搜索tabsman可找到快速记录命令。",
             type: "boolean",
-            defaultValue: false
+            defaultValue: true
+        },
+        prefixString: {
+            label: "快速记录日期前缀的起始字符",
+            description: "自定义快速记录日期前缀的起始字符，例如下方填写date，则前缀最终为date260331。支持emoji字符。",
+            type: "string",
+            defaultValue: "date"
+        },
+        enableAutoFoldQuickNotes: {
+            label: "快速记录时自动折叠",
+            description: "启用后，每当创建新的快速记录时，会自动折叠上一次快速记录，以保持日志页的整洁",
+            type: "boolean",
+            defaultValue: true
         }
     });
 

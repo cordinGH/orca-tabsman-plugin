@@ -61,6 +61,12 @@ let isFillSuspended = false;
 
 /** @type {boolean} 标记是否启用快速笔记前缀 */
 let enableQuickNotePrefix = false
+/** @type {boolean} 标记是否启用快速笔记自动折叠 */
+let enableAutoFoldQuickNotes = false
+/** @type {number} 存储上一个快速笔记的blockId */
+let lastQuickNoteBlockId = null;
+/** @type {string} 快速笔记前缀字符串 */
+let prefixString = "date"
 
 // ==================== 全局数据存储 ====================
 
@@ -370,6 +376,8 @@ function updateSortedTabsCache(panelId) {
  */
 function subscribeSettings(pluginName) {
     enableQuickNotePrefix = orca.state.plugins[pluginName]?.settings.enableQuickNotePrefix
+    enableAutoFoldQuickNotes = orca.state.plugins[pluginName]?.settings.enableAutoFoldQuickNotes
+    prefixString = orca.state.plugins[pluginName]?.settings.prefixString.trim()
     unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
         const settings = orca.state.plugins[pluginName]?.settings;
         if (!settings) {
@@ -377,6 +385,8 @@ function subscribeSettings(pluginName) {
             return
         }
         enableQuickNotePrefix = settings.enableQuickNotePrefix
+        enableAutoFoldQuickNotes = settings.enableAutoFoldQuickNotes
+        prefixString = settings.prefixString.trim()
     }
   )
 }
@@ -1077,14 +1087,13 @@ async function createQuickNoteTab(panelId) {
 
     if (enableQuickNotePrefix) {
         const date = new Date();
-        const y = date.getFullYear()
+        const y = date.getFullYear() - 2000
         const m = String(date.getMonth() + 1).padStart(2, '0')
         const d = String(date.getDate()).padStart(2, '0')
+        const prefix = prefixString + y + m + d
 
         
-        const updates = [
-            { id: quickNoteBlockId, content: [{ t: "t", v: y + m + d}] }
-        ]
+        const updates = [{ id: quickNoteBlockId, content: [{ t: "t", v: prefix }] }]
         await orca.commands.invokeEditorCommand(
             "core.editor.setBlocksContent",
             null,
@@ -1092,13 +1101,20 @@ async function createQuickNoteTab(panelId) {
             false,
         )
         
-        setTimeout(() => {
+        setTimeout((length = prefix.length) => {
             const selection = window.getSelection();
             const cursorData = orca.utils.getCursorDataFromSelection(selection);
-            cursorData.anchor.offset = 8 // 光标移动到日期前缀后面
+            cursorData.anchor.offset = length // 光标移动到日期前缀后面
             orca.utils.setSelectionFromCursorData(cursorData);
         }, 0);
+
+        if (enableAutoFoldQuickNotes && lastQuickNoteBlockId) {
+            orca.commands.invokeEditorCommand("core.editor.foldBlock", null, lastQuickNoteBlockId);
+        }
     }
+
+    // 保存快速记录块id，以便下次创建快速记录时进行自动折叠处理（根据用户设置决定是否启用自动折叠）
+    lastQuickNoteBlockId = quickNoteBlockId;
 }
 
 // 在今日日志末尾获取一个空块id（若连续2个空块，则不新建，直接采用最后一个）

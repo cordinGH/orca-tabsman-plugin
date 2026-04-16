@@ -1045,6 +1045,13 @@ async function createQuickNoteTab(panelId) {
     const newTab = await createTab({currentBlockId: quickNoteBlockId, panelId, initHistoryInfo: {view: "block", viewArgs: {blockId: quickNoteBlockId}}})
     await switchTab(newTab.id)
 
+    // 根据用户设置决定是否启用自动折叠上一个快速记录块的功能（如果存在上一个快速记录块）
+    if (enableAutoFoldQuickNotes && lastQuickNoteBlockId) {
+        orca.commands.invokeEditorCommand("core.editor.foldBlock", null, lastQuickNoteBlockId);
+        orca.commands.invokeEditorCommand("core.editor.goTop");
+    }
+
+    // 根据用户设置决定是否启用快速记录块前缀功能，如果启用则在新建的快速记录块内添加日期前缀，并将光标移动到前缀后面
     if (enableQuickNotePrefix) {
         const date = new Date();
         const y = date.getFullYear() - 2000
@@ -1052,7 +1059,6 @@ async function createQuickNoteTab(panelId) {
         const d = String(date.getDate()).padStart(2, '0')
         const prefix = prefixString + y + m + d
 
-        
         const updates = [{ id: quickNoteBlockId, content: [{ t: "t", v: prefix }] }]
         await orca.commands.invokeEditorCommand(
             "core.editor.setBlocksContent",
@@ -1060,22 +1066,44 @@ async function createQuickNoteTab(panelId) {
             updates,
             false,
         )
-        
+
         setTimeout((length = prefix.length) => {
-            const selection = window.getSelection();
-            const cursorData = orca.utils.getCursorDataFromSelection(selection);
-            cursorData.anchor.offset = length // 光标移动到日期前缀后面
+            const cursorData = __getCursorData(quickNoteBlockId, panelId)
+            // 光标给到日期前缀末尾
+            cursorData.anchor.offset = length
+            cursorData.focus.offset = length
             orca.utils.setSelectionFromCursorData(cursorData);
         }, 0);
-
-        if (enableAutoFoldQuickNotes && lastQuickNoteBlockId) {
-            orca.commands.invokeEditorCommand("core.editor.foldBlock", null, lastQuickNoteBlockId);
-        }
     }
 
     // 保存快速记录块id，以便下次创建快速记录时进行自动折叠处理（根据用户设置决定是否启用自动折叠）
     lastQuickNoteBlockId = quickNoteBlockId;
 }
+
+
+// 辅助函数，获取有效的cursorData，如果无法获取，则使用预设数据替代（预设数据的块id和面板id会被替换成当前快速记录块和面板）
+function __getCursorData(quickNoteBlockId, panelId) {
+    // 用于在无法获取cursorData时，直接生成cursorData。典型的无法获取场景就是白板中创建快速记录tab。
+    const cursorDataTemplate = {  
+        anchor: {blockId: 20260416, isInline: true, index: 0, offset: 0},
+        focus: {blockId: 20260416, isInline: true, index: 0, offset: 0},
+        isForward: true,
+        panelId: "当前虎鲸版本1.72.0",
+        rootBlockId: 20260416
+    };
+    const selection = window.getSelection();
+    let cursorData = orca.utils.getCursorDataFromSelection(selection);
+    if (!cursorData) {
+        cursorData = cursorDataTemplate
+        cursorData.anchor.blockId = quickNoteBlockId
+        cursorData.focus.blockId = quickNoteBlockId
+        cursorData.panelId = panelId
+        cursorData.rootBlockId = quickNoteBlockId
+        console.log("[tabsman] 无法获取cursorData，已使用预设数据替代，可能会导致光标位置不准确", cursorData);
+    }
+    return cursorData;
+}
+
 
 // 在今日日志末尾获取一个空块id（若连续2个空块，则不新建，直接采用最后一个）
 async function getQuickNoteBlockId(){

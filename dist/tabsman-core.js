@@ -1293,38 +1293,34 @@ function setupNavWrappers() {
     
     // 包装 orca.nav.goTo 以支持 Ctrl+点击创建后台标签页，且确保始终是当前面板跳转
     navOriginals.method.goTo = orca.nav.goTo
-    orca.nav.goTo = function(view, viewArgs, panelId) {  
+    orca.nav.goTo = function(view, viewArgs, panelId) {
+        // 如果没传panelId，或者传了个未被记录的panelId，则panelId定向为当前UI上的activePanelId
+        if (!panelId || !Object.hasOwn(activeTabs, panelId)) {
+            panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+        }
+
+        // activePanel切换到panelId上，以便在插件或官方黑盒中调用到orca.state.activePanel的地方可以正确跳转和填充历史。  
+        // 典型场景：官方在全局搜索视图中打开预览编辑，在里面跳转将会无效。下方switch之后，就可以正常跳转。
+        if (orca.state.activePanel !== panelId) orca.nav.switchFocusTo(panelId);
+
         // 处理Ctrl+Click（未按shift）：创建后台标签页
         if (window.event?.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
             // 根据视图类型确定目标内容ID
             const targetBlockId = getBlockIdByViewAndViewArgs(view, viewArgs);
-
-            // 检查当前是否在特殊面板（如'_globalSearch'），或者没传panelId，则在当前UI上的activePanel里打开
-            let panelId;
-            if (!Object.hasOwn(activeTabs, panelId)) {
-                panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-            } else {
-                panelId = orca.state.activePanel    
-            }
             createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
             .then(() => orca.notify("success", "[tabsman] 已创建后台标签页"))
+
         } else if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
             orca.nav.openInLastPanel(view, viewArgs);
+
         } else {
-            // 确保前往的面板是当前面板，以确保历史记录填对tab。
-            if (panelId !== orca.state.activePanel) orca.nav.switchFocusTo(panelId);
-            
-            return navOriginals.method.goTo.call(this, view, viewArgs, panelId);
+            // 检查panelId是否locked，如果locked，则单独用openInLastPanel封装，不然UI渲染会有问题。
+            const panel = orca.nav.findViewPanel(panelId, orca.state.panels);
+            panel.locked
+                ? orca.nav.openInLastPanel(view, viewArgs)
+                : navOriginals.method.goTo.call(this, view, viewArgs, panelId)
         }   
-    };
-    
-    // 包装 addTo API
-    navOriginals.method.addTo = orca.nav.addTo;
-    orca.nav.addTo = function(id, dir, src) {
-        const newPanelId = navOriginals.method.addTo.call(this, id, dir, src);
-        if (newPanelId) createTabForNewPanel(newPanelId);
-        return newPanelId;
     };
     
     // 包装 openInLastPanel API（空返回）
@@ -1332,27 +1328,34 @@ function setupNavWrappers() {
     orca.nav.openInLastPanel = function(view, viewArgs) {
         // 处理 Ctrl+Shift+Click：创建前台标签页
         if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
-
             const targetBlockId = getBlockIdByViewAndViewArgs(view, viewArgs);
-
-            // 检查当前面板是否为特殊面板（如'_globalSearch'），则变更为当前UI上的activePanel
-            let panelId = orca.state.activePanel;
-            if (!Object.hasOwn(activeTabs, panelId)) {
-                panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-            }
-            createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
-            .then(newTab => switchTab(newTab.id)).then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
+            // 取当前UI上的activePanelId
+            panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+            const tabPromise  = createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
+            tabPromise
+                .then(newTab => switchTab(newTab.id))
+                .then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
+            
         } else if (window.event?.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
             // 处理 Ctrl+Click：创建后台标签页
-            orca.nav.goTo(view, viewArgs, orca.state.activePanel);
+            orca.nav.goTo(view, viewArgs);
+
         } else {
-            // 调用原始函数
+            // 调用原始函数前往面板
             navOriginals.method.openInLastPanel.call(this, view, viewArgs);
             
             // 如果还没有这个面板的标签页，则初始化一份默认的标签页
             const newPanelId = orca.state.activePanel;
             if (!tabIdSetByPanelId.has(newPanelId)) createTabForNewPanel(newPanelId);
         }
+    };
+
+    // 包装 addTo API
+    navOriginals.method.addTo = orca.nav.addTo;
+    orca.nav.addTo = function(id, dir, src) {
+        const newPanelId = navOriginals.method.addTo.call(this, id, dir, src);
+        if (newPanelId) createTabForNewPanel(newPanelId);
+        return newPanelId;
     };
 
     // 包装orca.nav.close，转交给delete完成

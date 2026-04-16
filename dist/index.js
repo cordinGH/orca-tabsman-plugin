@@ -178,7 +178,7 @@ function startActivePanelUpdateHandle() {
     navOriginalFn = {
         "focusNext": null,
         "focusPrev": null,
-        "switchFocusTo": null
+        "switchFocusTo": null // 悬浮预览、全局搜索，都会调用该函数
     }
     Object.keys(navOriginalFn).forEach(fnName => {
         // 保存原函数
@@ -187,9 +187,10 @@ function startActivePanelUpdateHandle() {
         // 包装处理
         orca.nav[fnName] = function(panelId) {
             navOriginalFn[fnName].call(this, panelId)
-            if (orca.state.activePanel !== "_globalSearch") {
-                updateActivePanelStyle();
-            }
+
+            // 虎鲸官方特殊视图是以_开头的，例如'_globalSearch','_reference'。
+            // 切换视图不应该改变活跃面板的样式标记，否则可能会导致在这些视图中，无法正确创建Tabs。
+            if (!orca.state.activePanel.startsWith("_")) updateActivePanelStyle();
         }
     })
 

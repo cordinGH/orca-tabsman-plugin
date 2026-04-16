@@ -203,19 +203,19 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
 
     switch (type) {
         case "delete":
-            renderDelete(currentTab, previousTab);break;
+            __renderDelete(currentTab, previousTab);break;
         case "switch":
-            renderSwitch(currentTab, previousTab);break;
+            __renderSwitch(currentTab, previousTab);break;
         case "update":
-            renderUpdate(currentTab);break;
+            __renderUpdate(currentTab);break;
         case "pin":
-            renderPin(panelId);break;
+            __renderPin(panelId);break;
         case "create":
-            renderCreate(currentTab);break;
+            __renderCreate(currentTab);break;
         case "closePanel":
-            renderClosePanel(panelId);break;
+            __renderClosePanel(panelId);break;
         default:
-            renderAll();break;
+            __renderAll();break;
     }
     
     // 确保当前面板的active样式
@@ -227,7 +227,7 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
 }
 
 // 关闭面板，轻量渲染
-function renderClosePanel(panelId) {
+function __renderClosePanel(panelId) {
     const panelGroupEle = allPanelGroupEle[panelId]
     
     // 不重复清理
@@ -243,7 +243,7 @@ function renderClosePanel(panelId) {
 }
 
 // 创建tab时渲染，轻量渲染
-function renderCreate(tab) {
+function __renderCreate(tab) {
     const {id, panelId} = tab
     let panelGroup = allPanelGroupEle[panelId]
     if (!panelGroup) {
@@ -251,7 +251,7 @@ function renderCreate(tab) {
 
         // 该case是在第一次创建面板时构建初始tab，因此panelTabs期望长度应当是1
         if (panelTabs.length !== 1) {
-            orca.notify("info", "[tabsman] renderCreate期望值为1，请检查逻辑是否有误")
+            orca.notify("info", "[tabsman] __renderCreate期望值为1，请检查逻辑是否有误")
             return
         }
 
@@ -276,7 +276,7 @@ function renderCreate(tab) {
 }
 
 // pin住时更新整个面板，轻量渲染
-function renderPin(panelId){
+function __renderPin(panelId){
     const newPanelGroupEle = _renderOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
     allPanelGroupEle[panelId].replaceWith(newPanelGroupEle)
     allPanelGroupEle[panelId].remove()
@@ -308,7 +308,7 @@ function _renderOnePanelGroup(panelId, panelTabs) {
 
 // update更新单个标签页（活跃标签页），轻量渲染
 // currentTab => 需要被处理的标签页
-function renderUpdate (tab) {
+function __renderUpdate (tab) {
     const {id, panelId} = tab
 
     const tabElement = allTabEle[id].element
@@ -325,20 +325,20 @@ function renderUpdate (tab) {
 
 // delete轻量渲染
 // currentTab => 当前活跃的tab，pre是被删除的tab
-function renderDelete (currentTab, previousTab) {
+function __renderDelete (currentTab, previousTab) {
     allTabEle[currentTab.id].element.classList.add('active-tab-item');
     allTabEle[previousTab.id].element.remove()
     delete allTabEle[previousTab.id]
 }
 
 // switch轻量渲染
-function renderSwitch (currentTab, previousTab) {
+function __renderSwitch (currentTab, previousTab) {
     allTabEle[previousTab.id].element.classList.remove('active-tab-item');
     allTabEle[currentTab.id].element.classList.add('active-tab-item');
 }
 
 // 全部渲染
-function renderAll() {
+function __renderAll() {
     // 清空现有内容
     tabsmanTabsEle.innerHTML = '';
     allTabEle = {}

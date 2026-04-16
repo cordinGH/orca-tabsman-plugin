@@ -110,7 +110,7 @@ async function __checkTabCurrentBlockId(tab) {
         const date = new Date(new Date().toDateString())
         const name = date.toDateString()
         const icon = 'ti ti-calendar-smile'
-        tab.backStack.at(-1) = {icon, name, sourcePanelId: tab.panelId, view: "journal", viewArgs: {date}}
+        Object.assign(tab.at(-1), { icon, name, view: "journal", viewArgs: {date} })
         Object.assign(tab, { currentBlockId: date, name: date.toDateString(), currentIcon: 'ti ti-calendar-smile' })
     }
 }
@@ -278,7 +278,7 @@ async function updateTabProperties() {
     
     const activePanel = orca.nav.findViewPanel(activePanelId, orca.state.panels);
     const currentBlockId = getBlockIdByViewAndViewArgs(activePanel.view, activePanel.viewArgs)
-    activePanel.currentBlockId = currentBlockId;
+    activeTab.currentBlockId = currentBlockId;
     
     // 比对是否需要更新，避免不必要的UI刷新
     const {name, icon} = await generateTabNameAndIcon(currentBlockId);
@@ -1048,7 +1048,6 @@ async function createQuickNoteTab(panelId) {
     // 根据用户设置决定是否启用自动折叠上一个快速记录块的功能（如果存在上一个快速记录块）
     if (enableAutoFoldQuickNotes && lastQuickNoteBlockId) {
         orca.commands.invokeEditorCommand("core.editor.foldBlock", null, lastQuickNoteBlockId);
-        orca.commands.invokeEditorCommand("core.editor.goTop");
     }
 
     // 根据用户设置决定是否启用快速记录块前缀功能，如果启用则在新建的快速记录块内添加日期前缀，并将光标移动到前缀后面
@@ -1358,7 +1357,7 @@ function setupNavWrappers() {
         if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
             const targetBlockId = getBlockIdByViewAndViewArgs(view, viewArgs);
             // 取当前UI上的activePanelId
-            panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+            const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
             const tabPromise  = createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
             tabPromise
                 .then(newTab => switchTab(newTab.id))

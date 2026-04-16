@@ -76,9 +76,9 @@ function registerTabsmanCommand(){
         },
         {
             name: 'tabsman.goToPreviousActiveTab',
-            fn() {
-                const success = switchPreviousActiveTab(orca.state.activePanel)
-                if (!success) orca.notify("info", "[tabsman] 其他标签页暂未访问过")   
+            async fn() {
+                const success = await switchPreviousActiveTab(orca.state.activePanel)
+                if (!success) orca.notify("error", "[tabsman] switchPreviousActiveTab执行失败")   
             },
             description: '[tabsman] Go to previous active tab'
         },

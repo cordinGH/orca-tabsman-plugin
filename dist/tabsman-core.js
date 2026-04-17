@@ -688,12 +688,13 @@ async function deleteTab(tabId) {
     if (tabIdSet.size === 1) {
         navOriginals.method.close.call(navOriginals.thisValue, panelId) // orca全局历史订阅回调已处理：关闭行为而触发的orca全局历史减少，不会引起tab历史填充。
         
-        // 清理数据结构并刷新UI
+        // 清理UI再清除数据
+        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId});
+        
         delete tabs[tabId]
         tabIdSetByPanelId.delete(panelId)
         delete activeTabs[panelId]
         sortedTabsByPanelId.delete(panelId)
-        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId})
         return
     }
 
@@ -738,14 +739,14 @@ async function moveTabToPanel(tabId, newPanelId) {
     tabIdSetByPanelId.get(newPanelId).add(tabId);
     updateSortedTabsCache(newPanelId);
 
-    // 如果被移走的是唯一一个标签页，则从数据库中清除该面板数据并刷新ui
+    // 如果被移走的是唯一一个标签页，则先清UI，再清理数据库数据（UI清理需要读取数据库）。
     if (tabIdSetByPanelId.get(oldPanelId).size === 1) {
+        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId: oldPanelId});
         delete activeTabs[oldPanelId];
         tabIdSetByPanelId.delete(oldPanelId);
         sortedTabsByPanelId.delete(oldPanelId);
-
+        
         navOriginals.method.close.call(navOriginals.thisValue, oldPanelId)
-        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", oldPanelId})
         return true;
     }
 

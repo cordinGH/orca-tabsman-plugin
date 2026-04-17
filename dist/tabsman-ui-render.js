@@ -229,12 +229,11 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
 // 关闭面板，轻量渲染
 function __renderClosePanel(panelId) {
     const panelGroupEle = allPanelGroupEle[panelId]
-    
     // 不重复清理
     if (!panelGroupEle) return;
-
     panelGroupEle.remove()
-    const tabIdSet = TabsmanCore.getTabIdSetByPanelId(panelId)
+
+    const tabIdSet = TabsmanCore.getTabIdSetByPanelId().get(panelId)
     for (const tabId of tabIdSet) {
         delete allTabEle[tabId]
     }

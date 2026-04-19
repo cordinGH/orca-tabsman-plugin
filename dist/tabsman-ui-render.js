@@ -70,7 +70,7 @@ function createTabElement(tab, panelId, panelGroupEle) {
     // 标签页标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
     const title = createDomWithClass("div", 'plugin-tabsman-tab-title orca-fav-item-label', tabElement)
-    title.textContent = tab.name || `标签页 ${tab.id}`;
+    title.textContent = tab.name || `标签页name为空 ${tab.id}`;
 
     // 关闭按钮
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。

@@ -98,23 +98,6 @@ function importTabToActivePanel(tabInput) {
 }
 
 
-// 确保当前tab的数字类型blockid是有效的，如果无效了（被删除了），则重定向为今日日志
-async function __checkTabCurrentBlockId(tab) {
-    const {currentBlockId} = tab
-    if (typeof currentBlockId === "number") {
-        // 存在块不处理
-        if (await orca.invokeBackend("get-block", currentBlockId)) return
-
-        // 不存在块，重定向为今日日志
-        orca.notify("info",`[tabsman] 目标块${currentBlockId}已删除，现重定向为今日日志`)
-        const date = new Date(new Date().toDateString())
-        const name = date.toDateString()
-        const icon = 'ti ti-calendar-smile'
-        Object.assign(tab.at(-1), { icon, name, view: "journal", viewArgs: {date} })
-        Object.assign(tab, { currentBlockId: date, name: date.toDateString(), currentIcon: 'ti ti-calendar-smile' })
-    }
-}
-
 // 根据view和viewArgs获取tabsman所需的blockid
 function getBlockIdByViewAndViewArgs(view, viewArgs) {
     let blockId = ""
@@ -178,114 +161,164 @@ async function createTabsForInitialPanels() {
 // ==================== 标签页信息生成和更新 ====================
 
 /**
- * 生成标签页的名称和图标（优化版本，避免重复API调用）
+ * 读取后端数据，生成标签页的名称和图标
  * @param {string} blockId - 块ID
- * @returns {Promise<{name: string, icon: string}>} 返回包含名称和图标的对象
+ * @returns {Promise<{name: string, icon: string, needRedirect: boolean}>} 返回包含名称和图标的对象，以及是否重定向
  */
 async function generateTabNameAndIcon(blockId) {
-    if (!blockId) return {}
+    if (!blockId) return orca.notify("error", "[tabsman] generateTabNameAndIcon未传入参数，已中断执行流程，请联系插件开发者修复此问题")
 
-    // 如果是Date对象（journal视图），直接使用日期字符串
+    let needRedirect = false;
+    // journal视图
     if (blockId instanceof Date) {
-        return { name: blockId.toDateString(), icon: 'ti ti-calendar-smile' }
-    } else if (typeof blockId === "string") {
+        return { name: blockId.toDateString(), icon: 'ti ti-calendar-smile' , needRedirect}
+    }
+    
+    //插件视图或者官方块视图
+    if (typeof blockId === "string") {
         if (blockId.startsWith(PREFIX_PLUGIN_VIEW)) {
             // 第三方插件视图
-            return {name: blockId, icon: "ti ti-apps"}
+            return {name: blockId, icon: "ti ti-apps", needRedirect}
         } else if (blockId.startsWith(PREFIX_BGRAPH_VIEW)) {
             // 块图谱视图（官方）
-            return {name: blockId, icon: "ti ti-sitemap"}
+            return {name: blockId, icon: "ti ti-sitemap", needRedirect}
         }
     }
 
-    try {
-        const block = await orca.invokeBackend("get-block", blockId);
-        if (!block) return {}
+    if (typeof blockId !=="number") return { name: '标签页传入ID不合法', icon: 'ti ti-cube' };
+    
+    const block = await orca.invokeBackend("get-block", blockId);
+    // 不存在则重定向日志
+    if (!block) {
+        needRedirect = true;
+        return {
+            name: new Date(new Date().toDateString()).toDateString(),
+            icon: 'ti ti-calendar-smile',
+            needRedirect
+        }
+    }
 
-        const blockRepr = block.properties.find(p => p.name === '_repr')
-        const blockType = blockRepr.value.type
-        
-        // 生成名称
-        let name = '新标签页';
-        // 可编辑文本块，有别名且"显示为别名"则以别名作为name，否则显示text或type
-        if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType)) {
-            // 如果没找到_asAlias，说明是默认状态（显示为别名）
-            let showAlias = false;
-            if (block.aliases.length !== 0) {
-                const blockAsAlias = block.properties.find(p => p.name === '_asAlias');   
-                showAlias = blockAsAlias ? blockAsAlias.value : true;
-            }
+    const blockRepr = block.properties.find(p => p.name === '_repr')
+    const blockType = blockRepr.value.type
+    
+    // 生成名称
+    let name = '新标签页';
+    // 可编辑文本块，有别名且"显示为别名"则以别名作为name，否则显示text或type
+    if (['ul', 'ol', 'text', 'heading', 'task'].includes(blockType)) {
+        // 如果没找到_asAlias，说明是默认状态（显示为别名）
+        let showAlias = false;
+        if (block.aliases.length !== 0) {
+            const blockAsAlias = block.properties.find(p => p.name === '_asAlias');   
+            showAlias = blockAsAlias ? blockAsAlias.value : true;
+        }
 
-            if (showAlias) {
-                name = block.aliases[0];
-            } else {
-                const {text} = block
-                const shortText = (text?.length > 30) ? (text.slice(0, 30) + "...") : text
-                name = text ? shortText : `(${blockType})`
-            }
+        if (showAlias) {
+            name = block.aliases[0];
         } else {
-            // 非可编辑文本块，如果存在caption，则显示caption作为name
-            const blockCap = blockRepr.value.cap
-            name = blockCap ? blockCap : `(${blockType})`
+            const {text} = block
+            const shortText = (text?.length > 30) ? (text.slice(0, 30) + "...") : text
+            name = text ? shortText : `(${blockType})`
         }
-
-        // 生成图标
-        let icon = 'ti ti-cube';
-        switch (blockType) {
-            case 'heading':
-                const headingLevel = blockRepr.value.level
-                switch (headingLevel) {
-                    case -1: icon = 'ti ti-heading'; break; 
-                    case 1: icon = 'ti ti-h-1'; break;
-                    case 2: icon = 'ti ti-h-2'; break;
-                    case 3: icon = 'ti ti-h-3'; break;
-                    case 4: icon = 'ti ti-h-4'; break;
-                }
-                break;
-            case 'ul': icon = 'ti ti-list'; break;
-            case 'ol': icon = 'ti ti-list-numbers'; break;
-            case 'task': icon = 'ti ti-checkbox'; break;
-            case 'code': icon = 'ti ti-code'; break;
-            case 'quote2': icon = 'ti ti-blockquote'; break;
-            case 'image': icon = 'ti ti-photo'; break;
-            case 'video': icon = 'ti ti-movie'; break;
-            case 'whiteboard': icon = 'ti ti-chalkboard'; break;
-        }
-
-        // 版本1.8.0，判断是否为标签从而覆盖icon，如果块有别名，但不在别名列表，则说明是标签，反之说明是别名块
-        if (block.aliases.length !== 0){
-            const blockAlias = block.aliases[0];
-            const blockId = block.id;
-            const aliasBlockIdList = (await orca.invokeBackend("get-aliased-blocks", blockAlias, 0, 99999))[1];
-            icon = aliasBlockIdList.includes(blockId) ? "ti ti-file" : "ti ti-hash"
-        }
-
-        return { name, icon };
-    } catch (error) {
-        console.error("[tabsman]标签页生成失败", error)
-        return { name: '标签页生成失败', icon: 'ti ti-cube' };
+    } else {
+        // 非可编辑文本块，如果存在caption，则显示caption作为name
+        const blockCap = blockRepr.value.cap
+        name = blockCap ? blockCap : `(${blockType})`
     }
+
+    // 生成图标
+    let icon = 'ti ti-cube';
+    switch (blockType) {
+        case 'heading':
+            const headingLevel = blockRepr.value.level
+            switch (headingLevel) {
+                case -1: icon = 'ti ti-heading'; break; 
+                case 1: icon = 'ti ti-h-1'; break;
+                case 2: icon = 'ti ti-h-2'; break;
+                case 3: icon = 'ti ti-h-3'; break;
+                case 4: icon = 'ti ti-h-4'; break;
+            }
+            break;
+        case 'ul': icon = 'ti ti-list'; break;
+        case 'ol': icon = 'ti ti-list-numbers'; break;
+        case 'task': icon = 'ti ti-checkbox'; break;
+        case 'code': icon = 'ti ti-code'; break;
+        case 'quote2': icon = 'ti ti-blockquote'; break;
+        case 'image': icon = 'ti ti-photo'; break;
+        case 'video': icon = 'ti ti-movie'; break;
+        case 'whiteboard': icon = 'ti ti-chalkboard'; break;
+    }
+
+    // 版本1.8.0，判断是否为标签从而覆盖icon，如果块有别名，但不在别名列表，则说明是标签，反之说明是别名块
+    if (block.aliases.length !== 0){
+        const blockAlias = block.aliases[0];
+        const blockId = block.id;
+        const aliasBlockIdList = (await orca.invokeBackend("get-aliased-blocks", blockAlias, 0, 99999))[1];
+        icon = aliasBlockIdList.includes(blockId) ? "ti ti-file" : "ti ti-hash"
+    }
+
+    return { name, icon, needRedirect };
 }
 
+
+/** 
+ * 插件内部的页面跳转时，通过该函数确保其tab有效（典型场景，目标块被删除）
+ * @param {Object} tab - 标签页对象
+ * @returns {Promise<boolean>} 返回当前currentBlockId是否有效的布尔值
+*/
+async function __handleTabValidStatus(tab) {
+    const {currentBlockId} = tab
+    const {name, icon, needRedirect} = await generateTabNameAndIcon(currentBlockId)
+    let historyItemAssign, tabAssign;
+
+    if (typeof currentBlockId === "number" && needRedirect) {
+        const date = new Date(name)
+        historyItemAssign = {icon, name, view: "journal", viewArgs: {date}}
+        tabAssign = {currentBlockId: date, name, currentIcon: icon}
+        const tabId = tab.id
+        const tabIndex = getOneSortedTabs(tab.panelId).findIndex((item) => item.id === tabId) + 1
+        orca.notify("info",`[tabsman] 第${tabIndex}个标签页重定向为今日日志，因为其目标块${currentBlockId}已被删除。`)
+    } else {
+        historyItemAssign = {icon, name}
+        tabAssign = {name, currentIcon: icon}    
+    }
+    Object.assign(tab.backStack.at(-1), historyItemAssign)
+    Object.assign(tab, tabAssign)
+}
+
+
 /**
- * 用于在虎鲸官方的api跳转页面时，更新当前活跃标签页的属性和显示（块ID、名称、图标）
+ * 插件外部页面跳转时，通过该函数更新tab信息（块ID、名称、图标、当前访问历史）。数据来源为当前页面的显示情况。
  * @returns {Promise<void>}
  */
-async function updateTabProperties() {
+async function __updateTabInfoByPage() {
     const activePanelId = orca.state.activePanel
     const activeTab = activeTabs[activePanelId];
     if (!activeTab) return;
     
-    const activePanel = orca.nav.findViewPanel(activePanelId, orca.state.panels);
-    const currentBlockId = getBlockIdByViewAndViewArgs(activePanel.view, activePanel.viewArgs)
-    activeTab.currentBlockId = currentBlockId;
-    
-    // 比对是否需要更新，避免不必要的UI刷新
+    const {id, view, viewArgs} = orca.nav.findViewPanel(activePanelId, orca.state.panels)
+    const currentBlockId = getBlockIdByViewAndViewArgs(view, viewArgs)
     const {name, icon} = await generateTabNameAndIcon(currentBlockId);
-    if (activeTab.name === name && activeTab.currentIcon === icon) return;
+    Object.assign(activeTab, {currentBlockId, name, currentIcon: icon})
 
-    activeTab.name = name;
-    activeTab.currentIcon = icon;
+    // 填充Tab当前访问记录
+    const historyItem = {icon, name, sourcePanelId: id, view, viewArgs}
+    // 添加到tab的历史记录，如果满了先移除最旧的
+    // 约束后退栈长度：如果达到最大值，先移除最早的第一条历史
+    if (activeTab.backStack.length >= HISTORY_CONFIG.MAX_BACK_STACK) activeTab.backStack.shift();
+    activeTab.backStack.push(historyItem);
+    activeTab.forwardStack.length = 0;
+
+    // 对于非官方视图，或者当前填充发生在置顶tab内（所以后退栈至少为2==>当前+新入），则pop本次填充，并新建一个tab跳转
+    if (!OFFICIAL_VIEW_LIST.includes(view) || (activeTab.isPinned && activeTab.backStack.length >= 2)) {
+        activeTab.backStack.pop()
+        const newTab = await createTab({ currentBlockId: blockId, panelId: activePanelId, initHistoryInfo: {view, viewArgs} });
+        activeTab.isActive = false
+        newTab.isActive = true
+        activeTabs[id] = newTab
+        newTab.lastAccessedTs = Date.now();
+        if (renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: newTab , previousTab: activeTab});
+    }
+
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: activeTab});
 }
 
@@ -408,49 +441,13 @@ function subscribePanelBackHistory() {
         // orca历史减少时（由关闭面板这一行为触发。虎鲸1.41版本新特性），不做处理。
         const currentLength = orca.state.panelBackHistory.length;
         if (currentLength < lastHistoryLength) return;
-        await fillCurrentAccess()
-
+        
         // 更新tab信息
-        await updateTabProperties()
+        await __updateTabInfoByPage()
         
         // 更新最后一次历史长度
         lastHistoryLength = currentLength;
     });
-}
-
-
-/**
- * 填充当前访问记录到当前面板的活跃标签页
- */
-async function fillCurrentAccess() {
-    const activePanelId = orca.state.activePanel
-    const activeTab = activeTabs[activePanelId];
-    if (!activeTab) return;
-    
-    const {id, view, viewArgs} = orca.nav.findViewPanel(activePanelId, orca.state.panels)
-    const blockId = getBlockIdByViewAndViewArgs(view, viewArgs)
-    const {name, icon} = await generateTabNameAndIcon(blockId)
-    // 创建历史item
-    const historyItem = {icon, name, sourcePanelId: id, view, viewArgs}
-
-    // 添加到tab的历史记录，如果满了先移除最旧的
-    // 约束后退栈长度：如果达到最大值，先移除最早的第一条历史
-    if (activeTab.backStack.length >= HISTORY_CONFIG.MAX_BACK_STACK) activeTab.backStack.shift()
-    activeTab.backStack.push(historyItem);
-    activeTab.forwardStack.length = 0
-
-    // 对于非官方视图，或者当前填充发生在置顶tab内（所以后退栈至少为2==>当前+新入），则pop本次填充，并新建一个tab跳转
-    if (!OFFICIAL_VIEW_LIST.includes(view) || (activeTab.isPinned && activeTab.backStack.length >= 2)) {
-        activeTab.backStack.pop()
-        const newTab = await createTab({ currentBlockId: blockId, panelId: activePanelId, initHistoryInfo: {view, viewArgs} });
-        newTab.isActive = true
-        newTab.lastAccessedTs = Date.now();
-        activeTab.isActive = false
-        activeTabs[id] = newTab
-        if (renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: newTab , previousTab: activeTab});
-    }
-    
-    // console.log(`[tabsman] 当前标签页 ${activeTab.id} 的访问记录已更新: 后退栈长度${activeTab.backStack.length}（包含当前访问）, 前进栈长度${activeTab.forwardStack.length}`);
 }
 
 
@@ -476,13 +473,11 @@ async function navigateTabBack(tab) {
     }
     tab.forwardStack.push(currentItem);
     
-    // 获取新的当前项
-    const newCurrent = tab.backStack[tab.backStack.length - 1];
-    
-    // 导航到新的当前项，并更新当前的tab信息
+    // 切换页面显示
+    __handleTabValidStatus(tab)
+    const newCurrent = tab.backStack.at(-1);
     orca.nav.replace(newCurrent.view, newCurrent.viewArgs, newCurrent.sourcePanelId);
-    await updateTabProperties()
-    
+    if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
 }
 
@@ -503,10 +498,10 @@ async function navigateTabForward(tab) {
     const item = tab.forwardStack.pop();
     tab.backStack.push(item);
     
-    // 导航到取出的项，并更新当前的tab信息
+    // 切换页面显示
+    __handleTabValidStatus(tab)
     orca.nav.replace(item.view, item.viewArgs, item.sourcePanelId);
-    await updateTabProperties()
-    
+    if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
 }
 
@@ -560,18 +555,15 @@ async function createTab({ currentBlockId, panelId = orca.state.activePanel, nee
     
     // 创建标签页对象并填充初始历史
     const tab = createTabObject(currentBlockId, panelId, "", "")
-    await __checkTabCurrentBlockId(tab)
-    const {name, icon} = await generateTabNameAndIcon(tab.currentBlockId);
-    tab.name = name
-    tab.currentIcon = icon
     // 填充初始历史，如果没有传入initHistoryInfo则不填充
     if (!initHistoryInfo) {
         orca.notify("error", "[tabsman] createTab函数缺少initHistoryInfo参数，已中断创建流程，请联系插件开发者修复此问题");
         return;
     }
     const {view, viewArgs} = initHistoryInfo
-    const historyItem = {icon, name, sourcePanelId: panelId, view, viewArgs}
+    const historyItem = {icon: "", name: "", sourcePanelId: panelId, view, viewArgs}
     tab.backStack.push(historyItem)
+    await __handleTabValidStatus(tab)
     
     // tab登记到core数据结构中
     tabs[tab.id] = tab;
@@ -613,8 +605,11 @@ async function switchTab(tabId, needRender = true) {
     // tab就是当前面板的当前tab，则无需其他处理
     if (currentTab === tab) return
 
-    // 更新旧tab信息
-    await updateTabProperties()
+    // 处理tab有效性
+    await __handleTabValidStatus(currentTab)
+    await __handleTabValidStatus(tab)
+    if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: currentTab});
+    if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
 
     // 重新标记活跃tab
     const {panelId} = tab
@@ -625,20 +620,13 @@ async function switchTab(tabId, needRender = true) {
     activeTabs[panelId] = tab
     
     if (panelId !== activePanelId) orca.nav.switchFocusTo(panelId);
-
-    // 使tab的目标id是确保有效的，如果无效了（被删除了），则重定向为今日日志
-    await __checkTabCurrentBlockId(tab)
-
-    // 切换tab
+    
+    // 切换tab选中样式
     if (needRender && renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: tab , previousTab: activeTab});
 
-    // 替换成新tab，并更新tab信息
+    // 切换页面显示
     const {view, viewArgs} = getViewAndViewArgsByTab(tab)
     orca.nav.replace(view, viewArgs, panelId)
-    await updateTabProperties()
-
-    // 目标tab从未打开过则填充一次当前历史
-    if (tab.backStack.length === 0) await fillCurrentAccess()
 }
 
 
@@ -979,7 +967,7 @@ async function openWorkspace(name = ""){
     // 清除旧的排序缓存
     sortedTabsByPanelId.clear()
     for (const tab of activeTabsValue) {
-        await __checkTabCurrentBlockId(tab)
+        await __handleTabValidStatus(tab)
 
         // 准备新面板
         const {view, viewArgs} = getViewAndViewArgsByTab(tab)
@@ -1546,17 +1534,12 @@ export {
     getAllSortedTabs,
     // 核心操作函数
     createTab,
-    createTabObject,
     deleteTab,
     switchTab,
     moveTabToPanel,
     // Pin功能函数
     pinTab,
     unpinTab,
-    // 排序缓存函数
-    updateSortedTabsCache,
-    // 标签页信息生成函数
-    generateTabNameAndIcon,
     // 标签页导航函数
     switchToNextTab,
     switchToPreviousTab,

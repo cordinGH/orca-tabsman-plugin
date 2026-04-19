@@ -99,7 +99,7 @@ function importTabToActivePanel(tabInput) {
 
 
 // 根据view和viewArgs获取tabsman所需的blockid
-function getBlockIdByViewAndViewArgs(view, viewArgs) {
+function __getBlockIdByViewAndViewArgs(view, viewArgs) {
     let blockId = ""
     switch (view) {
         case "journal": blockId = viewArgs.date; break;
@@ -111,7 +111,7 @@ function getBlockIdByViewAndViewArgs(view, viewArgs) {
 }
 
 // 获取tab当前的view和viewArgs
-function getViewAndViewArgsByTab(tab) {
+function __getViewAndViewArgsByTab(tab) {
     const {currentBlockId, backStack} = tab
     let view = ""
     let viewArgs = null
@@ -165,8 +165,8 @@ async function createTabsForInitialPanels() {
  * @param {string} blockId - 块ID
  * @returns {Promise<{name: string, icon: string, needRedirect: boolean}>} 返回包含名称和图标的对象，以及是否重定向
  */
-async function generateTabNameAndIcon(blockId) {
-    if (!blockId) return orca.notify("error", "[tabsman] generateTabNameAndIcon未传入参数，已中断执行流程，请联系插件开发者修复此问题")
+async function __generateTabNameAndIcon(blockId) {
+    if (!blockId) return orca.notify("error", "[tabsman] __generateTabNameAndIcon未传入参数，已中断执行流程，请联系插件开发者修复此问题")
 
     let needRedirect = false;
     // journal视图
@@ -267,7 +267,7 @@ async function generateTabNameAndIcon(blockId) {
 */
 async function __handleTabValidStatus(tab) {
     const {currentBlockId} = tab
-    const {name, icon, needRedirect} = await generateTabNameAndIcon(currentBlockId)
+    const {name, icon, needRedirect} = await __generateTabNameAndIcon(currentBlockId)
     let historyItemAssign, tabAssign;
 
     if (typeof currentBlockId === "number" && needRedirect) {
@@ -296,8 +296,8 @@ async function __updateTabInfoByPage() {
     if (!activeTab) return;
     
     const {id, view, viewArgs} = orca.nav.findViewPanel(activePanelId, orca.state.panels)
-    const currentBlockId = getBlockIdByViewAndViewArgs(view, viewArgs)
-    const {name, icon} = await generateTabNameAndIcon(currentBlockId);
+    const currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
+    const {name, icon} = await __generateTabNameAndIcon(currentBlockId);
     Object.assign(activeTab, {currentBlockId, name, currentIcon: icon})
 
     // 填充Tab当前访问记录
@@ -522,7 +522,7 @@ async function createTabForNewPanel(panelId, needRender = true) {
     orca.nav.switchFocusTo(panelId);
 
     const {view, viewArgs} = panel
-    const currentBlockId = getBlockIdByViewAndViewArgs(view, viewArgs)
+    const currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
     const tab = await createTab({ currentBlockId, panelId, needRender, initHistoryInfo: {view, viewArgs} });
     return tab
 }
@@ -625,7 +625,7 @@ async function switchTab(tabId, needRender = true) {
     if (needRender && renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: tab , previousTab: activeTab});
 
     // 切换页面显示
-    const {view, viewArgs} = getViewAndViewArgsByTab(tab)
+    const {view, viewArgs} = __getViewAndViewArgsByTab(tab)
     orca.nav.replace(view, viewArgs, panelId)
 }
 
@@ -970,7 +970,7 @@ async function openWorkspace(name = ""){
         await __handleTabValidStatus(tab)
 
         // 准备新面板
-        const {view, viewArgs} = getViewAndViewArgsByTab(tab)
+        const {view, viewArgs} = __getViewAndViewArgsByTab(tab)
         const viewpanel = { view, viewArgs, viewState: {} }
         const newPanelId = navOriginals.method.addTo.call(navOriginals.thisValue, orca.state.activePanel, "left", viewpanel)
         newPanelIds.push(newPanelId)
@@ -1322,7 +1322,7 @@ function setupNavWrappers() {
         // 处理Ctrl+Click（未按shift）：创建后台标签页
         if (window.event?.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
             // 根据视图类型确定目标内容ID
-            const targetBlockId = getBlockIdByViewAndViewArgs(view, viewArgs);
+            const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
             createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
             .then(() => orca.notify("success", "[tabsman] 已创建后台标签页"))
 
@@ -1344,7 +1344,7 @@ function setupNavWrappers() {
     orca.nav.openInLastPanel = function(view, viewArgs) {
         // 处理 Ctrl+Shift+Click：创建前台标签页
         if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
-            const targetBlockId = getBlockIdByViewAndViewArgs(view, viewArgs);
+            const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
             // 取当前UI上的activePanelId
             const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
             const tabPromise  = createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })

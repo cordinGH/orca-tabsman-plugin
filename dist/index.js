@@ -8,8 +8,6 @@ import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
 
-import { updatePersistedTabData } from "./tabsman-persistence.js";
-
 let pluginName;
 
 // 取消订阅

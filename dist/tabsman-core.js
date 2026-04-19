@@ -1016,6 +1016,16 @@ async function openWorkspace(name = ""){
 
 /* ———————————————————————————————————————————— 明细业务功能 —————————————————————————————————————————————————————— */
 
+
+// 最近关闭命令接口
+async function reopenClosedTabsInOrder() {
+    const recentlyClosedTabs = TabsmanPersistence.getTabArray("recently-closed")
+    const tab = recentlyClosedTabs.shift()
+    importTabToActivePanel(tab)
+    if (renderTabsCallback) await renderTabsCallback({type:"create", currentTab: tab});
+    await switchTab(tab.id)
+}
+
 // 创建今日日志Tab
 async function createTodayJournalTab(panelId) {
     if (!panelId) orca.notify("error", "[tabsman] createQuickNoteTab函数缺少panelId参数，已中断创建流程，请联系插件开发者修复此问题");
@@ -1445,6 +1455,7 @@ async function start(callback = null, pluginName) {
     window.pluginTabsman.exitWS = exitWorkspace
     window.pluginTabsman.createQuickNoteTab = createQuickNoteTab
     window.pluginTabsman.createTodayJournalTab = createTodayJournalTab
+    window.pluginTabsman.reopenClosedTabsInOrder = reopenClosedTabsInOrder
 
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点

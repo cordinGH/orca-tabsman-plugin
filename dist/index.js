@@ -105,6 +105,13 @@ function registerTabsmanCommand(){
                 window.pluginTabsman.createQuickNoteTab(activePanel.dataset.tabsmanPanelId)
             },
             description: '[tabsman] 在今日日志中快速记录（聚焦打开新Tab）'
+        },
+        {
+            name: 'tabsman.reopenClosedTabsInOrder',
+            fn() {
+                window.pluginTabsman.reopenClosedTabsInOrder()
+            },
+            description: '[tabsman] 重新打开刚才关闭的标签页（按照关闭顺序）'
         }
     ]
 

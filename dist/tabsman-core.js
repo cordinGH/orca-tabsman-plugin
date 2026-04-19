@@ -1017,7 +1017,7 @@ async function openWorkspace(name = ""){
 /* ———————————————————————————————————————————— 明细业务功能 —————————————————————————————————————————————————————— */
 
 
-// 最近关闭命令接口
+// 重新打开最近关闭的标签页（不对持久化关闭栈做清理，方便下次接着用）
 async function reopenClosedTabsInOrder() {
     const recentlyClosedTabs = TabsmanPersistence.getTabArray("recently-closed")
     const tab = recentlyClosedTabs.shift()

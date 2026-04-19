@@ -267,7 +267,7 @@ async function __generateTabNameAndIcon(blockId) {
 */
 async function __handleTabValidStatus(tab) {
     const {currentBlockId} = tab
-    const {name, icon, needRedirect} = await __generateTabNameAndIcon(currentBlockId)
+    const {name, icon, needRedirect} = await __generateTabNameAndIcon(currentBlockId);
     let historyItemAssign, tabAssign;
 
     if (typeof currentBlockId === "number" && needRedirect) {
@@ -474,9 +474,11 @@ async function navigateTabBack(tab) {
     tab.forwardStack.push(currentItem);
     
     // 切换页面显示
-    __handleTabValidStatus(tab)
-    const newCurrent = tab.backStack.at(-1);
-    orca.nav.replace(newCurrent.view, newCurrent.viewArgs, newCurrent.sourcePanelId);
+    const target = tab.backStack.at(-1)
+    const {view, viewArgs} = target;
+    tab.currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
+    await __handleTabValidStatus(tab)
+    orca.nav.replace(target.view, target.viewArgs, target.sourcePanelId);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
 }
@@ -499,8 +501,11 @@ async function navigateTabForward(tab) {
     tab.backStack.push(item);
     
     // 切换页面显示
-    __handleTabValidStatus(tab)
-    orca.nav.replace(item.view, item.viewArgs, item.sourcePanelId);
+    const target = tab.backStack.at(-1)
+    const {view, viewArgs} = target;
+    tab.currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
+    await __handleTabValidStatus(tab)
+    orca.nav.replace(target.view, target.viewArgs, target.sourcePanelId);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
 }

@@ -99,7 +99,7 @@ function startRecentlyClosed(renderTabsByPanel) {
                                                 orca.notify("warn", "已经删除成功，无需再次删除");
                                                 return;
                                             }
-                                            await TabsmanPersistence.removeAndSaveTab(tab.id, "recently-closed");
+                                            await TabsmanPersistence.removeAndSaveTab(tab, "recently-closed");
                                         }
                                     })]
                                 ),

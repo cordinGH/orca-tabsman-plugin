@@ -298,28 +298,22 @@ async function __updateTabInfoByPage() {
     const {id, view, viewArgs} = orca.nav.findViewPanel(activePanelId, orca.state.panels)
     const currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
     const {name, icon} = await __generateTabNameAndIcon(currentBlockId);
-    Object.assign(activeTab, {currentBlockId, name, currentIcon: icon})
-
-    // 填充Tab当前访问记录
-    const historyItem = {icon, name, sourcePanelId: id, view, viewArgs}
-    // 添加到tab的历史记录，如果满了先移除最旧的
-    // 约束后退栈长度：如果达到最大值，先移除最早的第一条历史
-    if (activeTab.backStack.length >= HISTORY_CONFIG.MAX_BACK_STACK) activeTab.backStack.shift();
-    activeTab.backStack.push(historyItem);
-    activeTab.forwardStack.length = 0;
-
-    // 对于非官方视图，或者当前填充发生在置顶tab内（所以后退栈至少为2==>当前+新入），则pop本次填充，并新建一个tab跳转
+    // 对于非官方视图，或者当前填充发生在置顶tab内（所以后退栈至少为2==>当前+新入），新建一个tab跳转
     if (!OFFICIAL_VIEW_LIST.includes(view) || (activeTab.isPinned && activeTab.backStack.length >= 2)) {
-        activeTab.backStack.pop()
-        const newTab = await createTab({ currentBlockId: blockId, panelId: activePanelId, initHistoryInfo: {view, viewArgs} });
-        activeTab.isActive = false
-        newTab.isActive = true
-        activeTabs[id] = newTab
-        newTab.lastAccessedTs = Date.now();
-        if (renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: newTab , previousTab: activeTab});
+        const newTab = await createTab({ currentBlockId, panelId: activePanelId, initHistoryInfo: {view, viewArgs} });
+        await switchTab(newTab.id);
+    } else {
+        // 更新 当前显示
+        Object.assign(activeTab, {currentBlockId, name, currentIcon: icon})
+        // 填充Tab当前访问记录
+        const historyItem = {icon, name, sourcePanelId: id, view, viewArgs}
+        // 添加到tab的历史记录，如果满了先移除最旧的
+        // 约束后退栈长度：如果达到最大值，先移除最早的第一条历史
+        if (activeTab.backStack.length >= HISTORY_CONFIG.MAX_BACK_STACK) activeTab.backStack.shift();
+        activeTab.backStack.push(historyItem);
+        activeTab.forwardStack.length = 0;
+        await renderTabsCallback({type: "update", currentTab: activeTab});
     }
-
-    if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: activeTab});
 }
 
 /**

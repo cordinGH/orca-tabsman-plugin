@@ -1125,6 +1125,11 @@ async function reopenClosedTabsInOrder() {
     commandDoing = true
 
     const recentlyClosedTabs = TabsmanPersistence.getTabArray("recently-closed")
+    if (recentlyClosedTabs.length === 0) {
+        orca.notify("info","[tabsman] 最近关闭的标签页已还原完毕（最大支持5条）")
+        commandDoing = false;
+        return
+    }
     const tab = recentlyClosedTabs.shift()
     importTabToActivePanel(tab)
     if (renderTabsCallback) await renderTabsCallback({type:"create", currentTab: tab});

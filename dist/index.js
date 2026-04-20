@@ -57,28 +57,22 @@ function registerTabsmanCommand(){
 
     commands = [
         {
-            name: "tabsman.goToNextTab",
-            async fn() {
-                const success = await switchToNextTab();
-                if (success) orca.notify("success", "[tabsman] 已切换到下一个标签页")   
-            },
-            description: '[tabsman] Go to next tab'
+            name: "tabsman.switchToNextTab",
+            fn: switchToNextTab,
+            description: '[tabsman] 切换到上一个标签页'
         },
         {
-            name: "tabsman.goToPreviousTab",
-            async fn() {
-                const success = await switchToPreviousTab();
-                if (success) orca.notify("success", "[tabsman] 已切换到上一个标签页")   
-            },
-            description: '[tabsman] Go to previous tab'
+            name: "tabsman.switchToPreviousTab",
+            fn: switchToPreviousTab(),
+            description: '[tabsman] 切换到下一个标签页'
         },
         {
-            name: 'tabsman.goToPreviousActiveTab',
+            name: 'tabsman.switchPreviousActiveTab',
             async fn() {
                 const success = await switchPreviousActiveTab(orca.state.activePanel)
-                if (!success) orca.notify("error", "[tabsman] switchPreviousActiveTab执行失败")   
+                if (!success) orca.notify("info", "[tabsman] 当前还没有访问过其他标签页")   
             },
-            description: '[tabsman] Go to previous active tab'
+            description: '[tabsman] 切换到上一次访问的标签页'
         },
         {
             name: 'tabsman.toggleSidebarTabsman',
@@ -108,9 +102,7 @@ function registerTabsmanCommand(){
         },
         {
             name: 'tabsman.reopenClosedTabsInOrder',
-            fn() {
-                window.pluginTabsman.reopenClosedTabsInOrder()
-            },
+            fn: window.pluginTabsman.reopenClosedTabsInOrder(),
             description: '[tabsman] 重新打开刚才关闭的标签页（按照关闭顺序）'
         }
     ]

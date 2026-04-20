@@ -245,10 +245,11 @@ function __renderClosePanel(panelId) {
 function __renderCreate(tab) {
     const {id, panelId} = tab
     let panelGroup = allPanelGroupEle[panelId]
+    
+    // 该case是在第一次创建面板时构建初始tab。也因此panelTabs期望长度应当是1
     if (!panelGroup) {
         const panelTabs = TabsmanCore.getOneSortedTabs(panelId)
 
-        // 该case是在第一次创建面板时构建初始tab，因此panelTabs期望长度应当是1
         if (panelTabs.length !== 1) {
             orca.notify("info", "[tabsman] __renderCreate期望值为1，请检查逻辑是否有误")
             return
@@ -266,7 +267,6 @@ function __renderCreate(tab) {
         const tabElement = createTabElement(tab, panelId, panelGroup);
         allTabEle[tab.id] = tabElement;
         tabElement.element.classList.add('active-tab-item');
-        
         return
     }
 
@@ -305,7 +305,7 @@ function _renderOnePanelGroup(panelId, panelTabs) {
     return panelGroup
 }
 
-// update更新单个标签页（活跃标签页），轻量渲染
+// update更新单个标签页，轻量渲染
 // currentTab => 需要被处理的标签页
 function __renderUpdate (tab) {
     const {id, panelId} = tab
@@ -316,7 +316,8 @@ function __renderUpdate (tab) {
     const newTab = createTabElement(tab, panelId, panelGroupEle)
     const newTabElement = newTab.element
 
-    newTabElement.classList.add('active-tab-item');
+    tabElement.classList.contains('active-tab-item') && newTabElement.classList.add('active-tab-item');
+
     allTabEle[id] = newTab
     tabElement.replaceWith(newTabElement)
     tabElement.remove()

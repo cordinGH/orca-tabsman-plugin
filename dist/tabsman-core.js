@@ -1142,7 +1142,7 @@ async function reopenClosedTabsInOrder() {
     }
     const tab = recentlyClosedTabs.shift()
     importTabToActivePanel(tab)
-    if (renderTabsCallback) await renderTabsCallback({type:"create", currentTab: tab});
+    if (renderTabsCallback) await renderTabsCallback({type:"OnPanel", panelId: tab.panelId});
     await switchTab(tab.id)
 
     commandDoing = false;

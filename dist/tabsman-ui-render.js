@@ -208,6 +208,7 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
             __renderSwitch(currentTab, previousTab);break;
         case "update":
             __renderUpdate(currentTab);break;
+        case "OnPanel":
         case "pin":
             __renderPin(panelId);break;
         case "create":

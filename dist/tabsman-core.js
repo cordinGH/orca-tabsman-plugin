@@ -65,6 +65,9 @@ let lastQuickNoteBlockId = null;
 /** @type {string} 快速笔记前缀字符串 */
 let prefixString = "date"
 
+/** @type {boolean} 标记当前正存在该插件命令在执行 */
+let commandDoing = false
+
 // ==================== 全局数据存储 ====================
 
 /** @type {Object} 所有标签页的主存储 {tabId: tab} */
@@ -629,38 +632,27 @@ async function switchTab(tabId, needRender = true) {
 }
 
 
-/** 
- * 返回上一次的activeTab，如果最后的lastAccessedTs == 0，则中止切换。
- * @param {string} panelId - 面板ID
- * @param {boolean}  needRender - 是否需要渲染UI，false则不会渲染，这一般是其他函数借用该函数来切换到上一个活跃tab。
-*/
-async function switchPreviousActiveTab(panelId, needRender = true) {
-    let previewActiveTab;
-    for (const tab of getOneSortedTabs(panelId)) {
-        if (tab.isActive) continue
-        const isNewestActiveTab = !previewActiveTab || tab.lastAccessedTs > previewActiveTab.lastAccessedTs
-        if (isNewestActiveTab) previewActiveTab = tab
-    }
-    if (previewActiveTab.lastAccessedTs === 0) return false
-    await switchTab(previewActiveTab.id, needRender)
-    return true
-}
-
-
 /**
  * 删除标签页
  * @param {string} tabId - 标签页ID
  * @returns {Promise<void>}
  */
 async function deleteTab(tabId) {
+    if (commandDoing) return
+    commandDoing = true
+
     const tab = tabs[tabId];
 
     // 不存在tab
-    if (!tab) return
+    if (!tab) {
+        commandDoing = false;
+        return
+    }
 
     // 整个只有唯一tab，不允许删除
     if (Object.getOwnPropertyNames(tabs).length === 1) {
         orca.notify("warn", "[tabsman] 系统中只有一个标签页，无法删除");
+        commandDoing = false;
         return
     }
 
@@ -682,6 +674,8 @@ async function deleteTab(tabId) {
         tabIdSetByPanelId.delete(panelId)
         delete activeTabs[panelId]
         sortedTabsByPanelId.delete(panelId)
+        
+        commandDoing = false;
         return
     }
 
@@ -692,7 +686,9 @@ async function deleteTab(tabId) {
     delete tabs[tabId]
     tabIdSet.delete(tabId)
     updateSortedTabsCache(panelId)
-    if (renderTabsCallback) await renderTabsCallback({type: "delete", currentTab: activeTabs[panelId], previousTab: tab})
+    if (renderTabsCallback) await renderTabsCallback({type: "delete", currentTab: activeTabs[panelId], previousTab: tab});
+    
+    commandDoing = false;
 }
 
 
@@ -1014,31 +1010,150 @@ async function openWorkspace(name = ""){
     setTimeout(() => workspaceSwitching = false, 0);
 }
 
-/* ———————————————————————————————————————————— 明细业务功能 —————————————————————————————————————————————————————— */
+/* —————————————————————————————————————— 插件注册的命令接口（串行执行命令，防止长按导致数据不一致） ———————————————————————————————————————————— */
+
+/**
+ * 切换到下一个标签页
+ * @returns {Promise<boolean>} 返回是否切换成功
+ */
+async function switchToNextTab() {
+    if (commandDoing) return
+    commandDoing = true
+
+    const activePanelId = orca.state.activePanel;
+
+    const panelTabs = getOneSortedTabs(activePanelId);
+    if (panelTabs.length <= 1) {
+        orca.notify("info", "[tabsman] 当前面板只有一个标签页");
+        commandDoing = false;
+        return false;
+    }
+    
+    const activeTab = activeTabs[activePanelId];
+    if (!activeTab) {
+        orca.notify("warn", "[tabsman] 无法获取当前活跃标签页");
+        commandDoing = false;
+        return false;
+    }
+    
+    // 找到当前标签页在列表中的位置
+    const currentIndex = panelTabs.findIndex(tab => tab.id === activeTab.id);
+    if (currentIndex === -1) {
+        orca.notify("warn", "[tabsman] 当前标签页不在列表中");
+        commandDoing = false;
+        return false;
+    }
+    
+    // 计算下一个标签页的索引（循环到第一个）
+    const nextIndex = (currentIndex + 1) % panelTabs.length;
+    const nextTab = panelTabs[nextIndex];
+    
+    commandDoing = false;
+    return await switchTab(nextTab.id);
+}
+
+/**
+ * 切换到上一个标签页
+ * @returns {Promise<boolean>} 返回是否切换成功
+ */
+async function switchToPreviousTab() {
+    if (commandDoing) return
+    commandDoing = true
+
+    const activePanelId = orca.state.activePanel;
+    
+    const panelTabs = getOneSortedTabs(activePanelId);
+    if (panelTabs.length <= 1) {
+        orca.notify("info", "[tabsman] 当前面板只有一个标签页");
+        commandDoing = false;
+        return false;
+    }
+    
+    const activeTab = activeTabs[activePanelId];
+    if (!activeTab) {
+        orca.notify("warn", "[tabsman] 无法获取当前活跃标签页");
+        commandDoing = false;
+        return false;
+    }
+    
+    // 找到当前标签页在列表中的位置
+    const currentIndex = panelTabs.findIndex(tab => tab.id === activeTab.id);
+    if (currentIndex === -1) {
+        orca.notify("warn", "[tabsman] 当前标签页不在列表中");
+        commandDoing = false;
+        return false;
+    }
+    
+    // 计算上一个标签页的索引（循环到最后一个）
+    const prevIndex = currentIndex === 0 ? panelTabs.length - 1 : currentIndex - 1;
+    const prevTab = panelTabs[prevIndex];
+
+    commandDoing = false;
+    return await switchTab(prevTab.id);
+}
+
+
+/** 
+ * 返回上一次的activeTab，如果最后的lastAccessedTs == 0，则中止切换。
+ * @param {string} panelId - 面板ID
+ * @param {boolean}  needRender - 是否需要渲染UI，false则不会渲染，这一般是其他函数借用该函数来切换到上一个活跃tab。
+*/
+async function switchPreviousActiveTab(panelId, needRender = true) {
+    if (commandDoing) return
+    commandDoing = true
+
+    let previewActiveTab;
+    for (const tab of getOneSortedTabs(panelId)) {
+        if (tab.isActive) continue
+        const isNewestActiveTab = !previewActiveTab || tab.lastAccessedTs > previewActiveTab.lastAccessedTs
+        if (isNewestActiveTab) previewActiveTab = tab
+    }
+    if (previewActiveTab.lastAccessedTs === 0) {
+        commandDoing = false;
+        return false
+    }
+    await switchTab(previewActiveTab.id, needRender)
+
+    commandDoing = false;
+    return true
+}
 
 
 // 重新打开最近关闭的标签页（不对持久化关闭栈做清理，方便下次接着用）
 async function reopenClosedTabsInOrder() {
+    if (commandDoing) return
+    commandDoing = true
+
     const recentlyClosedTabs = TabsmanPersistence.getTabArray("recently-closed")
     const tab = recentlyClosedTabs.shift()
     importTabToActivePanel(tab)
     if (renderTabsCallback) await renderTabsCallback({type:"create", currentTab: tab});
     await switchTab(tab.id)
+
+    commandDoing = false;
 }
 
 // 创建今日日志Tab
 async function createTodayJournalTab(panelId) {
+    if (commandDoing) return
+    commandDoing = true
+
     if (!panelId) orca.notify("error", "[tabsman] createQuickNoteTab函数缺少panelId参数，已中断创建流程，请联系插件开发者修复此问题");
     const today = new Date(new Date().toDateString());
     const initHistoryInfo = {view: "journal", viewArgs: {date: today}};
     const newTab = await createTab({currentBlockId: today, panelId, initHistoryInfo})
     await switchTab(newTab.id)
+
+    commandDoing = false;
 }
 
 // 创建快速记录Tab
 async function createQuickNoteTab(panelId) {
+    if (commandDoing) return
+    commandDoing = true
+
     if (!panelId) orca.notify("error", "[tabsman] createQuickNoteTab函数缺少panelId参数，已中断创建流程，请联系插件开发者修复此问题");
-    const {quickNoteBlockId, isNewBlock} = await getQuickNoteBlockId()
+    const {quickNoteBlockId, isNewBlock} = await __getQuickNoteBlockId()
     if (!isNewBlock) orca.notify("info", "[tabsman] 日志末尾已存在空块，直接使用");
     const newTab = await createTab({currentBlockId: quickNoteBlockId, panelId, initHistoryInfo: {view: "block", viewArgs: {blockId: quickNoteBlockId}}})
     await switchTab(newTab.id)
@@ -1075,6 +1190,7 @@ async function createQuickNoteTab(panelId) {
 
     // 保存快速记录块id，以便下次创建快速记录时进行自动折叠处理（根据用户设置决定是否启用自动折叠）
     lastQuickNoteBlockId = quickNoteBlockId;
+    commandDoing = false
 }
 
 
@@ -1103,7 +1219,7 @@ function __getCursorData(quickNoteBlockId, panelId) {
 
 
 // 在今日日志末尾获取一个空块id（若连续2个空块，则不新建，直接采用最后一个）
-async function getQuickNoteBlockId(){
+async function __getQuickNoteBlockId(){
     const todayDate = new Date()
     const today = await orca.invokeBackend("get-journal-block", todayDate)
     const todayChildren = today.children
@@ -1118,7 +1234,8 @@ async function getQuickNoteBlockId(){
         // last空块检查
         const lastChildrenId = todayChildren[todayChildrenLen - 1]
         const lastBlock = await orca.invokeBackend("get-block", lastChildrenId)
-        const isEmptyTextBlock = lastBlock.text === null && lastBlock.properties.find(p => p.name === '_repr').value.type === "text"
+        const iswhiteSpace = lastBlock.text === null || lastBlock.text.trim() == false;
+        const isEmptyTextBlock = iswhiteSpace && lastBlock.properties.find(p => p.name === '_repr').value.type === "text"
 
         if (!isEmptyTextBlock) {
             newBlockNumber = 2
@@ -1129,7 +1246,8 @@ async function getQuickNoteBlockId(){
             // 倒数第二个空块检查
             const last2ChildrenId = todayChildren[todayChildrenLen - 2]
             const last2Block = await orca.invokeBackend("get-block", last2ChildrenId)
-            const isEmptyTextBlock = last2Block.text === null && last2Block.properties.find(p => p.name === '_repr').value.type === "text"
+            const iswhiteSpace = last2Block.text === null || last2Block.text.trim() == false;
+            const isEmptyTextBlock = iswhiteSpace && last2Block.properties.find(p => p.name === '_repr').value.type === "text"
             
             if (isEmptyTextBlock) {
                 newBlockNumber = 0
@@ -1157,76 +1275,6 @@ async function getQuickNoteBlockId(){
 }
 
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
-
-
-
-/**
- * 切换到下一个标签页
- * @returns {Promise<boolean>} 返回是否切换成功
- */
-async function switchToNextTab() {
-    const activePanelId = orca.state.activePanel;
-
-    const panelTabs = getOneSortedTabs(activePanelId);
-    if (panelTabs.length <= 1) {
-        orca.notify("info", "[tabsman] 当前面板只有一个标签页");
-        return false;
-    }
-    
-    const activeTab = activeTabs[activePanelId];
-    if (!activeTab) {
-        orca.notify("warn", "[tabsman] 无法获取当前活跃标签页");
-        return false;
-    }
-    
-    // 找到当前标签页在列表中的位置
-    const currentIndex = panelTabs.findIndex(tab => tab.id === activeTab.id);
-    if (currentIndex === -1) {
-        orca.notify("warn", "[tabsman] 当前标签页不在列表中");
-        return false;
-    }
-    
-    // 计算下一个标签页的索引（循环到第一个）
-    const nextIndex = (currentIndex + 1) % panelTabs.length;
-    const nextTab = panelTabs[nextIndex];
-    
-    return switchTab(nextTab.id);
-}
-
-/**
- * 切换到上一个标签页
- * @returns {Promise<boolean>} 返回是否切换成功
- */
-async function switchToPreviousTab() {
-    const activePanelId = orca.state.activePanel;
-    
-    const panelTabs = getOneSortedTabs(activePanelId);
-    if (panelTabs.length <= 1) {
-        orca.notify("info", "[tabsman] 当前面板只有一个标签页");
-        return false;
-    }
-    
-    const activeTab = activeTabs[activePanelId];
-    if (!activeTab) {
-        orca.notify("warn", "[tabsman] 无法获取当前活跃标签页");
-        return false;
-    }
-    
-    // 找到当前标签页在列表中的位置
-    const currentIndex = panelTabs.findIndex(tab => tab.id === activeTab.id);
-    if (currentIndex === -1) {
-        orca.notify("warn", "[tabsman] 当前标签页不在列表中");
-        return false;
-    }
-    
-    // 计算上一个标签页的索引（循环到最后一个）
-    const prevIndex = currentIndex === 0 ? panelTabs.length - 1 : currentIndex - 1;
-    const prevTab = panelTabs[prevIndex];
-
-    return switchTab(prevTab.id);
-}
-
-
 
 
 // ==================== 命令拦截 ====================

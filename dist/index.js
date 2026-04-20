@@ -63,7 +63,7 @@ function registerTabsmanCommand(){
         },
         {
             name: "tabsman.switchToPreviousTab",
-            fn: switchToPreviousTab(),
+            fn: switchToPreviousTab,
             description: '[tabsman] 切换到下一个标签页'
         },
         {
@@ -93,6 +93,14 @@ function registerTabsmanCommand(){
             description: '[tabsman] 开启/关闭显示侧边Tabs栏'
         },
         {
+            name: 'tabsman.createTodayJournalTab',
+            fn () {
+                const activePanel = document.querySelector('.plugin-tabsman-panel-group-active');
+                window.pluginTabsman.createTodayJournalTab(activePanel.dataset.tabsmanPanelId)
+            },
+            description: '[tabsman] 在新标签页打开今日日志'
+        },
+        {
             name: 'tabsman.quickNoteByFoucs',
             fn () {
                 const activePanel = document.querySelector('.plugin-tabsman-panel-group-active');
@@ -102,7 +110,7 @@ function registerTabsmanCommand(){
         },
         {
             name: 'tabsman.reopenClosedTabsInOrder',
-            fn: window.pluginTabsman.reopenClosedTabsInOrder(),
+            fn: window.pluginTabsman.reopenClosedTabsInOrder,
             description: '[tabsman] 重新打开刚才关闭的标签页（按照关闭顺序）'
         }
     ]

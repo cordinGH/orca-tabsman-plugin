@@ -62,6 +62,7 @@ async function addAndSaveTab(tab, tabType = "") {
             if (recentlyClosedTabArray.length >= CONFIG.MAX_RECENTLY_CLOSED_TABS) {
                 recentlyClosedTabArray.pop();
             }
+            tab.isActive = false;
             recentlyClosedTabArray.unshift(tab);
             break;
         }

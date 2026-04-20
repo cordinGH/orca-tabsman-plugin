@@ -91,12 +91,22 @@ let sortedTabsByPanelId = new Map();
 function importTabToActivePanel(tabInput) {
     const panelId = orca.state.activePanel
     const tabArrary = Array.isArray(tabInput) ? tabInput : [tabInput];
+
+    const updateHistoryPanelId = (stack, panelId) => {        
+        if (stack.length === 0) return
+        for (const historyItem of stack) historyItem.sourcePanelId = panelId;
+    }
+
     for (const tab of tabArrary) {
         tab.panelId = panelId;
         tab.isActive = false;
+        const {backStack, forwardStack} = tab
+        updateHistoryPanelId(backStack, panelId)
+        updateHistoryPanelId(forwardStack, panelId)
         tabs[tab.id] = tab;
         tabIdSetByPanelId.get(panelId).add(tab.id)
     }
+
     updateSortedTabsCache(panelId);
 }
 

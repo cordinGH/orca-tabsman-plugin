@@ -385,8 +385,8 @@ function updateSortedTabsCache(panelId) {
     // 获取所有标签页并按优先级排序
     const panelTabs = Array.from(tabIdSet).map(tabId => tabs[tabId]).sort((a, b) => {
             // 负数说明a索引更小更靠前，正数说明b索引更小更靠前
-            // 返回pinOrder差值，越晚置顶的索引越靠前，越靠近顶部。
-            if (a.isPinned && b.isPinned) return b.pinTs - a.pinTs;
+            // 返回pinOrder差值，越晚置顶的索引越靠后，越靠近底部。
+            if (a.isPinned && b.isPinned) return  a.pinTs - b.pinTs;
             
             // 置顶的标签页排在前面
             if (a.isPinned && !b.isPinned) return -1;

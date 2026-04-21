@@ -169,9 +169,11 @@ async function restoreTabs(rawTabArray, tabType) {
             TabsmanCore.importTabToActivePanel(pinnedTabArray);
             return pinnedTabArray;
         case "recently-closed":
+            for (const tab of tabArray) await TabsmanCore.__handleTabValidStatus(tab);
             recentlyClosedTabArray = tabArray;
             return recentlyClosedTabArray;
         case "favorite":
+            for (const tab of tabArray) await TabsmanCore.__handleTabValidStatus(tab);
             favoriteTabArray = tabArray;
             return favoriteTabArray;
     }

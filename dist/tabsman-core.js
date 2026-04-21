@@ -1635,5 +1635,7 @@ export {
     switchToPreviousTab,
     switchPreviousActiveTab,
     // 外部API，外部使用它导入tab进Core数据结构
-    importTabToActivePanel
+    importTabToActivePanel,
+    // 持久化模块需要用该函数处理tab的有效性
+    __handleTabValidStatus
 };

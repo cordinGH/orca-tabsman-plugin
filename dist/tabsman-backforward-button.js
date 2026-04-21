@@ -12,6 +12,74 @@ const closePopupwithAnimation = window.pluginTabsman.closePopupwithAnimation
 
 // 历史菜单
 let backForwardMenu = null
+
+// ———————————————————————————————————————————————————————Tooltip———————————————————————————————————————————————————————
+
+let tooltipPopup = null;
+
+/**
+ * 获取当前 activePanel 对应活跃 tab 的历史栈信息
+ * @param {'back'|'forward'} stackType
+ * @returns {{ count: number }}
+ */
+function getHistoryCount(stackType) {
+    const activeTabs = TabsmanCore.getActiveTabs();
+    const tab = activeTabs?.[orca.state.activePanel];
+    if (!tab) return { count: 0 };
+
+    if (stackType === 'back') {
+        // backStack 长度 - 1，因为栈顶是当前访问
+        return { count: Math.max(0, tab.backStack.length - 1) };
+    } else {
+        return { count: tab.forwardStack.length };
+    }
+}
+
+/**
+ * 显示 tooltip
+ * @param {HTMLElement} buttonEle - 触发的按钮元素
+ * @param {'back'|'forward'} stackType
+ */
+function showTooltip(buttonEle, stackType) {
+    hideTooltip();
+
+    const { count } = getHistoryCount(stackType);
+    const text = `右键查看历史 | 当前${count}`;
+
+    // 复用或新建 tooltip popup
+    if (!tooltipPopup) {
+        tooltipPopup = document.createElement('div');
+        tooltipPopup.setAttribute('contenteditable', 'false');
+        tooltipPopup.className = 'orca-popup plugin-tabsman-history-tooltip-popup';
+        Object.assign(tooltipPopup.style, {
+            zIndex: '499',
+            transformOrigin: 'center top',
+            pointerEvents: 'none',
+        });
+
+        const inner = document.createElement('div');
+        inner.className = 'orca-tooltip';
+        inner.setAttribute('contenteditable', 'false');
+        tooltipPopup.appendChild(inner);
+    }
+
+    // 追加到dom并更新文本
+    headbar.appendChild(tooltipPopup)
+    tooltipPopup.querySelector('.orca-tooltip').textContent = text;
+
+    // 定位弹窗到按钮下方
+    const rect = buttonEle.getBoundingClientRect();
+    tooltipPopup.style.left = `${rect.left}px`;
+    tooltipPopup.style.top = "var(--orca-height-headbar)";
+}
+
+/**
+ * 隐藏 tooltip
+ */
+function hideTooltip() {
+    tooltipPopup && tooltipPopup.remove();
+}
+
 /**
  * 启动后退前进按钮模块
  * @returns {Promise<void>}
@@ -23,15 +91,21 @@ function startbackforwardbutton() {
     orcaBackButton.replaceWith(backButton);
     orcaForwardButton.replaceWith(forwardButton);
     
-    // 监听新创建的按钮（右键触发）
+    // 右键触发历史菜单
     backButton.addEventListener('contextmenu', handleHistoryButtonRightClick);
     forwardButton.addEventListener('contextmenu', handleHistoryButtonRightClick);
     
-    // 监听新创建的按钮（左键触发）
+    // 左键触发前进后退
     backButton.addEventListener('click', handleBackButtonLeftClick);
     forwardButton.addEventListener('click', handleForwardButtonLeftClick);
 
-    // 注册item点击跳转
+    // 悬停 tooltip
+    backButton.addEventListener('mouseenter', handleBackButtonMouseEnter);
+    backButton.addEventListener('mouseleave', handleButtonMouseLeave);
+    forwardButton.addEventListener('mouseenter', handleForwardButtonMouseEnter);
+    forwardButton.addEventListener('mouseleave', handleButtonMouseLeave);
+
+    // 注册历史条目容器
     if (!backForwardMenu) {
         backForwardMenu = document.createElement('div')
         backForwardMenu.className = 'orca-menu plugin-tabsman-history-menu'
@@ -44,17 +118,42 @@ function startbackforwardbutton() {
  * @returns {void}
  */
 function stopbackforwardbutton() {
-    // 移除新按钮的事件监听器
+    // 移除按钮的事件监听器
     backButton.removeEventListener('contextmenu', handleHistoryButtonRightClick);
     forwardButton.removeEventListener('contextmenu', handleHistoryButtonRightClick);
     backButton.removeEventListener('click', handleBackButtonLeftClick);
     forwardButton.removeEventListener('click', handleForwardButtonLeftClick);
 
-    // 恢复原始按钮
+    backButton.removeEventListener('mouseenter', handleBackButtonMouseEnter);
+    backButton.removeEventListener('mouseleave', handleButtonMouseLeave);
+    forwardButton.removeEventListener('mouseenter', handleForwardButtonMouseEnter);
+    forwardButton.removeEventListener('mouseleave', handleButtonMouseLeave);
+
+    // 清理残留 tooltip
+    if (tooltipPopup) {
+        tooltipPopup.remove();
+        tooltipPopup = null;
+    }
+
+    // 恢复官方的原始按钮
     backButton.replaceWith(orcaBackButton);
     forwardButton.replaceWith(orcaForwardButton);
 }
 
+
+// ———————————————————————————————————————————————————————Tooltip 事件———————————————————————————————————————————————————————
+
+function handleBackButtonMouseEnter(e) {
+    showTooltip(backButton, 'back');
+}
+
+function handleForwardButtonMouseEnter(e) {
+    showTooltip(forwardButton, 'forward');
+}
+
+function handleButtonMouseLeave(e) {
+    hideTooltip();
+}
 
 
 // ———————————————————————————————————————————————————————按钮左键事件———————————————————————————————————————————————————————
@@ -62,8 +161,6 @@ function stopbackforwardbutton() {
 
 /**
  * 处理后退按钮左键点击事件
- * @param {Event} e - 事件对象
- * @returns {void}
  */
 function handleBackButtonLeftClick(e) {
     orca.commands.invokeCommand('core.goBack');
@@ -71,21 +168,16 @@ function handleBackButtonLeftClick(e) {
 
 /**
  * 处理前进按钮左键点击事件
- * @param {Event} e - 事件对象
- * @returns {void}
  */
 function handleForwardButtonLeftClick(e) {
     orca.commands.invokeCommand('core.goForward');
 }
 
 
-
 // ———————————————————————————————————————————————————————退出菜单事件———————————————————————————————————————————————————————
 
 /**
  * 处理关闭弹窗事件（ESC键或点击）
- * @param {KeyboardEvent|MouseEvent} e - 键盘或鼠标事件对象
- * @returns {void}
  */
 async function handleClosePopup(e) {
     if (currentPopup) {
@@ -132,20 +224,15 @@ async function handleClosePopup(e) {
 
 /**
  * 处理后退前进按钮右键点击事件
- * @param {Event} e - 事件对象
- * @param {string} stackType - 栈类型 ('back' 或 'forward')
- * @returns {Promise<void>}
  */
 async function handleHistoryButtonRightClick(e) {
-    // 判断是否已有弹窗，有则先移除
+    // 右键打开历史时先隐藏 tooltip
+    hideTooltip();
+    
     if (currentPopup) {
         currentPopup.remove();
         currentPopup = null;
     }
-    
-    // e.preventDefault();
-    // e.stopPropagation();
-    // e.stopImmediatePropagation();
 
     const stackType = backButton.contains(e.target)? "back" : "forward"
     let stack = stackType === 'back' ? TabsmanCore.getActiveTabs()[orca.state.activePanel].backStack : TabsmanCore.getActiveTabs()[orca.state.activePanel].forwardStack;
@@ -154,9 +241,7 @@ async function handleHistoryButtonRightClick(e) {
     popupEle.className = 'orca-popup plugin-tabsman-history-popup';
     popupEle.setAttribute('contenteditable', 'false');
     Object.assign(popupEle.style, { zIndex: '399', transformOrigin: 'left top' });
-    // 传递栈副本用于渲染菜单，避免修改原始栈数组
     popupEle.appendChild(await createBackForwardMenu([...stack], stackType));
-    // 添加到headbar，并定位弹窗到按钮下方
     headbar.appendChild(popupEle);
     
     // 定位弹窗到按钮下方
@@ -168,7 +253,6 @@ async function handleHistoryButtonRightClick(e) {
     // 保存当前弹窗引用
     currentPopup = popupEle;
 
-    // tips：关闭成功后会移除监听，不占用开支
     document.addEventListener('keydown', handleClosePopup);
     document.addEventListener('pointerdown', handleClosePopup);
 }
@@ -182,28 +266,25 @@ async function handleHistoryButtonRightClick(e) {
  */
 let stackItemArrary = []
 async function createBackForwardMenu(stackArrary, stackType) {
-    // 创建菜单容器
+    // 重置菜单
     backForwardMenu.textContent = ''
     backForwardMenu.style.cssText = ''
-    
+    stackItemArrary.length = 0
+
     if ((stackType === 'back' && stackArrary.length <= 1) ||  (stackType === 'forward' && stackArrary.length == 0)){
         backForwardMenu.textContent = `暂无${stackType === 'back' ? '后退' : '前进'}历史`
         Object.assign(backForwardMenu.style, {color: "var(--orca-color-gray-5)", textAlign: "center"})
         return backForwardMenu;
     }
 
-    stackItemArrary.length = 0
     // 获取栈，如果是后退栈，先弹出栈顶元素（当前块）
     let stack = stackType === 'back' ? stackArrary.slice(0, -1) : stackArrary;
-    for (const stackItem of stack) {
-        // 栈当前设计是越新的item index越大，越靠近站顶
-        stackItemArrary.push(stackItem)
-    }
+    stackItemArrary = [...stack]
 
     if (stackType === 'back') stackItemArrary.reverse()
 
-    // 创建菜单项
-    for (let i = 0; i < stackItemArrary.length; i++) {
+    // 创建历史记录的条目项
+        for (let i = 0; i < stackItemArrary.length; i++) {
         let stackItemInfo = stackItemArrary[i];
         let menuItem = createMenuItem(stackItemInfo, i);
         backForwardMenu.appendChild(menuItem); // 添加到菜单中
@@ -214,7 +295,7 @@ async function createBackForwardMenu(stackArrary, stackType) {
 
 
 /**
- * 创建后退前进菜单项
+ * 创建后退前进条目项
  * @param {Object} stackItemInfo - 栈项信息
  * @param {Number} index - item编号
  * @returns {HTMLElement} 返回菜单项元素
@@ -226,7 +307,6 @@ function createMenuItem(stackItemInfo, index) {
     item.className = 'orca-menu-text plugin-tabsman-history-item';
     item.setAttribute('data-tabsman-history-item-index', index);
     item.setAttribute('data-tabsman-history-item-view', stackItemInfo.view);
-    // item.setAttribute('data-tabsman-history-item-view-args', stackItemInfo.viewArgs);
     
     // 创建图标
     const icon = createDomWithClass("i", `${stackItemInfo.icon} orca-menu-text-icon orca-menu-text-pre`, item)

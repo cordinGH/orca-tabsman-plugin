@@ -707,16 +707,28 @@ async function deleteTab(tabId) {
 }
 
 
-// 辅助函数，当一个tab准备从面板中被移出前，调用该函数可切换到符合期望的tab上。
-// 先检查是否存在上一个访问过的活跃tab，如果没有，则根据位置给出新tab，是0就给1，否则就给上一个，以维持选中位置的不变。
+// 辅助函数，当一个活跃tab准备从面板中被移出前，调用该函数可切换到符合期望的新tab上。
+// 先检查是否存在上一个访问过的活跃tab，如果没有，则根据位置给出新tab，是0就给1，否则就给下一个，以维持选中位置的不变。
 async function __switchTabBeforeDelete(panelId, activeTabId) {
-    const existPreviousActiveTab = await switchPreviousActiveTab(panelId, false)
-    if (!existPreviousActiveTab) {
-        const activeTabIndex = getOneSortedTabs(panelId).findIndex(tab => tab.id === activeTabId);
-        const newIndex  = activeTabIndex === 0 ? 1 : activeTabIndex - 1;
-        const newTab = getOneSortedTabs(panelId)[newIndex];
-        await switchTab(newTab.id, false)
+    const tabsOfPanel = getOneSortedTabs(panelId)
+    const isTailIndex = tabsOfPanel.length - 1
+    let activeTabIndex, targetIndex = -1;
+    for ( let index = 0, targetAccessedTs = 0; index <= isTailIndex; index++) {
+        const tab = tabsOfPanel[index]
+        // 记录当前活跃面板的id，用于在没有上一个访问tab时使用
+        if (tab.id === activeTabId) {
+            activeTabIndex = index;
+            continue;
+        }
+
+        // 如果访问时间更大，则更新target
+        const tabAccessedTs = tab.lastAccessedTs
+        if (tabAccessedTs === 0 || tabAccessedTs <= targetAccessedTs) continue;
+        targetAccessedTs = tabAccessedTs;
+        targetIndex = index
     }
+    if (targetIndex === -1) targetIndex = (activeTabIndex === isTailIndex) ? isTailIndex - 1 : activeTabIndex + 1;
+    await switchTab(tabsOfPanel[targetIndex].id, false)
 }
 
 

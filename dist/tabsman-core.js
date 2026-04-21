@@ -1254,7 +1254,7 @@ async function __getQuickNoteBlockId(){
         // last空块检查
         const lastChildrenId = todayChildren[todayChildrenLen - 1]
         const lastBlock = await orca.invokeBackend("get-block", lastChildrenId)
-        const iswhiteSpace = lastBlock.text === null || lastBlock.text.trim() == false;
+        const iswhiteSpace = lastBlock.text === null || (lastBlock.text.trim() === '');
         const isEmptyTextBlock = iswhiteSpace && lastBlock.properties.find(p => p.name === '_repr').value.type === "text"
 
         if (!isEmptyTextBlock) {
@@ -1266,7 +1266,7 @@ async function __getQuickNoteBlockId(){
             // 倒数第二个空块检查
             const last2ChildrenId = todayChildren[todayChildrenLen - 2]
             const last2Block = await orca.invokeBackend("get-block", last2ChildrenId)
-            const iswhiteSpace = last2Block.text === null || last2Block.text.trim() == false;
+            const iswhiteSpace = last2Block.text === null || (last2Block.text.trim() === '' );
             const isEmptyTextBlock = iswhiteSpace && last2Block.properties.find(p => p.name === '_repr').value.type === "text"
             
             if (isEmptyTextBlock) {

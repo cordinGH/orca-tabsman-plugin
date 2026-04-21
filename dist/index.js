@@ -57,13 +57,13 @@ function registerTabsmanCommand(){
 
     commands = [
         {
-            name: "tabsman.switchToNextTab",
-            fn: switchToNextTab,
+            name: "tabsman.switchToPreviousTab",
+            fn: switchToPreviousTab,
             description: '[tabsman] 切换到上一个标签页'
         },
         {
-            name: "tabsman.switchToPreviousTab",
-            fn: switchToPreviousTab,
+            name: "tabsman.switchToNextTab",
+            fn: switchToNextTab,
             description: '[tabsman] 切换到下一个标签页'
         },
         {

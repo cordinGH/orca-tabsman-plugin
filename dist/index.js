@@ -242,6 +242,12 @@ async function load(name) {
             type: "boolean",
             defaultValue: false
         },
+        maxRecentlyClosedTabs: {
+            label: "最近关闭标签页的最大保留条数",
+            description: "指定最近关闭标签页的最大保留条数，超出后， 最早的关闭记录将被丢弃。若设置<2或>10的值，将等同于默认值5。",
+            type: "number",
+            defaultValue: 5
+        },
         enableQuickNotePrefix: {
             label: "快速记录时追加日期前缀",
             description: "启用后，快速记录时会自动追加今日日期前缀，如260331。命令面板搜索tabsman可找到快速记录命令。",

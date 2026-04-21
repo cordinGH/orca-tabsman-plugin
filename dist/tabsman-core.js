@@ -404,9 +404,13 @@ function updateSortedTabsCache(panelId) {
  * 设置设置变更监听器
  */
 function subscribeSettings(pluginName) {
-    enableQuickNotePrefix = orca.state.plugins[pluginName]?.settings.enableQuickNotePrefix
-    enableAutoFoldQuickNotes = orca.state.plugins[pluginName]?.settings.enableAutoFoldQuickNotes
-    prefixString = orca.state.plugins[pluginName]?.settings.prefixString.trim()
+    const pluginSettings = orca.state.plugins[pluginName]?.settings;
+
+    enableQuickNotePrefix = pluginSettings.enableQuickNotePrefix
+    enableAutoFoldQuickNotes = pluginSettings.enableAutoFoldQuickNotes
+    prefixString = pluginSettings.prefixString.trim()
+    TabsmanPersistence.setMaxRecentlyClosedTabs(pluginSettings.maxRecentlyClosedTabs)
+
     unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
         const settings = orca.state.plugins[pluginName]?.settings;
         if (!settings) {
@@ -416,6 +420,7 @@ function subscribeSettings(pluginName) {
         enableQuickNotePrefix = settings.enableQuickNotePrefix
         enableAutoFoldQuickNotes = settings.enableAutoFoldQuickNotes
         prefixString = settings.prefixString.trim()
+        TabsmanPersistence.setMaxRecentlyClosedTabs(settings.maxRecentlyClosedTabs)
     }
   )
 }

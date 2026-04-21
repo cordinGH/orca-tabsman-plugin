@@ -6,12 +6,8 @@
 // 导入 core 模块
 import * as TabsmanCore from './tabsman-core.js';
 
-/**
- * 配置常量
- */
-const CONFIG = {
-    MAX_RECENTLY_CLOSED_TABS: 5  // 最近关闭标签页最大保存数量
-};
+// 最近关闭标签页最大保存数量
+let maxRecentlyClosedTabs = 5;
 
 /** @type {Array} pinTab数组，存储需要被[持久化存储]的所有置顶标签页 */
 let pinnedTabArray = [];
@@ -19,6 +15,12 @@ let pinnedTabArray = [];
 let recentlyClosedTabArray = [];
 /** @type {Array} 标签页数组，存储需要被[持久化存储]的所有收藏标签页 */
 let favoriteTabArray = [];
+
+// 设置最近关闭标签页的最大保存数量，由core代码中订阅设置。
+function setMaxRecentlyClosedTabs(value) {
+    if (value < 2 || value > 10) maxRecentlyClosedTabs = 5;
+    else maxRecentlyClosedTabs = value;
+}
 
 
 /**
@@ -59,8 +61,8 @@ async function addAndSaveTab(tab, tabType = "") {
             break;
         }
         case "recently-closed": {
-            if (recentlyClosedTabArray.length >= CONFIG.MAX_RECENTLY_CLOSED_TABS) {
-                recentlyClosedTabArray.pop();
+            if (recentlyClosedTabArray.length >= maxRecentlyClosedTabs) {
+                recentlyClosedTabArray.splice(maxRecentlyClosedTabs - 1);
             }
             tab.isActive = false;
             recentlyClosedTabArray.unshift(tab);
@@ -360,5 +362,6 @@ export {
     getTabArray,
     wakeTabArray,
     restorePersistedData,
-    updatePersistedTabData
+    updatePersistedTabData,
+    setMaxRecentlyClosedTabs
 };

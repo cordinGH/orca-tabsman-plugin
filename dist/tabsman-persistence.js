@@ -140,6 +140,9 @@ function wakeTabArray(rawTabArray, tabType = "") {
         if (typeof rawTab.createdAt === 'string') {
             rawTab.createdAt = new Date(rawTab.createdAt);
         }
+
+        // currentBlockId因为是json解析的，所以这里只会有number、string，因为日期对象会被解析为json。
+        // 所以，字符串类型就检查一下是否为日期，不是日期就原样给出，是日期就变为日期类型。
         if (typeof rawTab.currentBlockId === 'string') {
             const testDateString = new Date(rawTab.currentBlockId);
             // 无效的日期字符串
@@ -213,14 +216,21 @@ async function restorePersistedData() {
         await updatePersistedTabData();
         await orca.plugins.setData('tabsman-update', "ok?", JSON.stringify(1));
     }
+    
+    // 3.0.1的数据版本升级存在疏漏：历史栈中历史条目的字段格式没有同步变更。
+    const isFixed = await orca.plugins.getData('tabsman-update', "fix-history_item") === "1"
+    if (!isFixed) {
+        await fixHistoryItem();
+        await orca.plugins.setData('tabsman-update', "fix-history_item", JSON.stringify(1));
+    }
 }
 
 
 // 3.0.1，更新持久化数据中的Tab对象字段版本，以适配TabsmanCore中Tab对象结构的变更
 async function updatePersistedTabData() {
 
-    // 处理过时的标签页数据结构，返回结果信息 更新完成或者重定向 {result: "updated"} 或 {result: "redirected"}，如果是重定向则需要用户确认后才进行数据更新
-    function updateTabDate(tab) {
+    // 处理过时的标签页数据结构
+    function updateTabData(tab) {
         
         // 当前版本3.0.0
         // 版本字段特征：
@@ -234,7 +244,8 @@ async function updatePersistedTabData() {
         let view, viewArgs, historyItem;
         // 通用适配
         // 3.0.0之前的版本中 block 和 journal 以外的视图，全部重定向为日志视图 并清空历史栈
-        // 并重新填充一次当前访问，因为3.0.0之前历史栈均可能为0长度
+        // （3.0.0之前历史记录的viewArgs封装有误，对于第三方视图直接封装了空对象）。
+        // 并为所有tab重新填充一次当前访问，因为3.0.0之前历史栈均可能为0长度
         if ( typeof currentBlockId === 'number') {
             view = "block";
             viewArgs = {blockId: currentBlockId};
@@ -271,7 +282,7 @@ async function updatePersistedTabData() {
 
         // 适配 1.2.0- 2.8.0的版本
         // 版本特征：11条字段，缺少 lastAccessedTs 字段，pinOrder值是当前方案（时间戳）。
-        // 由于2.2.0版本更改了历史记录的字段封装，且距离3.0.0已经接近3个月，太久了，故不再保留历史记录。
+        // 由于2.2.0版本更改了历史记录的字段封装（追加了name icon），且距离3.0.0已经接近3个月，太久了，故不再保留历史记录。
         if (!tab.hasOwnProperty("lastAccessedTs")) {
             tab.lastAccessedTs = 0;
             tab.isPinned ? tab.pinTs = tab.pinOrder : tab.pinTs = 0;
@@ -285,8 +296,8 @@ async function updatePersistedTabData() {
         // 适配2.8.1 -3.0.1的版本
         // 字段已定型，故只需pinOrder 更名为 pinTs即可。
         // 修复，3.0.0版本的失误代码==> view = tab.view。
-        // 同时删除掉block 和 journal以外的历史记录（3.0.0之前的封装逻辑有误）。
-        // 同时更新activePanel - sourcePanelId
+        // 同时删除掉block 和 journal以外的历史记录（3.0.0之前历史记录的viewArgs封装有误，对于第三方视图直接封装了空对象）。
+        // 同时更新历史记录字段activePanel - sourcePanelId
         for (let index = 0; index < backStack.length - 1; index++) {
             const historyItem = backStack[index]
             const view = historyItem.view
@@ -318,31 +329,85 @@ async function updatePersistedTabData() {
         const wsTabsJSON = await orca.plugins.getData('tabsman-workspace', key);
         const parsedTabs = JSON.parse(wsTabsJSON);
 
-        const tabs = Object.values(parsedTabs);
-        for (const tab of tabs) {
-            updateTabDate(tab);
+        const tabArray = Object.values(parsedTabs);
+        for (const tab of tabArray) {
+            updateTabData(tab);
         }
         await orca.plugins.setData('tabsman-workspace', key, JSON.stringify(parsedTabs));
     }
 
     for (const tab of pinnedTabArray) {
-        updateTabDate(tab);
+        updateTabData(tab);
     }
     for (const tab of recentlyClosedTabArray) {
-        updateTabDate(tab);
+        updateTabData(tab);
     }
     for (const tab of favoriteTabArray) {
-        updateTabDate(tab);
+        updateTabData(tab);
     }
 
     await saveTabArray("pinned");
     await saveTabArray("recently-closed");
     await saveTabArray("favorite");
 
-    orca.notify("success", "[tabsman] 过时数据已升级完毕");
+    orca.notify("success", "[tabsman] 过时数据已升级完毕（tab本体数据）");
 }
 
-window.updatePersistedTabData = updatePersistedTabData;
+// 针对3.0.1的数据版本升级的补丁：
+// - 历史栈中历史条目的字段格式没有同步变更（2.2.0之前缺少name和icon），对此修复一下。
+// - 没有将tab对象中的一些日期对象还原回去。
+async function fixHistoryItem() {
+
+    async function updateHistoryStackData(stack) {
+        for (const item of stack) {
+            const {view, viewArgs} = item
+            const currentBlockId = TabsmanCore.__getBlockIdByViewAndViewArgs(view, viewArgs)
+            const {name,icon} = await TabsmanCore.__generateTabNameAndIcon(currentBlockId)
+            Object.assign(item, {name, icon, sourcePanelId:""}) // sourcePanelId 目前来说没什么用了已经，3.3.0已经不再需要，但考虑到一致性，还是留着吧。
+            delete item.activePanel
+        }
+    }
+
+
+    const wsDataKeys = await orca.plugins.getDataKeys("tabsman-workspace");
+    for (const key of wsDataKeys) {
+        const wsTabsJSON = await orca.plugins.getData('tabsman-workspace', key);
+        const parsedTabs = JSON.parse(wsTabsJSON);
+
+        const tabArray = Object.values(parsedTabs);
+        const tabArrary2 = wakeTabArray(tabArray, "workspace");
+        for (const tab of tabArrary2) {
+            const {backStack, forwardStack} = tab
+            await updateHistoryStackData(backStack)
+            await updateHistoryStackData(forwardStack)
+        }
+
+        await orca.plugins.setData('tabsman-workspace', key, JSON.stringify(parsedTabs));
+    }
+
+    for (const tab of pinnedTabArray) {
+        const {backStack, forwardStack} = tab
+        await updateHistoryStackData(backStack)
+        await updateHistoryStackData(forwardStack)
+    }
+    
+    for (const tab of recentlyClosedTabArray) {
+        const {backStack, forwardStack} = tab
+        await updateHistoryStackData(backStack)
+        await updateHistoryStackData(forwardStack)
+    }
+    for (const tab of favoriteTabArray) {
+        const {backStack, forwardStack} = tab
+        await updateHistoryStackData(backStack)
+        await updateHistoryStackData(forwardStack)
+    }
+
+    await saveTabArray("pinned");
+    await saveTabArray("recently-closed");
+    await saveTabArray("favorite");
+
+    orca.notify("success", "[tabsman] 旧版本过时数据已升级完毕（tab历史记录）");
+}
 
 /**
  * 获取指定类型的标签页数组

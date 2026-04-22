@@ -490,7 +490,7 @@ async function navigateTabBack(tab) {
     const {view, viewArgs} = target;
     tab.currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
     await __handleTabValidStatus(tab)
-    orca.nav.replace(target.view, target.viewArgs, target.sourcePanelId);
+    orca.nav.replace(target.view, target.viewArgs, tab.panelId);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
 }
@@ -517,7 +517,7 @@ async function navigateTabForward(tab) {
     const {view, viewArgs} = target;
     tab.currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
     await __handleTabValidStatus(tab)
-    orca.nav.replace(target.view, target.viewArgs, target.sourcePanelId);
+    orca.nav.replace(target.view, target.viewArgs, tab.panelId);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
 }
@@ -1637,5 +1637,7 @@ export {
     // 外部API，外部使用它导入tab进Core数据结构
     importTabToActivePanel,
     // 持久化模块需要用该函数处理tab的有效性
-    __handleTabValidStatus
+    __handleTabValidStatus,
+    __generateTabNameAndIcon,
+    __getBlockIdByViewAndViewArgs
 };

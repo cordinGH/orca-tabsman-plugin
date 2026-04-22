@@ -1,6 +1,3 @@
-const orcaHeadbarSidebarTools = document.querySelector(".orca-headbar-sidebar-tools")
-const header = document.querySelector('#headbar')
-
 /** @type {HTMLInputElement} */
 let saveButton = null
 
@@ -31,6 +28,8 @@ const closePopupwithAnimation = window.pluginTabsman.closePopupwithAnimation
 export async function startWSRender() {
 // export async function startWSRender(lastWorkspaceName = "") {
     // 创建固定元素，保存按钮和WS容器
+    const orcaHeadbarSidebarTools = document.querySelector(".orca-headbar-sidebar-tools")
+
     wsTools = createDomWithClass("div", "plugin-tabsman-ws", orcaHeadbarSidebarTools)
     saveButton = createDomWithClass("button", "plugin-tabsman-ws-save orca-button plain", wsTools)
     createDomWithClass("i", "ti ti-device-floppy orca-headbar-icon", saveButton)
@@ -159,6 +158,7 @@ function appendWSItemEle(name) {
     wsItem.textContent = name.slice(name.indexOf('_') + 1)
     createDomWithClass("i", "ti ti-x plugin-tabsman-ws-items-item-delete", wsItem)
     wsItemsObj[name] = wsItem
+    return wsItem
 }
 
 // 点击元素打开工作区
@@ -276,22 +276,36 @@ async function appendSavePopup() {
             savePopup.result = inputValue
         }
 
-        let saveReturn = null
-        if (savePopup.onlyActiveTab) {
-            saveReturn = await window.pluginTabsman.saveWS(savePopup.result, true)
-        } else {
-            saveReturn = await window.pluginTabsman.saveWS(savePopup.result)
-        }
+        const saveReturn = await window.pluginTabsman.saveWS(savePopup.result, savePopup.onlyActiveTab, false)
 
         if (saveReturn) {
             savePopup.inputActualinput.value = ""
             removePopup(savePopup)
-            appendWSItemEle(saveReturn)
+            const wsItem = appendWSItemEle(saveReturn)
+            
+            // 添加后如果使得顶部栏空间溢出，则自动删除并提示UI空间不足。
+            if (!hasEnoughHeadbarSpace(wsItem)) {
+                removeWSItemEle(saveReturn)
+                await window.pluginTabsman.deleteWS(saveReturn, false)
+                orca.notify("warn", "[tabsman] 顶部栏UI空间不足，请先删除一些工作区再保存");
+                return;
+            }
+
+            orca.notify("success", "[tabsman]新工作区创建成功！");
+
         } else {
             savePopup.input.classList.add("orca-input-has-error")
             savePopup.input.appendChild(savePopup.inputError)
         }
     };
+}
+
+// 是否存在足够的UI渲染空间
+function hasEnoughHeadbarSpace(wsItem) {
+    const userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
+    const userToolsRect = userTools.getBoundingClientRect();
+    const wsItemRect = wsItem.getBoundingClientRect();
+    return userToolsRect.left > wsItemRect.right
 }
 
 async function handleCancelConfirmPopup(e) {

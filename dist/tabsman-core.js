@@ -854,7 +854,7 @@ function getPanelScrollInfo() {
 }
 
 // 保存工作空间
-async function saveWorkspace(name, onlyActiveTab = false){
+async function saveWorkspace(name, onlyActiveTab = false, needNotify = true){
     const sname = String(name)
     // 时间戳前缀用于排序（getDataKeys获取的数组是按照keys的码值排序的）
     // 只禁止恶意重名：一个时间戳内连续生成相同name
@@ -877,7 +877,7 @@ async function saveWorkspace(name, onlyActiveTab = false){
         await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(getPanelScrollInfo()));
     }
 
-    orca.notify("success", "[tabsman]新工作区创建成功！");
+    needNotify && orca.notify("success", "[tabsman]新工作区创建成功！");
     return saveName
 }
 
@@ -889,11 +889,11 @@ async function getAllWorkspace(){
 }
 
 // 删除指定name的工作空间，返回值1用于删除时是否正处于该工作区
-async function deleteWorkspace(name) {
+async function deleteWorkspace(name, needNotify = true) {
     const sname = String(name)
     await orca.plugins.removeData("tabsman-workspace", sname)
     await orca.plugins.removeData("tabsman-workspace-scroll", sname)
-    orca.notify("success", "[tabsman]工作区删除成功");
+    needNotify && orca.notify("success", "[tabsman]工作区删除成功");
     // 正在工作区就先退出
     if (workspaceNow === sname) {
         exitWorkspace()

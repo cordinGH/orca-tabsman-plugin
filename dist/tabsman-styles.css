@@ -169,10 +169,10 @@
 }
 
 .plugin-tabsman-ws-confirm_popup, .plugin-tabsman-ws-save_popup, .plugin-tabsman-history-popup, .plugin-tabsman-history-tooltip-popup {
-    animation: orcaPopIn .2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    animation: orcaPopIn .15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 .plugin-tabsman-ws-confirm_popup.is-closing, .plugin-tabsman-ws-save_popup.is-closing, .plugin-tabsman-history-popup.is-closing, .plugin-tabsman-history-tooltip-popup.is-closing {
-    animation: orcaPopOut .2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    animation: orcaPopOut .15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     pointer-events: none;
 }
 

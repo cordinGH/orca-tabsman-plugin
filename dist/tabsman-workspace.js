@@ -7,19 +7,19 @@ let saveButton = null
 /** @type {HTMLInputElement} */
 let exitButton = null
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLInputElement} 选项卡 */
 let wsItems = null
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLInputElement} 工作区顶部工具栏（选项卡 + 保存 + 退出） */
 let wsTools = null
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLInputElement} 确认窗口 */
 let confirmPopup = null
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLInputElement} 保存窗口 */
 let savePopup = null
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLInputElement}  */
 let wsItemSelected = null
 
 let wsItemsObj = {}
@@ -60,19 +60,22 @@ export async function startWSRender() {
             if (confirmPopup?.isConnected) {
                 // 说明：阻止挂在document上的关闭监听。当连接时再次点击delete只要换一下位置即可
                 e.stopImmediatePropagation();
-                // removePopup(confirmPopup)
-                // return
-            } else {
-                appendConfirmPopup()
-                // 加入进dom后，监听savePopup的关闭事件
-                setTimeout(() => {
-                    document.addEventListener('pointerdown', handleCancelConfirmPopup);
-                    document.addEventListener('keydown', handleCancelConfirmPopup);
-                    // orca.notify("success", "[tabsman] 添加delete监听");
-                }, 0);
+                confirmPopup.classList.add("is-closing")
+                await removePopup(confirmPopup)
             }
+            appendConfirmPopup()
+            
+            // 加入进dom后，监听savePopup的关闭事件
+            setTimeout(() => {
+                document.addEventListener('pointerdown', handleCancelConfirmPopup);
+                document.addEventListener('keydown', handleCancelConfirmPopup);
+                // orca.notify("success", "[tabsman] 添加delete监听");
+            }, 0);
+
+            // 记录目标工作区名字
             const wsName = target.closest(".plugin-tabsman-ws-items-item").dataset.pluginTabsmanWsName
             confirmPopup.result = wsName
+
             // 定位弹窗到按钮下方
             const rect = target.parentElement.getBoundingClientRect();
             confirmPopup.style.left = `${rect.left}px`;

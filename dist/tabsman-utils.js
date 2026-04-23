@@ -29,7 +29,7 @@ export function closePopupwithAnimation(popupEle){
 export function setPopupPosition(popupEle, buttonEle){
     const rect = buttonEle.getBoundingClientRect();
     popupEle.style.left = `${rect.left}px`;
-    popupEle.style.top = `${rect.bottom + 1}px`;
+    popupEle.style.top = `${rect.bottom + 6}px`;
     // popupEle.style.top = "var(--orca-height-headbar)";
 }
 

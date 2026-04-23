@@ -59,12 +59,16 @@ function createTabElement(tab, panelId, panelGroupEle) {
 
     // 置顶图标
     const pinIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`, tabElement)
+    pinIcon.onmouseenter = () => Utils.showTooltip(pinIcon, tab.isPinned ? '点击取消置顶' : '点击置顶')
+    pinIcon.onmouseleave = () => Utils.hideTooltip()
 
     // 块图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质是相同的。
     const blockIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`, tabElement)
     blockIcon.setAttribute('data-tabsman-tab-id', tab.id);
     blockIcon.setAttribute('data-tabsman-panel-id', panelId);
+    blockIcon.onmouseenter = () => Utils.showTooltip(blockIcon, isFavorite ? '点击取消收藏' : '点击收藏该标签页')
+    blockIcon.onmouseleave = () => Utils.hideTooltip()
 
     // 标签页标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
@@ -126,6 +130,8 @@ function createPanelItemElement(panelId, panelGroupEle) {
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
     const newTabButton = Utils.createDomWithClass("i", 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu', panelItemElement)
     newTabButton.setAttribute('data-tabsman-panel-id', panelId);
+    newTabButton.onmouseenter = () => Utils.showTooltip(newTabButton, '打开新标签页')
+    newTabButton.onmouseleave = () => Utils.hideTooltip()
 
     // 返回包含DOM元素和子元素引用的对象
     return {

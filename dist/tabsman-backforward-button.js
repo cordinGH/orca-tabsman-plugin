@@ -180,42 +180,45 @@ function handleForwardButtonLeftClick(e) {
  * 处理关闭弹窗事件（ESC键或点击）
  */
 async function handleClosePopup(e) {
-    if (currentPopup) {
-        // 如果是键盘事件，检查是否为ESC键
-        let needClose = false
-        if (e.type === 'keydown' && e.key === 'Escape') {
-            needClose = true
-        }
-        
-        // 如果点击的元素包含data-tabsman-backforward-block-id属性，执行特定逻辑
-        if (e.type === 'pointerdown'){
-            needClose = true
-            const target = e.target.closest('.plugin-tabsman-history-item')
-            if (target) {
-                const index = target.getAttribute('data-tabsman-history-item-index')
-                let view = target.getAttribute('data-tabsman-history-item-view')
-                const stackItem = stackItemArrary[index]
-                if (view === "block") {
-                    const {blockId} = stackItem.viewArgs
-                    const block = await orca.invokeBackend("get-block", blockId)
-                    if (!block) {
-                        orca.notify("info",`[tabsman] 目标块${blockId}已删除，现重定向为今日日志`)
-                        const date = new Date(new Date().toDateString())
-                        Object.assign(stackItem, {icon: 'ti ti-calendar-smile', name: date.toDateString(), view: "journal", viewArgs: {date}})
-                    }
-                }
-                orca.nav.goTo(stackItem.view, stackItem.viewArgs)
+    if (!currentPopup)  return
+
+    // 如果是键盘事件，检查是否为ESC键
+    let needClose = false
+    if (e.type === 'keydown' && e.key === 'Escape') {
+        needClose = true
+    }
+    
+    // 如果点击的元素包含data-tabsman-backforward-block-id属性，执行特定逻辑
+    if (e.type === 'pointerdown'){
+        needClose = true
+
+        const target = e.target.closest('.plugin-tabsman-history-item')
+        if (!target) return
+
+        const index = target.getAttribute('data-tabsman-history-item-index')
+        let view = target.getAttribute('data-tabsman-history-item-view')
+        const stackItem = stackItemArrary[index]
+
+        if (view === "block") {
+            const {blockId} = stackItem.viewArgs
+            const block = await orca.invokeBackend("get-block", blockId)
+            if (!block) {
+                orca.notify("info",`[tabsman] 目标块${blockId}已删除，现重定向为今日日志`)
+                const date = new Date(new Date().toDateString())
+                Object.assign(stackItem, {icon: 'ti ti-calendar-smile', name: date.toDateString(), view: "journal", viewArgs: {date}})
             }
         }
 
-        // 关闭弹窗
-        if (needClose) {
-            await closePopupwithAnimation(currentPopup)
-            currentPopup = null;
-            // 移除关闭弹窗事件监听器
-            document.removeEventListener('keydown', handleClosePopup);
-            document.removeEventListener('pointerdown', handleClosePopup);
-        }
+        orca.nav.goTo(stackItem.view, stackItem.viewArgs)
+    }
+
+    // 关闭弹窗
+    if (needClose) {
+        await closePopupwithAnimation(currentPopup)
+        currentPopup = null;
+        // 移除关闭弹窗事件监听器
+        document.removeEventListener('keydown', handleClosePopup);
+        document.removeEventListener('pointerdown', handleClosePopup);
     }
 }
 

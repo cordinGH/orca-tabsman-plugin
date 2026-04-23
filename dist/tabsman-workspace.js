@@ -75,8 +75,8 @@ export async function startWSRender() {
         }
     })
 
-    saveButton.addEventListener('mouseenter', handleSaveButtonMouseEnter);
-    saveButton.addEventListener('mouseleave', handleSaveButtonMouseLeave);
+    saveButton.onmouseenter = () => Utils.showTooltip(saveButton, '保存为新工作区')
+    saveButton.onmouseleave = () => Utils.hideTooltip()
 }
 
 export function stopWSRender(){
@@ -88,8 +88,6 @@ export function stopWSRender(){
     if (savePopup?.isConnected) {
         document.removeEventListener('pointerdown', handleCancelSavePopupClose)
         document.removeEventListener('keydown', handleCancelSavePopupClose)
-        saveButton.removeEventListener('mouseenter', handleSaveButtonMouseEnter);
-        saveButton.removeEventListener('mouseleave', handleSaveButtonMouseLeave);
     }
     wsTools = null
     saveButton = null
@@ -101,13 +99,6 @@ export function stopWSRender(){
     wsItemsObj = {}
 }
 
-function handleSaveButtonMouseEnter(e) {
-    Utils.showTooltip(saveButton, '保存为新工作区');
-}
-
-function handleSaveButtonMouseLeave(e) {
-    Utils.hideTooltip();
-}
 
 // 工具函数，移除选中样式和选中元素记录
 function clearWSItemSelected() {

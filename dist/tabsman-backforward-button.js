@@ -51,10 +51,10 @@ function startbackforwardbutton() {
     forwardButton.addEventListener('click', handleForwardButtonLeftClick);
 
     // 悬停 tooltip
-    backButton.addEventListener('mouseenter', handleBackButtonMouseEnter);
-    backButton.addEventListener('mouseleave', handleButtonMouseLeave);
-    forwardButton.addEventListener('mouseenter', handleForwardButtonMouseEnter);
-    forwardButton.addEventListener('mouseleave', handleButtonMouseLeave);
+    backButton.onmouseenter = () => Utils.showTooltip(backButton, `右键查看历史 | 当前${getHistoryCount('back')}`)
+    backButton.onmouseleave = () => Utils.hideTooltip()
+    forwardButton.onmouseenter = () => Utils.showTooltip(forwardButton, `右键查看历史 | 当前${getHistoryCount('forward')}`)
+    forwardButton.onmouseleave = () => Utils.hideTooltip()
 
     // 注册历史条目容器
     if (!backForwardMenu) {
@@ -75,32 +75,9 @@ function stopbackforwardbutton() {
     backButton.removeEventListener('click', handleBackButtonLeftClick);
     forwardButton.removeEventListener('click', handleForwardButtonLeftClick);
 
-    backButton.removeEventListener('mouseenter', handleBackButtonMouseEnter);
-    backButton.removeEventListener('mouseleave', handleButtonMouseLeave);
-    forwardButton.removeEventListener('mouseenter', handleForwardButtonMouseEnter);
-    forwardButton.removeEventListener('mouseleave', handleButtonMouseLeave);
-
     // 恢复官方的原始按钮
     backButton.replaceWith(orcaBackButton);
     forwardButton.replaceWith(orcaForwardButton);
-}
-
-
-// ———————————————————————————————————————————————————————Tooltip 事件———————————————————————————————————————————————————————
-
-function handleBackButtonMouseEnter(e) {
-    
-    const text = `右键查看历史 | 当前${getHistoryCount('back')}`
-    Utils.showTooltip(backButton, text);
-}
-
-function handleForwardButtonMouseEnter(e) {
-    const text = `右键查看历史 | 当前${getHistoryCount('forward')}`
-    Utils.showTooltip(forwardButton, text);
-}
-
-function handleButtonMouseLeave(e) {
-    Utils.hideTooltip();
 }
 
 

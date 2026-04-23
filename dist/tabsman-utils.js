@@ -34,13 +34,14 @@ export function setPopupPosition(popupEle, buttonEle){
 }
 
 
-// 获取一个toolTip弹窗，弹窗被插入在body中
+// 获取一个toolTip弹窗
 let tooltipPopup;
 export function getTooltipPopup() {
 
-    if (tooltipPopup) return;
+    if (tooltipPopup) return tooltipPopup;
 
-    tooltipPopup = createDomWithClass('div', 'orca-popup plugin-tabsman-tooltip-popup', document.body)
+    tooltipPopup = document.createElement('div')
+    tooltipPopup.className = 'orca-popup plugin-tabsman-tooltip-popup'
 
     tooltipPopup.setAttribute('contenteditable', 'false');
     Object.assign(tooltipPopup.style, {
@@ -59,23 +60,26 @@ export function getTooltipPopup() {
 
 /**
  * 显示 tooltip
- * @param {HTMLElement} baseEle - 弹窗插入位置
  * @param {HTMLElement} buttonEle - 触发的按钮元素
  * @param {string} text tooltip需要显示的文本
  */
-
+let timer = null
 export function showTooltip(buttonEle, text) {
+    // 清除计时器并移除tooltip
     hideTooltip();
+    // 防抖
+    timer = setTimeout(() => {
+        document.body.appendChild(getTooltipPopup())
+        // 更新文本，并将定位到按钮下方
+        tooltipPopup.querySelector('.orca-tooltip').textContent = text;
+        setPopupPosition(tooltipPopup, buttonEle)
+    }, 100)
 
-    tooltipPopup ? document.body.appendChild(tooltipPopup) : tooltipPopup = getTooltipPopup();
-
-    // 更新文本
-    tooltipPopup.querySelector('.orca-tooltip').textContent = text;
-
-    // 定位弹窗到按钮下方
-    setPopupPosition(tooltipPopup, buttonEle)
 }
 
 export function hideTooltip() {
+    // 防止滞留
+    timer && clearTimeout(timer);
+    timer = null;
     tooltipPopup && tooltipPopup.remove();
 }

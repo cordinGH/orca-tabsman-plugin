@@ -168,22 +168,28 @@
     }
 }
 
-.plugin-tabsman-ws-confirm_popup, .plugin-tabsman-ws-save_popup, .plugin-tabsman-history-popup, .plugin-tabsman-history-tooltip-popup {
+.plugin-tabsman-ws-confirm_popup,
+.plugin-tabsman-ws-save_popup,
+.plugin-tabsman-history-popup,
+.plugin-tabsman-tooltip-popup {
     animation: orcaPopIn .15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
-.plugin-tabsman-ws-confirm_popup.is-closing, .plugin-tabsman-ws-save_popup.is-closing, .plugin-tabsman-history-popup.is-closing, .plugin-tabsman-history-tooltip-popup.is-closing {
+.plugin-tabsman-ws-confirm_popup.is-closing,
+.plugin-tabsman-ws-save_popup.is-closing,
+.plugin-tabsman-history-popup.is-closing,
+.plugin-tabsman-tooltip-popup.is-closing {
     animation: orcaPopOut .15s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     pointer-events: none;
 }
 
 /* tooltips，按钮 */
-.orca-button.plugin-tabsman-ws-exit,
-.orca-button.plugin-tabsman-ws-save{
+.orca-button.plugin-tabsman-ws-exit/*,
+.orca-button.plugin-tabsman-ws-save*/{
     position:relative;
 }
 
-.orca-button.plugin-tabsman-ws-exit::before,
-.orca-button.plugin-tabsman-ws-save::before{
+.orca-button.plugin-tabsman-ws-exit::before/*,
+.orca-button.plugin-tabsman-ws-save::before*/{
     padding: var(--orca-spacing-sm) var(--orca-spacing-md);
     border-radius: var(--orca-radius-md);
     background-color: var(--orca-color-text-1);
@@ -207,15 +213,15 @@
     pointer-events: none; /* 防止遮挡鼠标事件 */
 }
 
-.orca-button.plugin-tabsman-ws-save::before{
+/* .orca-button.plugin-tabsman-ws-save::before{
     content: "保存为新工作区";
-}
+} */
 .orca-button.plugin-tabsman-ws-exit::before{
     content: "退出工作区";
 }
 
-.orca-button.plugin-tabsman-ws-exit:hover::before,
-.orca-button.plugin-tabsman-ws-save:hover::before{
+.orca-button.plugin-tabsman-ws-exit:hover::before/*,
+.orca-button.plugin-tabsman-ws-save:hover::before*/{
     transition: opacity .15s .15s;
     opacity: 1;
   }

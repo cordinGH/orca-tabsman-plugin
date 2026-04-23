@@ -40,7 +40,7 @@ export function getTooltipPopup() {
 
     if (tooltipPopup) return;
 
-    tooltipPopup = createDomWithClass('div', 'orca-popup plugin-tabsman-history-tooltip-popup', document.body)
+    tooltipPopup = createDomWithClass('div', 'orca-popup plugin-tabsman-tooltip-popup', document.body)
 
     tooltipPopup.setAttribute('contenteditable', 'false');
     Object.assign(tooltipPopup.style, {

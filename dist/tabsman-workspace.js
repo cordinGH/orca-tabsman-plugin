@@ -70,9 +70,13 @@ export async function startWSRender() {
         } else if (target.closest(".plugin-tabsman-ws-save")) {
             // 连接状态下，document上挂载了关闭监听，无需处理
             if (savePopup?.isConnected) return;
+            Utils.hideTooltip()
             openSavePopupByClickEle()
         }
     })
+
+    saveButton.addEventListener('mouseenter', handleSaveButtonMouseEnter);
+    saveButton.addEventListener('mouseleave', handleSaveButtonMouseLeave);
 }
 
 export function stopWSRender(){
@@ -84,6 +88,8 @@ export function stopWSRender(){
     if (savePopup?.isConnected) {
         document.removeEventListener('pointerdown', handleCancelSavePopupClose)
         document.removeEventListener('keydown', handleCancelSavePopupClose)
+        saveButton.removeEventListener('mouseenter', handleSaveButtonMouseEnter);
+        saveButton.removeEventListener('mouseleave', handleSaveButtonMouseLeave);
     }
     wsTools = null
     saveButton = null
@@ -93,6 +99,14 @@ export function stopWSRender(){
     savePopup = null
     wsItemSelected = null
     wsItemsObj = {}
+}
+
+function handleSaveButtonMouseEnter(e) {
+    Utils.showTooltip(saveButton, '保存为新工作区');
+}
+
+function handleSaveButtonMouseLeave(e) {
+    Utils.hideTooltip();
 }
 
 // 工具函数，移除选中样式和选中元素记录

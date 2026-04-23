@@ -10,6 +10,9 @@ let wsItems = null
 /** @type {HTMLInputElement} 工作区顶部工具栏（选项卡 + 保存 + 退出） */
 let wsTools = null
 
+// 插件栏元素
+const userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
+
 /** @type {HTMLInputElement} 确认窗口 */
 let confirmPopup = null
 
@@ -281,13 +284,18 @@ async function appendSavePopup() {
         if (saveReturn) {
             savePopup.inputActualinput.value = ""
             removePopup(savePopup)
+            
+            const baseRight = userTools.getBoundingClientRect().right
             const wsItem = appendWSItemEle(saveReturn)
+            const wsItemsRight = wsItem.getBoundingClientRect().right;
+            const { left: userToolsLeft, right: newRight } = userTools.getBoundingClientRect();
             
             // 添加后如果使得顶部栏空间溢出，则自动删除并提示UI空间不足。
-            if (!hasEnoughHeadbarSpace(wsItem)) {
+            // 如果挤压了userTools，使得right变大说明溢出了，防止浮点误差，提供1px误差。 或者userToolsLeft和item重叠，也说明溢出
+            if (newRight -1 > baseRight || userToolsLeft < wsItemsRight) {
                 removeWSItemEle(saveReturn)
                 await window.pluginTabsman.deleteWS(saveReturn, false)
-                orca.notify("warn", "[tabsman] 顶部栏UI空间不足，请先删除一些工作区再保存");
+                orca.notify("warn", "[tabsman] 顶部栏UI空间不足，请拉宽窗口或删除一些工作区。");
                 return;
             }
 
@@ -300,13 +308,6 @@ async function appendSavePopup() {
     };
 }
 
-// 是否存在足够的UI渲染空间
-function hasEnoughHeadbarSpace(wsItem) {
-    const userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
-    const userToolsRect = userTools.getBoundingClientRect();
-    const wsItemRect = wsItem.getBoundingClientRect();
-    return userToolsRect.left > wsItemRect.right
-}
 
 async function handleCancelConfirmPopup(e) {
     // orca.notify("success", "[tabsman] 触发handle点击");

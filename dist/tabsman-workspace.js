@@ -1,35 +1,36 @@
+import * as Utils from './tabsman-utils.js'
+
 /** @type {HTMLInputElement} */
 let saveButton = null
 
 /** @type {HTMLInputElement} */
 let exitButton = null
 
-/** @type {HTMLInputElement} 选项卡 */
+/** @type {HTMLElement} 选项卡 */
 let wsItems = null
 
-/** @type {HTMLInputElement} 工作区顶部工具栏（选项卡 + 保存 + 退出） */
+/** @type {HTMLElement} 工作区顶部工具栏（选项卡 + 保存 + 退出） */
 let wsTools = null
 
-// 插件栏元素
+// 插件栏元素和虎鲸headerbar
 const userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
+const headbar = document.querySelector('#headbar')
 
-/** @type {HTMLInputElement} 确认窗口 */
+/** @type {HTMLElement} 确认窗口 */
 let confirmPopup = null
 
-/** @type {HTMLInputElement} 保存窗口 */
+/** @type {HTMLElement} 保存窗口 */
 let savePopup = null
 
-/** @type {HTMLInputElement}  */
+/** @type {HTMLElement}  当前被打开的工作区（元素）*/
 let wsItemSelected = null
 
 let wsItemsObj = {}
 
-const createDomWithClass = window.pluginTabsman.createDomWithClass
-const closePopupwithAnimation = window.pluginTabsman.closePopupwithAnimation
+const {createDomWithClass, closePopupwithAnimation} = Utils
 
 // 启动初始渲染
 export async function startWSRender() {
-// export async function startWSRender(lastWorkspaceName = "") {
     // 创建固定元素，保存按钮和WS容器
     const orcaHeadbarSidebarTools = document.querySelector(".orca-headbar-sidebar-tools")
 
@@ -49,82 +50,40 @@ export async function startWSRender() {
 
     // ws工具栏监听委托
     wsTools.addEventListener("pointerdown", async function (e) {
-        // e.stopPropagation()
         const target = e.target
-        const classList = target.classList
-        if (classList.contains("plugin-tabsman-ws-items-item")) {
-            if (wsItemSelected) clearWSItemSelected()
-            wsItemSelected = target
-            openWSByClickEle(target.dataset.pluginTabsmanWsName)
-            wsItemSelected.classList.add("plugin-tabsman-ws-selected")
-            return
+        const {classList} = target
+        if (target.classList.contains("plugin-tabsman-ws-items-item")) {
+            openWSByClickEle(target)
         } else if (classList.contains("plugin-tabsman-ws-items-item-delete")) {
+            // 连接状态下，当再次点击关闭时，由于可能是想关闭其他工作区，因此应当先清理掉弹窗。
+            // 这种情况下先前挂在document上的关闭监听就不能再处理了。否则执行栈会出bug导致弹窗秒开秒关，具体的执行栈原因分析见笔记date260423
+            // 简单说就是，不阻止冒泡的话 下方remove成功移除打开新弹窗后，会先去执行冒泡上去的document监听关窗，然后才会执行新窗的滞后挂载，这个监听挂载就一直留在这了，导致第三次打开秒开秒关.
             if (confirmPopup?.isConnected) {
-                // 说明：阻止挂在document上的关闭监听。当连接时再次点击delete只要换一下位置即可
-                e.stopImmediatePropagation();
-                confirmPopup.classList.add("is-closing")
+                e.stopPropagation()  
                 await removePopup(confirmPopup)
             }
-            appendConfirmPopup()
-            
-            // 加入进dom后，监听savePopup的关闭事件
-            setTimeout(() => {
-                document.addEventListener('pointerdown', handleCancelConfirmPopup);
-                document.addEventListener('keydown', handleCancelConfirmPopup);
-                // orca.notify("success", "[tabsman] 添加delete监听");
-            }, 0);
+            openDeletePopupByClickEle(target)
 
-            // 记录目标工作区名字
-            const wsName = target.closest(".plugin-tabsman-ws-items-item").dataset.pluginTabsmanWsName
-            confirmPopup.result = wsName
-
-            // 定位弹窗到按钮下方
-            const rect = target.parentElement.getBoundingClientRect();
-            confirmPopup.style.left = `${rect.left}px`;
-            confirmPopup.style.top = "var(--orca-height-headbar)";
-            return
         } else if (target.closest(".plugin-tabsman-ws-exit")) {
-            window.pluginTabsman.exitWS()
-            exitButton.remove()
-            clearWSItemSelected()
-            return
+            exitWSByClickEle()
+
         } else if (target.closest(".plugin-tabsman-ws-save")) {
-            if (savePopup?.isConnected) {
-                // 说明：关闭事件监听会调用remove，无序重复调用
-                // removePopup(savePopup)
-                return
-            }
-            appendSavePopup()
-            // 加入进dom后，监听savePopup的关闭事件
-            setTimeout(() => {
-                document.addEventListener('pointerdown', handleCancelSavePopup);
-                document.addEventListener('keydown', handleCancelSavePopup);
-                savePopup.inputActualinput.focus()
-                // orca.notify("success", "[tabsman] 添加save监听");
-            }, 0);   
-            const rect = target.getBoundingClientRect();
-            savePopup.style.left = `${rect.left}px`;
-            savePopup.style.top = "var(--orca-height-headbar)";
+            // 连接状态下，document上挂载了关闭监听，无需处理
+            if (savePopup?.isConnected) return;
+            openSavePopupByClickEle()
         }
     })
-
-    // setTimeout(() => {
-    //     if (lastWorkspaceName) {
-    //         const item = wsItemsObj[lastWorkspaceName]
-    //         if (item) item.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    //     }
-    // },1000)
 }
 
 export function stopWSRender(){
     wsTools?.remove()
     if (confirmPopup?.isConnected) {
-        document.removeEventListener('pointerdown', handleCancelConfirmPopup)
-        document.removeEventListener('keydown', handleCancelConfirmPopup)
+        document.removeEventListener('pointerdown', handleConfirmPopupClose)
+        document.removeEventListener('keydown', handleConfirmPopupClose)
     }
     if (savePopup?.isConnected) {
-        document.removeEventListener('pointerdown', handleCancelSavePopup)
-        document.removeEventListener('keydown', handleCancelSavePopup)
+        document.removeEventListener('pointerdown', handleCancelSavePopupClose)
+        document.removeEventListener('keydown', handleCancelSavePopupClose)
     }
     wsTools = null
     saveButton = null
@@ -164,8 +123,17 @@ function appendWSItemEle(name) {
     return wsItem
 }
 
-// 点击元素打开工作区
-function openWSByClickEle(name) {
+
+/**
+ * 点击元素打开工作区
+ * @param {HTMLElement} target 需要打开的目标工作区
+ */
+function openWSByClickEle(target) {
+
+    if (wsItemSelected) clearWSItemSelected();
+    wsItemSelected = target
+    const name = wsItemSelected.dataset.pluginTabsmanWsName
+    wsItemSelected.classList.add("plugin-tabsman-ws-selected")
     window.pluginTabsman.openWS(name)
 
     // 确保存在退出点如果还没有退出点元素则先建立
@@ -178,8 +146,60 @@ function openWSByClickEle(name) {
     }
 }
 
+
+/**
+ * 点击打开删除工作区的弹窗
+ * @param {HTMLElement} target 需要打开的目标工作区
+ */
+async function openDeletePopupByClickEle(target) {
+
+    // 加入DOM并监听关闭触发
+    appendConfirmPopup()
+
+    setTimeout(() => {
+        document.addEventListener('pointerdown', handleConfirmPopupClose);
+        document.addEventListener('keydown', handleConfirmPopupClose);
+    }, 0)
+
+    // 记录目标工作区名字
+    const wsName = target.closest(".plugin-tabsman-ws-items-item").dataset.pluginTabsmanWsName
+    confirmPopup.result = wsName
+
+    // 定位弹窗到按钮下方
+    Utils.setPopupPosition(confirmPopup, target.parentElement)
+}
+
+
+/**
+ * 点击退出工作区
+ */
+function exitWSByClickEle() {
+    window.pluginTabsman.exitWS()
+    exitButton.remove()
+    clearWSItemSelected()
+}
+
+/**
+ * 点击打开保存工作区的弹窗
+ */
+function openSavePopupByClickEle() {
+
+    // 加入DOM并监听关闭触发
+    appendSavePopup()
+    
+    // 确保焦点触发。
+    setTimeout(() => {
+        document.addEventListener('pointerdown', handleCancelSavePopupClose);
+        document.addEventListener('keydown', handleCancelSavePopupClose);
+        savePopup.inputActualinput.focus()
+    }, 0);
+
+    Utils.setPopupPosition(savePopup, saveButton)
+}
+
+
 // 获取确认窗对象，确认窗result保存处理的wsName
-async function appendConfirmPopup() {
+function appendConfirmPopup() {
     if (confirmPopup) {
         headbar.appendChild(confirmPopup)
         return
@@ -200,27 +220,23 @@ async function appendConfirmPopup() {
     noBtn.textContent = "取消"
     const yesBtn = createDomWithClass("div", 'orca-button dangerous', confirmBox)
     yesBtn.textContent = "确认"
-    noBtn.onclick = async function() {
-        confirmPopup.classList.add("is-closing")
-        removePopup(confirmPopup)
-    };
-    yesBtn.onclick = async function(){
-        confirmPopup.classList.add("is-closing")
+    noBtn.onclick = () => removePopup(confirmPopup)
+    yesBtn.onclick = () => {
         const wsName = confirmPopup.result
         removePopup(confirmPopup)
-
-        // 如果删除的是当前工作区，则先移除退出按钮和样式
-        const deleteKind = await window.pluginTabsman.deleteWS(wsName)
-        if ( deleteKind === 1) {
-            exitButton.remove()
-            clearWSItemSelected()
-        }
-        removeWSItemEle(wsName)
+        window.pluginTabsman.deleteWS(wsName).then((deleteKind) => {
+            // 删除活跃工作区会返回1，需要移除按钮并清理选中
+            if ( deleteKind === 1) {
+                exitButton.remove()
+                clearWSItemSelected()
+            }
+            removeWSItemEle(wsName)
+        })
     };
 }
 
 // 获取保存窗对象，result属性为获取的name
-async function appendSavePopup() {
+function appendSavePopup() {
     if (savePopup && !savePopup.isConnected) {
         headbar.appendChild(savePopup)
         return
@@ -264,11 +280,9 @@ async function appendSavePopup() {
     inputError.remove()
     inputError.textContent = "1毫秒内创建多次？emmm"
 
-    extendBtn.onclick = function(){
-        savePopup.onlyActiveTab = savePopup.extendBtn.classList.toggle('orca-switch-on')
-    }
+    extendBtn.onclick = () => savePopup.onlyActiveTab = savePopup.extendBtn.classList.toggle('orca-switch-on')
 
-    yesBtn.onclick = async function (){
+    yesBtn.onclick = async () => {
         const inputValue = savePopup.inputActualinput.value
         
         // 未填写默认采用日期作为命名
@@ -282,15 +296,16 @@ async function appendSavePopup() {
         const saveReturn = await window.pluginTabsman.saveWS(savePopup.result, savePopup.onlyActiveTab, false)
 
         if (saveReturn) {
+            // 清空输入框内容
             savePopup.inputActualinput.value = ""
             removePopup(savePopup)
             
+            // 添加后如果使得顶部栏空间溢出，则自动删除并提示UI空间不足。
             const baseRight = userTools.getBoundingClientRect().right
             const wsItem = appendWSItemEle(saveReturn)
             const wsItemsRight = wsItem.getBoundingClientRect().right;
             const { left: userToolsLeft, right: newRight } = userTools.getBoundingClientRect();
-            
-            // 添加后如果使得顶部栏空间溢出，则自动删除并提示UI空间不足。
+
             // 如果挤压了userTools，使得right变大说明溢出了，防止浮点误差，提供1px误差。 或者userToolsLeft和item重叠，也说明溢出
             if (newRight -1 > baseRight || userToolsLeft < wsItemsRight) {
                 removeWSItemEle(saveReturn)
@@ -309,38 +324,34 @@ async function appendSavePopup() {
 }
 
 
-async function handleCancelConfirmPopup(e) {
-    // orca.notify("success", "[tabsman] 触发handle点击");
-    if (confirmPopup.isConnected) {
-        if (e.type === 'keydown' && e.key === 'Escape') removePopup(confirmPopup)
-        if (e.type === 'pointerdown' && !confirmPopup.contains(e.target)) removePopup(confirmPopup)
-    }
+async function handleConfirmPopupClose(e) {
+    if (!confirmPopup.isConnected) return
+    // 键盘esc或者是点在了confirmPopup以外的元素，则移除popup
+    const shouldClose = (e.type === 'keydown' && e.key === 'Escape') || (e.type === 'pointerdown' && !confirmPopup.contains(e.target))
+    shouldClose && removePopup(confirmPopup)
 }
 
-async function handleCancelSavePopup(e) {
+async function handleCancelSavePopupClose(e) {
     // 该回调只在appendSavePopup执行后才追加回调，因此savePopup是必然存在的
-    if (savePopup.isConnected) {
-        if (e.type === 'keydown' && e.key === 'Escape') removePopup(savePopup)
-        if (e.type === 'pointerdown' && !savePopup.contains(e.target)) removePopup(savePopup)
-    }
+    if (!savePopup.isConnected) return
+    const shouldClose = (e.type === 'keydown' && e.key === 'Escape') || (e.type === 'pointerdown' && !savePopup.contains(e.target))
+    shouldClose && removePopup(savePopup)
 }
 
 // 从dom中移除save弹窗，同时一并移除监听器
 async function removePopup (popupEle){
     await closePopupwithAnimation(popupEle)
     if (popupEle === savePopup) {
-        document.removeEventListener('pointerdown', handleCancelSavePopup)
-        document.removeEventListener('keydown', handleCancelSavePopup)
+        document.removeEventListener('pointerdown', handleCancelSavePopupClose)
+        document.removeEventListener('keydown', handleCancelSavePopupClose)
         // 恢复按钮
         if(savePopup.onlyActiveTab) {
             savePopup.extendBtn.classList.toggle('orca-switch-on')
             savePopup.onlyActiveTab = false
         }
-        // orca.notify("success", "[tabsman] 移除save监听");
     }
     if (popupEle === confirmPopup) {
-        document.removeEventListener('pointerdown', handleCancelConfirmPopup)
-        document.removeEventListener('keydown', handleCancelConfirmPopup)
-        // orca.notify("success", "[tabsman] 移除delete监听");
+        document.removeEventListener('pointerdown', handleConfirmPopupClose)
+        document.removeEventListener('keydown', handleConfirmPopupClose)
     }
 }

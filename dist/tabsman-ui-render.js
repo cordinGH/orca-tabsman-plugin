@@ -5,6 +5,7 @@
 import * as TabsmanCore from './tabsman-core.js';
 import * as Persistence from './tabsman-persistence.js';
 import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.js';
+import * as Utils from "./tabsman-utils.js";
 
 
 // 标签页容器元素
@@ -18,8 +19,6 @@ let dockedPanelIdUnSubscribe = null;
 let pluginDockPanelReady = false
 
 let rendering = false;
-
-const createDomWithClass = window.pluginTabsman.createDomWithClass
 
 
 /**
@@ -52,29 +51,29 @@ function createTabElement(tab, panelId, panelGroupEle) {
 
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
-    const tabElement = createDomWithClass("div", "plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item", panelGroupEle)
+    const tabElement = Utils.createDomWithClass("div", "plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item", panelGroupEle)
     tabElement.className = 'plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item';
     tabElement.setAttribute('data-tabsman-tab-id', tab.id);
     tabElement.setAttribute('data-tabsman-panel-id', panelId);
     tabElement.setAttribute('draggable', 'true');
 
     // 置顶图标
-    const pinIcon = createDomWithClass("i", `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`, tabElement)
+    const pinIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`, tabElement)
 
     // 块图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质是相同的。
-    const blockIcon = createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`, tabElement)
+    const blockIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`, tabElement)
     blockIcon.setAttribute('data-tabsman-tab-id', tab.id);
     blockIcon.setAttribute('data-tabsman-panel-id', panelId);
 
     // 标签页标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
-    const title = createDomWithClass("div", 'plugin-tabsman-tab-title orca-fav-item-label', tabElement)
+    const title = Utils.createDomWithClass("div", 'plugin-tabsman-tab-title orca-fav-item-label', tabElement)
     title.textContent = tab.name || `标签页name为空 ${tab.id}`;
 
     // 关闭按钮
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
-    const closeBtn = createDomWithClass("i", 'plugin-tabsman-tab-close ti ti-x orca-fav-item-menu', tabElement)
+    const closeBtn = Utils.createDomWithClass("i", 'plugin-tabsman-tab-close ti ti-x orca-fav-item-menu', tabElement)
     closeBtn.setAttribute('data-tabsman-tab-id', tab.id);
     closeBtn.setAttribute('data-tabsman-panel-id', panelId);
 
@@ -97,12 +96,12 @@ function createTabElement(tab, panelId, panelGroupEle) {
 function createPanelItemElement(panelId, panelGroupEle) {
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
-    const panelItemElement = createDomWithClass("div", 'plugin-tabsman-panel-item plugin-tabsman-item-item orca-fav-item-item', panelGroupEle)
+    const panelItemElement = Utils.createDomWithClass("div", 'plugin-tabsman-panel-item plugin-tabsman-item-item orca-fav-item-item', panelGroupEle)
     panelItemElement.setAttribute('data-tabsman-panel-id', panelId);
 
     // 折叠图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
-    const collapseIcon = createDomWithClass("i", 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font', panelItemElement)
+    const collapseIcon = Utils.createDomWithClass("i", 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font', panelItemElement)
     const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
     if (panelId !== dockedPanelId) {
         collapseIcon.className += ' ti ti-chevron-down';
@@ -113,7 +112,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
 
     // 面板标题
     // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
-    const title = createDomWithClass("div", 'plugin-tabsman-panel-title orca-fav-item-label', panelItemElement)
+    const title = Utils.createDomWithClass("div", 'plugin-tabsman-panel-title orca-fav-item-label', panelItemElement)
     title.setAttribute("contenteditable", "true");
     // 加载保存的标题，如果没有则使用默认标题
     const savedTitle = getPanelTitle(panelId);
@@ -125,7 +124,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
 
     // 创建新标签页按钮
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
-    const newTabButton = createDomWithClass("i", 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu', panelItemElement)
+    const newTabButton = Utils.createDomWithClass("i", 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu', panelItemElement)
     newTabButton.setAttribute('data-tabsman-panel-id', panelId);
 
     // 返回包含DOM元素和子元素引用的对象
@@ -256,7 +255,7 @@ function __renderCreate(tab) {
             return
         }
 
-        panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
+        panelGroup = Utils.createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
         panelGroup.setAttribute('data-tabsman-panel-id', panelId);
         allPanelGroupEle[panelId] = panelGroup
 
@@ -286,7 +285,7 @@ function __renderPin(panelId){
 // 渲染单个group，返回渲染结果
 function _renderOnePanelGroup(panelId, panelTabs) {
     // 创建面板分组容器
-    const panelGroup = createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
+    const panelGroup = Utils.createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
     panelGroup.setAttribute('data-tabsman-panel-id', panelId);
     
     // 创建面板标题项

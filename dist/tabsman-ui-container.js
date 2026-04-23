@@ -1,7 +1,8 @@
 // Orca Tabsman Plugin - UI外壳模块
 // 负责创建和注入标签页管理器的UI外壳到Orca侧边栏中
+import * as Utils from "./tabsman-utils.js";
 let tabsmanShell = null;
-const createDomWithClass = window.pluginTabsman.createDomWithClass
+
 let commandInterceptHandler = null
 let handleSidebarTabOptionsClick = null
 
@@ -17,11 +18,11 @@ function injectHideableContainer(targetElement) {
 
     // 创建 .plugin-tabsman-container 元素
     // ⭐️⭐️⭐️借用orca-favorites-list样式，性质是相同的。
-    const tabsmanContainer = createDomWithClass("div", 'plugin-tabsman-container orca-favorites-list', hideableContainer)
+    const tabsmanContainer = Utils.createDomWithClass("div", 'plugin-tabsman-container orca-favorites-list', hideableContainer)
     
     // 创建 .plugin-tabsman-tabs 元素
     // ⭐️⭐️⭐️借用orca-favorites-items样式，性质是相同的。
-    const tabsmanTabs = createDomWithClass("div", 'plugin-tabsman-tabs orca-favorites-items', tabsmanContainer)
+    const tabsmanTabs = Utils.createDomWithClass("div", 'plugin-tabsman-tabs orca-favorites-items', tabsmanContainer)
     
     // 注入到.orca-sidebar-tabs
     targetElement.insertBefore(hideableContainer, targetElement.firstChild);
@@ -52,7 +53,7 @@ async function injectTabsmanShell() {
         
         // 注入侧边栏内容外壳和tab-option
         const hideableContainer = injectHideableContainer(sidebarTabsEl);
-        const tabOptionEl = createDomWithClass("div", 'orca-segmented-item plugin-tabsman-tab-option', sidebarTabOptionsEl)
+        const tabOptionEl = Utils.createDomWithClass("div", 'orca-segmented-item plugin-tabsman-tab-option', sidebarTabOptionsEl)
         tabOptionEl.textContent = 'Tabs';
         
         // 保存完整的外壳对象

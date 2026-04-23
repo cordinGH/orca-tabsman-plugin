@@ -1,8 +1,6 @@
 // Orca Tabsman Plugin - 插件入口
 // 负责启动核心功能和UI注入
 
-
-import "./tabsman-utils.js";
 import { start, destroy, switchToNextTab, switchToPreviousTab, switchPreviousActiveTab } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';

@@ -5,7 +5,7 @@ let orcaBackButton = document.querySelector('.orca-button.orca-headbar-back');
 let orcaForwardButton = document.querySelector('.orca-button.orca-headbar-back+.orca-button');
 let backButton = orcaBackButton.cloneNode(true);
 let forwardButton = orcaForwardButton.cloneNode(true);
-let headbar = document.querySelector('#headbar');
+let headbar = document.getElementById('headbar');
 let currentPopup = null;
 
 // 历史菜单
@@ -144,6 +144,8 @@ async function handleClosePopup(e) {
         // 移除关闭弹窗事件监听器
         document.removeEventListener('keydown', handleClosePopup);
         document.removeEventListener('pointerdown', handleClosePopup);
+        document.body.classList.remove('orca-popup-pointer-logic')
+        headbar.classList.remove('plugin-tabsman-popup-open')
     }
 }
 
@@ -173,6 +175,8 @@ async function handleHistoryButtonRightClick(e) {
     // 定位弹窗到按钮下方
     const buttonEle = stackType === 'back' ? backButton : forwardButton;
     Utils.setPopupPosition(popupEle, buttonEle)
+    document.body.classList.add('orca-popup-pointer-logic')
+    headbar.classList.add('plugin-tabsman-popup-open')
     
     // 保存当前弹窗引用
     currentPopup = popupEle;

@@ -13,8 +13,8 @@ let wsItems = null
 let wsTools = null
 
 // 插件栏元素和虎鲸headerbar
-const userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
-const headbar = document.querySelector('#headbar')
+let userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
+let headbar = document.getElementById('headbar')
 
 /** @type {HTMLElement} 确认窗口 */
 let confirmPopup = null
@@ -97,6 +97,8 @@ export function stopWSRender(){
     savePopup = null
     wsItemSelected = null
     wsItemsObj = {}
+    userTools = null
+    headbar = null
 }
 
 
@@ -172,6 +174,8 @@ async function openDeletePopupByClickEle(target) {
 
     // 定位弹窗到按钮下方
     Utils.setPopupPosition(confirmPopup, target.parentElement)
+    document.body.classList.add('orca-popup-pointer-logic')
+    headbar.classList.add('plugin-tabsman-popup-open')
 }
 
 
@@ -200,6 +204,8 @@ function openSavePopupByClickEle() {
     }, 0);
 
     Utils.setPopupPosition(savePopup, saveButton)
+    document.body.classList.add('orca-popup-pointer-logic')
+    headbar.classList.add('plugin-tabsman-popup-open')
 }
 
 
@@ -343,9 +349,11 @@ async function handleCancelSavePopupClose(e) {
     shouldClose && removePopup(savePopup)
 }
 
-// 从dom中移除save弹窗，同时一并移除监听器
+// 从dom中移除弹窗，同时一并移除监听器
 async function removePopup (popupEle){
     await closePopupwithAnimation(popupEle)
+    document.body.classList.remove('orca-popup-pointer-logic')
+    headbar.classList.remove('plugin-tabsman-popup-open')
     if (popupEle === savePopup) {
         document.removeEventListener('pointerdown', handleCancelSavePopupClose)
         document.removeEventListener('keydown', handleCancelSavePopupClose)

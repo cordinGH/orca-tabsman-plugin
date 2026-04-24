@@ -182,6 +182,7 @@
     pointer-events: none;
 }
 
+/* ———————————————————————————————————————————————————————————————————————————————————————————————————————————— */
 /* tooltips，按钮 */
 .orca-button.plugin-tabsman-ws-exit/*,
 .orca-button.plugin-tabsman-ws-save*/{
@@ -224,4 +225,9 @@
 .orca-button.plugin-tabsman-ws-save:hover::before*/{
     transition: opacity .15s .15s;
     opacity: 1;
-  }
+}
+
+/* ——————————————————————————————————————————————— 弹窗事件控制 ——————————————————————————————————————————————————— */
+#headbar.plugin-tabsman-popup-open{
+    pointer-events: auto;
+}

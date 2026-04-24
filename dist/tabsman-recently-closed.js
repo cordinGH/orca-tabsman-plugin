@@ -3,6 +3,7 @@ const { Button, HoverContextMenu, ContextMenu, Menu, MenuText } = orca.component
 
 import * as TabsmanCore from './tabsman-core.js';
 import * as TabsmanPersistence from './tabsman-persistence.js';
+import * as Utils from './tabsman-utils.js'
 
 let renderTabsByPanelCallback;
 
@@ -127,6 +128,14 @@ function startRecentlyClosed(renderTabsByPanel) {
             menu: (close) => createElement(RecentlyClosedMenu, { close })
         }
     ));
+    
+
+    /** @type {HTMLElement} */
+    setTimeout(() => {
+        const button = document.querySelector('.orca-button.plugin-tabsman-fav-and-closed')
+        button.onmouseenter = () => Utils.showTooltip(button, '收藏&最近关闭')
+        button.onmouseleave = () => Utils.hideTooltip()
+    }, 0)
 }
 
 export { startRecentlyClosed, stopRecentlyClosed };

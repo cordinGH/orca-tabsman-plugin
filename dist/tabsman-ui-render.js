@@ -121,6 +121,8 @@ function createPanelItemElement(panelId, panelGroupEle) {
     // 加载保存的标题，如果没有则使用默认标题
     const savedTitle = getPanelTitle(panelId);
     title.textContent = savedTitle;
+    title.onmouseenter = () => Utils.showTooltip(title, "点击可修改名称，修改后按enter生效")
+    title.onmouseleave = () => Utils.hideTooltip()
     
     if (panelId === dockedPanelId) {
         title.style.color = "var(--orca-color-primary-5)"
@@ -130,7 +132,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
     // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
     const newTabButton = Utils.createDomWithClass("i", 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu', panelItemElement)
     newTabButton.setAttribute('data-tabsman-panel-id', panelId);
-    newTabButton.onmouseenter = () => Utils.showTooltip(newTabButton, '打开新标签页')
+    newTabButton.onmouseenter = () => Utils.showTooltip(newTabButton, '单击 或 Alt+单击')
     newTabButton.onmouseleave = () => Utils.hideTooltip()
 
     // 返回包含DOM元素和子元素引用的对象

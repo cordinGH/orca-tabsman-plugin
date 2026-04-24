@@ -41,12 +41,15 @@ export async function startWSRender() {
 
     // 提取用户的工作区
     const allUserWS = await window.pluginTabsman.getAllWS()
+    console.log(allUserWS)
     // const allUserWS = allWS.filter(item => item !== "tabsman-workspace-exit")
 
     // 创建userWS（选项卡）
+    const fragment = document.createDocumentFragment()
     for(const name of allUserWS){
-        appendWSItemEle(name)
+        appendWSItemEle(name, fragment)
     }
+    wsItems.appendChild(fragment)
 
     // ws工具栏监听委托
     wsTools.addEventListener("pointerdown", async function (e) {
@@ -121,8 +124,8 @@ function removeWSItemEle(name) {
 }
 
 // 添加工作区元素
-function appendWSItemEle(name) {
-    const wsItem = createDomWithClass("div", "plugin-tabsman-ws-items-item orca-segmented-item", wsItems)
+function appendWSItemEle(name, container = wsItems) {
+    const wsItem = createDomWithClass("div", "plugin-tabsman-ws-items-item orca-segmented-item", container)
     wsItem.dataset.pluginTabsmanWsName = name
     wsItem.textContent = name.slice(name.indexOf('_') + 1)
     createDomWithClass("i", "ti ti-x plugin-tabsman-ws-items-item-delete", wsItem)

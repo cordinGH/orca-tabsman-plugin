@@ -8,10 +8,13 @@ import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.
 import * as Utils from "./tabsman-utils.js";
 
 
-// 标签页容器元素
+/** @type {HTMLElement} - 标签页容器元素*/
 let tabsmanTabsEle = null;
 
+/** @type {Object} - 标签页缓存对象*/
 let allTabEle = null
+
+/** @type {Object} - 面板组缓存对象 */
 let allPanelGroupEle = null
 
 let pluginDockpanelUnSubscribe = null;
@@ -165,9 +168,8 @@ async function handleTabsmanClick(e) {
             await TabsmanCore.deleteTab(tabId);
         } else if (target.classList.contains('plugin-tabsman-tab-icon')) {
             // 点击块图标切换收藏状态
-            const isFavorite = target.classList.toggle('plugin-tabsman-tab-favorite');
-            isFavorite ? await Persistence.addAndSaveTab(tab, "favorite") : await Persistence.removeAndSaveTab(tab, "favorite");
-            // renderTabsByPanel({type: "favorite", panelId});
+            const isFavorite = target.classList.contains('plugin-tabsman-tab-favorite');
+            isFavorite ? await Persistence.removeAndSaveTab(tab, "favorite") : await Persistence.addAndSaveTab(tab, "favorite");
             renderTabsByPanel();
         } else {
             // 存在停靠面板则先联动dockpanel插件=>切换停靠面板的折叠状态。
@@ -284,22 +286,24 @@ function __renderCreate(tab) {
 
 // pin住时更新整个面板，轻量渲染
 function __renderPin(panelId){
-    const newPanelGroupEle = _renderOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
+    const fragment = document.createDocumentFragment();
+    const newPanelGroupEle = __createOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
     allPanelGroupEle[panelId].replaceWith(newPanelGroupEle)
     allPanelGroupEle[panelId].remove()
     allPanelGroupEle[panelId] = newPanelGroupEle
 }
 
-// 渲染单个group，返回渲染结果
-function _renderOnePanelGroup(panelId, panelTabs) {
+// 创建单个group并返回
+function __createOnePanelGroup(panelId, panelTabs) {
     // 创建面板分组容器
-    const panelGroup = Utils.createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
+    const panelGroup = document.createElement("div")
+    panelGroup.className = 'plugin-tabsman-panel-group orca-fav-item'
     panelGroup.setAttribute('data-tabsman-panel-id', panelId);
     
     // 创建面板标题项
     createPanelItemElement(panelId, panelGroup);
     
-    // 渲染该面板的标签页并加入面板分组容器
+    // 将该面板的标签页并加入面板分组容器
     for (const tab of panelTabs) {
         const tabElement = createTabElement(tab, panelId, panelGroup);
         allTabEle[tab.id] = tabElement;
@@ -357,10 +361,16 @@ function __renderAll() {
 
     if (!allSortedTabs || allSortedTabs.size < 1) return;
 
+    // 一次性插入
+    const fragment = document.createDocumentFragment();
     for (const [panelId, panelTabs] of allSortedTabs) {
         if (panelTabs.length === 0) continue;
-        allPanelGroupEle[panelId] = _renderOnePanelGroup(panelId, panelTabs)
+        const panelGroup = __createOnePanelGroup(panelId, panelTabs)
+        allPanelGroupEle[panelId] = panelGroup
+        fragment.appendChild(panelGroup)
     }
+    
+    tabsmanTabsEle.appendChild(fragment);
 }
 
 

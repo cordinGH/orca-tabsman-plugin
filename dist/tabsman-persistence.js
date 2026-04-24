@@ -99,7 +99,7 @@ async function removeAndSaveTab(tab, tabType = "") {
 
     let index;
     if ( tabType === "favorite" ) {
-        index = tabArray.findIndex(item => item.currentBlockId === tab.currentBlockId);
+        index = tabArray.findIndex(item => item.currentBlockId.valueOf() === tab.currentBlockId.valueOf());
     } else {
         index = tabArray.findIndex(item => item.id === tab.id);
     }

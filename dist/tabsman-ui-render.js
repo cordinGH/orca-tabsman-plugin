@@ -48,13 +48,11 @@ function createTabElement(tab, panelId, panelGroupEle) {
     // 判断是否为收藏块
     let isFavorite = false;
     const isFavoriteBlock = Persistence.getTabArray("favorite").find(favoriteTab => favoriteTab.currentBlockId.toString() === tab.currentBlockId.toString())
-    if (isFavoriteBlock) {
-        isFavorite = true;
-    }
+    if (isFavoriteBlock) isFavorite = true;
 
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
-    const tabElement = Utils.createDomWithClass("div", "plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item", panelGroupEle)
+    const tabElement = document.createElement('div')
     tabElement.className = 'plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item';
     tabElement.setAttribute('data-tabsman-tab-id', tab.id);
     tabElement.setAttribute('data-tabsman-panel-id', panelId);
@@ -84,6 +82,8 @@ function createTabElement(tab, panelId, panelGroupEle) {
     closeBtn.setAttribute('data-tabsman-tab-id', tab.id);
     closeBtn.setAttribute('data-tabsman-panel-id', panelId);
 
+    panelGroupEle.appendChild(tabElement)
+
     // 返回包含DOM元素和子元素引用的对象
     return {
         element: tabElement,
@@ -101,9 +101,11 @@ function createTabElement(tab, panelId, panelGroupEle) {
  * @returns {Object} 返回包含DOM元素和子元素引用的对象
  */
 function createPanelItemElement(panelId, panelGroupEle) {
+
     // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
     // plugin-tabsman-item-item为了适配tune-theme
-    const panelItemElement = Utils.createDomWithClass("div", 'plugin-tabsman-panel-item plugin-tabsman-item-item orca-fav-item-item', panelGroupEle)
+    const panelItemElement = document.createElement('div')
+    panelItemElement.className = 'plugin-tabsman-panel-item plugin-tabsman-item-item orca-fav-item-item'
     panelItemElement.setAttribute('data-tabsman-panel-id', panelId);
 
     // 折叠图标
@@ -138,6 +140,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
     newTabButton.onmouseenter = () => Utils.showTooltip(newTabButton, '单击 或 Alt+单击')
     newTabButton.onmouseleave = () => Utils.hideTooltip()
 
+    panelGroupEle.appendChild(panelItemElement)
     // 返回包含DOM元素和子元素引用的对象
     return {
         element: panelItemElement,

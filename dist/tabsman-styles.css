@@ -129,7 +129,7 @@
 }
 
 .plugin-tabsman-ws-items-item.orca-segmented-item.plugin-tabsman-ws-selected{
-    outline: 1px solid var(--orca-color-primary-5);
+    outline: 1.5px solid var(--orca-color-primary-5);
     color: initial;
 }
 

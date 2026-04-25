@@ -71,6 +71,7 @@ export function showTooltip(buttonEle, text) {
     timer = setTimeout(() => {
         document.body.appendChild(getTooltipPopup())
         // 更新文本，并将定位到按钮下方
+        // tooltipPopup.querySelector('.orca-tooltip').innerHTML = text;
         tooltipPopup.querySelector('.orca-tooltip').textContent = text;
         setPopupPosition(tooltipPopup, buttonEle)
     }, 100)

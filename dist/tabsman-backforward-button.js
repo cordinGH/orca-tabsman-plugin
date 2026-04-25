@@ -51,8 +51,10 @@ function startbackforwardbutton() {
     forwardButton.addEventListener('click', handleForwardButtonLeftClick);
 
     // 悬停 tooltip
+    // backButton.onmouseenter = () => Utils.showTooltip(backButton, `右键查看历史<span class="orca-tooltip-shortcut">当前${getHistoryCount('back')}</span>`)
     backButton.onmouseenter = () => Utils.showTooltip(backButton, `右键查看历史 | 当前${getHistoryCount('back')}`)
     backButton.onmouseleave = () => Utils.hideTooltip()
+    // backButton.onmouseenter = () => Utils.showTooltip(backButton, `右键查看历史<span class="orca-tooltip-shortcut">当前${getHistoryCount('forward')}</span>`)
     forwardButton.onmouseenter = () => Utils.showTooltip(forwardButton, `右键查看历史 | 当前${getHistoryCount('forward')}`)
     forwardButton.onmouseleave = () => Utils.hideTooltip()
 
@@ -212,7 +214,7 @@ async function createBackForwardMenu(stackArrary, stackType) {
     if (stackType === 'back') stackItemArrary.reverse()
 
     // 创建历史记录的条目项
-        for (let i = 0; i < stackItemArrary.length; i++) {
+    for (let i = 0; i < stackItemArrary.length; i++) {
         let stackItemInfo = stackItemArrary[i];
         let menuItem = createMenuItem(stackItemInfo, i);
         backForwardMenu.appendChild(menuItem); // 添加到菜单中

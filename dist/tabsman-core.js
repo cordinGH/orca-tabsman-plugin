@@ -855,10 +855,9 @@ function getPanelScrollInfo() {
 
 // 保存工作空间
 async function saveWorkspace(name, onlyActiveTab = false, needNotify = true){
-    const sname = String(name)
     // 时间戳前缀用于排序（getDataKeys获取的数组是按照keys的码值排序的）
     // 只禁止恶意重名：一个时间戳内连续生成相同name
-    const saveName = String(Date.now()) + "_" + sname
+    const saveName = String(Date.now()) + "_" + String(name)
 
     const existName = await orca.plugins.getData('tabsman-workspace', saveName)
     if (existName || existName === "tabsman-workspace-exit"){
@@ -881,11 +880,32 @@ async function saveWorkspace(name, onlyActiveTab = false, needNotify = true){
     return saveName
 }
 
+/**
+ * 为目标工作区重命名
+ * @param {string} targetName 目标name
+ * @param {string} newName 新名称
+ * @returns {string} 保存的名称（带有时间戳）
+ */
+async function renameWorkspace(targetName, newName) {
+    const workspaceTabs = JSON.parse(await orca.plugins.getData('tabsman-workspace', targetName))
+    const workspaceScrollJSON = await orca.plugins.getData('tabsman-workspace-scroll', targetName)
+    let workspaceScroll;
+    if (workspaceScrollJSON) {
+        workspaceScroll = JSON.parse(workspaceScrollJSON)
+    } 
+    await orca.plugins.removeData("tabsman-workspace", targetName)
+    await orca.plugins.removeData("tabsman-workspace-scroll", targetName)
+    const timestamp = targetName.slice(0, targetName.indexOf('_'))
+    const saveName = timestamp + "_" + String(newName)
+    await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(workspaceTabs));
+    workspaceScroll && await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(workspaceScroll));
+    return saveName
+}
+
 // 显示所有的工作空间name
 async function getAllWorkspace(){
     const keys = await orca.plugins.getDataKeys("tabsman-workspace")
-
-    return keys
+    return keys.sort()
 }
 
 // 删除指定name的工作空间，返回值1用于删除时是否正处于该工作区
@@ -1652,5 +1672,6 @@ export {
     deleteAllWorkspace,
     saveWorkspace,
     openWorkspace,
-    exitWorkspace
+    exitWorkspace,
+    renameWorkspace
 };

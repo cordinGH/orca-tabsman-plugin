@@ -23,9 +23,16 @@ let confirmPopup = null
 /** @type {HTMLElement} 保存窗口 */
 let savePopup = null
 
+/** @type {HTMLElement} 重命名窗口 */
+let renamePopup = null;
+
 /** @type {HTMLElement}  当前被打开的工作区（元素）*/
 let wsItemSelected = null
 
+/**
+ * 工作区映射表，以工作区 ID 为键，对应的 DOM 元素为值
+ * @type {Object.<string, HTMLElement>}
+ */
 let wsItemsObj = {}
 
 const {createDomWithClass, closePopupwithAnimation} = Utils
@@ -56,7 +63,15 @@ export async function startWSRender() {
         const target = e.target
         const {classList} = target
         if (target.classList.contains("plugin-tabsman-ws-items-item")) {
-            openWSByClickEle(target)
+            const buttonType = e.button
+            buttonType === 0 && openWSByClickEle(target)
+            if (buttonType === 2) {
+                if (renamePopup?.isConnected) {
+                   e.stopPropagation()  
+                    await removePopup(renamePopup)
+                }
+                openRenamePopupByClickEle(target)
+            }
         } else if (classList.contains("plugin-tabsman-ws-items-item-delete")) {
             // 连接状态下，当再次点击关闭时，由于可能是想关闭其他工作区，因此应当先清理掉弹窗。
             // 这种情况下先前挂在document上的关闭监听就不能再处理了。否则执行栈会出bug导致弹窗秒开秒关，具体的执行栈原因分析见笔记date260423
@@ -133,6 +148,32 @@ function appendWSItemEle(name, container = wsItems) {
     return wsItem
 }
 
+/**
+ * 更新指定工作区Item的名字
+ * @param {String} oldName - 目标旧名字
+ * @param {String} newName - 目标新名字
+ */
+function wsItemEleRename(oldName, newName){
+    
+    // 新建item
+    const newItem = document.createElement('div')
+    newItem.className = 'plugin-tabsman-ws-items-item orca-segmented-item'
+    newItem.dataset.pluginTabsmanWsName = newName
+    newItem.textContent = newName.slice(newName.indexOf('_') + 1)
+    createDomWithClass("i", "ti ti-x plugin-tabsman-ws-items-item-delete", newItem)
+    wsItemsObj[newName] = newItem
+
+    // 替换并移除旧的item
+    const targetItem = wsItemsObj[oldName]
+    targetItem.replaceWith(newItem)
+
+    if (wsItemSelected === targetItem) {
+        wsItemSelected = newItem
+        wsItemSelected.classList.add("plugin-tabsman-ws-selected")
+    }
+    delete wsItemsObj[oldName]
+}
+
 
 /**
  * 点击元素打开工作区
@@ -156,12 +197,36 @@ function openWSByClickEle(wsItem) {
     }
 }
 
+/**
+ * 点击（右键）打开重命名工作区的弹窗
+ * @param {HTMLElement} wsItem 需要重命名的工作区
+ */
+function openRenamePopupByClickEle(wsItem) {
+
+    // 加入DOM并监听关闭触发
+    appendRenamePopup()
+    
+    // 确保焦点触发。
+    setTimeout(() => {
+        document.addEventListener('pointerdown', handleRenamePopupClose);
+        document.addEventListener('keydown', handleRenamePopupClose);
+        renamePopup.inputActualinput.focus()
+    }, 0);
+
+    const wsName = wsItem.dataset.pluginTabsmanWsName
+    renamePopup.result = wsName
+
+    Utils.setPopupPosition(renamePopup, wsItem)
+    document.body.classList.add('orca-popup-pointer-logic')
+    headbar.classList.add('plugin-tabsman-popup-open')
+}
+
 
 /**
  * 点击打开删除工作区的弹窗
  * @param {HTMLElement} wsItem 需要打开的目标工作区
  */
-async function openDeletePopupByClickEle(wsItem) {
+function openDeletePopupByClickEle(wsItem) {
 
     // 加入DOM并监听关闭触发
     appendConfirmPopup()
@@ -183,15 +248,6 @@ async function openDeletePopupByClickEle(wsItem) {
 
 
 /**
- * 点击退出工作区
- */
-function exitWSByClickEle() {
-    TabsmanCore.exitWorkspace()
-    exitButton.remove()
-    clearWSItemSelected()
-}
-
-/**
  * 点击打开保存工作区的弹窗
  */
 function openSavePopupByClickEle() {
@@ -210,6 +266,60 @@ function openSavePopupByClickEle() {
     document.body.classList.add('orca-popup-pointer-logic')
     headbar.classList.add('plugin-tabsman-popup-open')
 }
+
+
+/**
+ * 点击退出工作区 
+ */
+function exitWSByClickEle() {
+    TabsmanCore.exitWorkspace()
+    exitButton.remove()
+    clearWSItemSelected()
+}    
+
+
+// 将重命名弹窗添加进dom
+function appendRenamePopup() {
+
+    if (renamePopup) {
+        headbar.appendChild(renamePopup)
+        return
+    }
+    // 创建重命名弹窗
+    renamePopup = document.createElement('div')
+    renamePopup.className = 'orca-popup plugin-tabsman-ws-rename_popup'
+    renamePopup = createDomWithClass("div", 'orca-popup plugin-tabsman-ws-rename_popup', headbar)
+    Object.assign(renamePopup.style, { zIndex: '299', transformOrigin: 'left top' });
+
+    // 容器
+    const confirmBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-confirm-box', renamePopup)
+
+    // 输入区
+    const input = createDomWithClass("div", 'orca-confirm-box-message', confirmBox)
+    const inputInput = createDomWithClass("span", 'orca-input-input', input)
+    inputInput.innerHTML = '<i class="ti ti-forms orca-input-box-icon orca-input-pre"></i>'
+    const inputActualinput = createDomWithClass("input", 'orca-input-actualinput', inputInput)
+    renamePopup.inputActualinput = inputActualinput
+    inputActualinput.placeholder = "请输入新名称..."
+    inputActualinput.type = "text"
+
+    // 确认按钮
+    const noBtn = createDomWithClass("div", 'orca-button outline', confirmBox)
+    noBtn.textContent = "取消"
+    const yesBtn = createDomWithClass("div", 'orca-button solid', confirmBox)
+    yesBtn.textContent = "确认"
+    
+    noBtn.onclick = () => removePopup(renamePopup)
+    yesBtn.onclick = () => {
+        const targetName = renamePopup.result
+        TabsmanCore.renameWorkspace(targetName, renamePopup.inputActualinput.value)
+        .then((renameResult) => wsItemEleRename(targetName, renameResult))
+        renamePopup.inputActualinput.value = ""
+        removePopup(renamePopup)
+    };
+
+    headbar.appendChild(renamePopup)
+}    
 
 
 // 获取确认窗对象，确认窗result保存处理的wsName
@@ -249,6 +359,7 @@ function appendConfirmPopup() {
     headbar.appendChild(confirmPopup)
 }
 
+
 // 获取保存窗对象，result属性为获取的name
 function appendSavePopup() {
     if (savePopup && !savePopup.isConnected) {
@@ -261,15 +372,14 @@ function appendSavePopup() {
     savePopup.className = 'orca-popup plugin-tabsman-ws-save_popup'
     Object.assign(savePopup.style, { zIndex: '299', transformOrigin: 'left top' });
 
-    // 弹窗的命名输入区
+    // 容器
     const saveInputBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-input-box', savePopup)
 
+    // 弹窗的命名输入区
     const input = createDomWithClass("span", 'orca-input', saveInputBox)
     savePopup.input = input
-
     const inputInput = createDomWithClass("span", 'orca-input-input', input)
     inputInput.innerHTML = '<i class="ti ti-forms orca-input-box-icon orca-input-pre"></i>'
-
     const inputActualinput = createDomWithClass("input", 'orca-input-actualinput', inputInput)
     savePopup.inputActualinput = inputActualinput
     inputActualinput.placeholder = "请为新工作区命名..."
@@ -344,14 +454,20 @@ function appendSavePopup() {
 }
 
 
-async function handleConfirmPopupClose(e) {
+function handleRenamePopupClose(e) {
+    if (!renamePopup.isConnected) return
+    const shouldClose = (e.type === 'keydown' && e.key === 'Escape') || (e.type === 'pointerdown' && !renamePopup.contains(e.target))
+    shouldClose && removePopup(renamePopup)
+}
+
+function handleConfirmPopupClose(e) {
     if (!confirmPopup.isConnected) return
     // 键盘esc或者是点在了confirmPopup以外的元素，则移除popup
     const shouldClose = (e.type === 'keydown' && e.key === 'Escape') || (e.type === 'pointerdown' && !confirmPopup.contains(e.target))
     shouldClose && removePopup(confirmPopup)
 }
 
-async function handleSavePopupClose(e) {
+function handleSavePopupClose(e) {
     // 该回调只在appendSavePopup执行后才追加回调，因此savePopup是必然存在的
     if (!savePopup.isConnected) return
     const shouldClose = (e.type === 'keydown' && e.key === 'Escape') || (e.type === 'pointerdown' && !savePopup.contains(e.target))
@@ -372,8 +488,14 @@ async function removePopup (popupEle){
             savePopup.onlyActiveTab = false
         }
     }
+
     if (popupEle === confirmPopup) {
         document.removeEventListener('pointerdown', handleConfirmPopupClose)
         document.removeEventListener('keydown', handleConfirmPopupClose)
+    }
+
+    if (popupEle === renamePopup) {
+        document.removeEventListener('pointerdown', handleRenamePopupClose)
+        document.removeEventListener('keydown', handleRenamePopupClose)
     }
 }

@@ -49,6 +49,7 @@ export function getTooltipPopup() {
         zIndex: '499',
         transformOrigin: 'center top',
         pointerEvents: 'none',
+        whiteSpace: 'pre-wrap'
     });
 
     const inner = createDomWithClass('div', 'orca-tooltip', tooltipPopup)

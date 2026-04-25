@@ -840,7 +840,11 @@ async function unpinTab(tabId) {
 /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
 /* ———————————————————————————————————————实现工作区————————————————————————————————————————————————— */
 /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
-// 获取面板位置
+
+/**
+ * 获取面板位置
+ * @returns {number} -浮点数，滚动距离
+ */
 function getPanelScrollInfo() {
     const panelIds = Object.keys(activeTabs)
     const scrollInfo = {}
@@ -880,26 +884,30 @@ async function saveWorkspace(name, onlyActiveTab = false, needNotify = true){
     return saveName
 }
 
+
 /**
- * 为目标工作区重命名
- * @param {string} targetName 目标name
- * @param {string} newName 新名称
- * @returns {string} 保存的名称（带有时间戳）
+ * 重命名当前工作区，迁移其关联数据（标签页、滚动位置）到新键名
+ * @param {string} newName 新的工作区显示名称（不含时间戳前缀）
+ * @returns {Promise<{success: boolean, result: string|null}>}
+ *   - `success`: 是否重命名成功；若当前无活动工作区则为 `false`
+ *   - `result`: 重命名后的完整存储键名（格式为 `{timestamp}_{newName}`）；失败时为 `null`
  */
-async function renameWorkspace(targetName, newName) {
-    const workspaceTabs = JSON.parse(await orca.plugins.getData('tabsman-workspace', targetName))
-    const workspaceScrollJSON = await orca.plugins.getData('tabsman-workspace-scroll', targetName)
-    let workspaceScroll;
-    if (workspaceScrollJSON) {
-        workspaceScroll = JSON.parse(workspaceScrollJSON)
-    } 
-    await orca.plugins.removeData("tabsman-workspace", targetName)
-    await orca.plugins.removeData("tabsman-workspace-scroll", targetName)
-    const timestamp = targetName.slice(0, targetName.indexOf('_'))
+async function renameWorkspace(newName) {
+    if (!workspaceNow) return {success: false, key: null}
+
+    // 移除过时数据
+    await orca.plugins.removeData("tabsman-workspace", workspaceNow)
+    const ownScroll = await orca.plugins.getData('tabsman-workspace-scroll', workspaceNow)
+    ownScroll && await orca.plugins.removeData("tabsman-workspace-scroll", workspaceNow)
+
+    // 新名称
+    const timestamp = workspaceNow.slice(0, workspaceNow.indexOf('_'))
     const saveName = timestamp + "_" + String(newName)
-    await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(workspaceTabs));
-    workspaceScroll && await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(workspaceScroll));
-    return saveName
+    workspaceNow = saveName
+
+    await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));
+    await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(getPanelScrollInfo()));
+    return {success: true, key: saveName}
 }
 
 // 显示所有的工作空间name
@@ -1527,7 +1535,6 @@ async function start(callback = null, pluginName) {
         // 进入具体工作空间后每次刷新ui都更新数据
         if (workspaceNow !== ""){
             await orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));
-            // await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
         }
     }
 

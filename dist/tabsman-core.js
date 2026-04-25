@@ -936,16 +936,21 @@ async function openWorkspace(name = ""){
     }
 
     // 维护退出点数据
+    // 当前不在工作区，需要进入工作区，则保存退出点
     if (workspaceNow === "") {
         await orca.plugins.setData('tabsman-workspace', "tabsman-workspace-exit", JSON.stringify(tabs));
         await orca.plugins.setData('tabsman-workspace-scroll', "tabsman-workspace-exit", JSON.stringify(getPanelScrollInfo()));
     } else if (sname === "") {
-        // 丢弃过时的退出点
-        await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
+        // 当前在工作区，目标是退出点，则更新最新的滚动位置，并移除过时的退出点数据。
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
+        await orca.plugins.removeData("tabsman-workspace", "tabsman-workspace-exit")
     } else if (sname) {
+        // 当前在工作区，目标是另一个工作区，则更新最新的滚动位置。
+        // 不需要重新保存旧工作区数据，因为每次渲染时会做保存。
         await orca.plugins.setData('tabsman-workspace-scroll', workspaceNow, JSON.stringify(getPanelScrollInfo()));
     }
+
+    // 更新当前工作区名字
     workspaceNow = sname
 
     // 恢复工作区tabs数据
@@ -1639,5 +1644,13 @@ export {
     // 持久化模块需要用该函数处理tab的有效性
     __handleTabValidStatus,
     __generateTabNameAndIcon,
-    __getBlockIdByViewAndViewArgs
+    __getBlockIdByViewAndViewArgs,
+
+    // 工作区
+    getAllWorkspace,
+    deleteWorkspace,
+    deleteAllWorkspace,
+    saveWorkspace,
+    openWorkspace,
+    exitWorkspace
 };

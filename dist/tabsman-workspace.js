@@ -1,4 +1,5 @@
 import * as Utils from './tabsman-utils.js'
+import * as TabsmanCore from './tabsman-core.js'
 
 /** @type {HTMLInputElement} */
 let saveButton = null
@@ -40,8 +41,7 @@ export async function startWSRender() {
     wsItems = createDomWithClass("div", "plugin-tabsman-ws-items", wsTools)
 
     // 提取用户的工作区
-    const allUserWS = await window.pluginTabsman.getAllWS()
-    console.log(allUserWS)
+    const allUserWS = await TabsmanCore.getAllWorkspace()
     // const allUserWS = allWS.filter(item => item !== "tabsman-workspace-exit")
 
     // 创建userWS（选项卡）
@@ -144,7 +144,7 @@ function openWSByClickEle(target) {
     wsItemSelected = target
     const name = wsItemSelected.dataset.pluginTabsmanWsName
     wsItemSelected.classList.add("plugin-tabsman-ws-selected")
-    window.pluginTabsman.openWS(name)
+    TabsmanCore.openWorkspace(name)
 
     // 确保存在退出点如果还没有退出点元素则先建立
     if (!exitButton) {
@@ -186,7 +186,7 @@ async function openDeletePopupByClickEle(target) {
  * 点击退出工作区
  */
 function exitWSByClickEle() {
-    window.pluginTabsman.exitWS()
+    TabsmanCore.exitWorkspace()
     exitButton.remove()
     clearWSItemSelected()
 }
@@ -238,7 +238,7 @@ function appendConfirmPopup() {
     yesBtn.onclick = () => {
         const wsName = confirmPopup.result
         removePopup(confirmPopup)
-        window.pluginTabsman.deleteWS(wsName).then((deleteKind) => {
+        TabsmanCore.deleteWorkspace(wsName).then((deleteKind) => {
             // 删除活跃工作区会返回1，需要移除按钮并清理选中
             if ( deleteKind === 1) {
                 exitButton.remove()
@@ -307,7 +307,7 @@ function appendSavePopup() {
             savePopup.result = inputValue
         }
 
-        const saveReturn = await window.pluginTabsman.saveWS(savePopup.result, savePopup.onlyActiveTab, false)
+        const saveReturn = await TabsmanCore.saveWorkspace(savePopup.result, savePopup.onlyActiveTab, false)
 
         if (saveReturn) {
             // 清空输入框内容
@@ -323,7 +323,7 @@ function appendSavePopup() {
             // 如果挤压了userTools，使得right变大说明溢出了，防止浮点误差，提供1px误差。 或者userToolsLeft和item重叠，也说明溢出
             if (newRight -1 > baseRight || userToolsLeft < wsItemsRight) {
                 removeWSItemEle(saveReturn)
-                await window.pluginTabsman.deleteWS(saveReturn, false)
+                await TabsmanCore.deleteWorkspace(saveReturn, false)
                 orca.notify("warn", "[tabsman] 顶部栏UI空间不足，请拉宽窗口或删除一些工作区。");
                 return;
             }

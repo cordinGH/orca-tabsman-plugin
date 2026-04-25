@@ -121,7 +121,7 @@ function wakeTabArray(rawTabArray, tabType = "") {
     
     for (const rawTab of rawTabArray) {
         
-        if (tabType === "workspace") {
+        if (tabType !== "workspace") {
             // 工作区的id需要保持不变，以便正确恢复到对应面板；非工作区的id则不需要，恢复时直接放在当前活跃面板即可
             rawTab.panelId = currentPanelId;
         }

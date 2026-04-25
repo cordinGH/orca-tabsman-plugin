@@ -1058,6 +1058,12 @@ async function openWorkspace(name = ""){
                         top: topValue,
                         behavior: 'smooth'
                     });
+
+                    // 确保smooth动画结束再执行。
+                    setTimeout(() => {
+                        orca.plugins.setData('tabsman-workspace-scroll', sname ? sname : "tabsman-workspace-exit", JSON.stringify(getPanelScrollInfo()));
+                    }, 1000);
+
                 }, 500);
             }
         }

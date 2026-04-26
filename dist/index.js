@@ -263,12 +263,18 @@ async function load(name) {
             description: "启用后，每当创建新的快速记录时，会自动折叠上一次快速记录，以保持日志页的整洁",
             type: "boolean",
             defaultValue: true
+        },
+        enableTabPreview: {
+            label: "标签页悬浮预览（需重启生效）",
+            description: "启用后，按住 Alt 悬停在标签页上时，会显示预览窗口",
+            type: "boolean",
+            defaultValue: true
         }
     });
 
 
     // 启动标签页渲染    
-    await startTabsRender();
+    await startTabsRender(pluginName);
     // 启动标签页系统，传递UI更新回调
     await start(renderTabsByPanel, pluginName);
     

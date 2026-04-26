@@ -85,3 +85,61 @@ export function hideTooltip() {
     timer = null;
     tooltipPopup && tooltipPopup.remove();
 }
+
+
+/**
+ * 启用悬浮预览
+ * @param {HTMLElement} tabElement - 标签页元素
+ * @param {Object} tab - tab对象
+ * @returns 
+ */
+let previewClose;
+let previewTimer;
+export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, tab) {
+
+    // 按住alt 时，tab元素触发悬停预览（可编辑模式）
+    const blockId = tab.currentBlockId
+
+    let targetBlockId;
+    if (blockId instanceof Date) {
+        // journal
+        const journalBlock = await orca.invokeBackend("get-journal-block", blockId);
+        targetBlockId = journalBlock.id;
+    } else if (Number.isInteger(Number(blockId))) {
+        // block
+        targetBlockId = blockId
+    } else {
+        orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块')
+    }
+
+    tabElement.onmouseenter = (e) => {
+        if (!e.altKey) return
+        clearPreview()
+        previewTimer = setTimeout(()=>{
+            const tabRect = tabElement.getBoundingClientRect();
+            const { top, bottom, right, left, width, height } = tabRect
+            const fakeRect = new DOMRect(
+                right, // 矩形区域的x偏移
+                top + height * 0.5, // 矩形区域的y偏移
+                0, // 矩形的x宽度
+                0 // 矩形的y高度
+            );
+            previewClose = orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, false);
+            document.body.classList.add('plugin-tabsman-preview')
+        }, 150)
+    }
+
+    tabElement.onmouseleave = (e) => {
+        const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
+        !isEditing && clearPreview(e)
+    }
+}
+
+function clearPreview() {
+    previewTimer && clearTimeout(previewTimer)
+    if (!previewClose) return
+    previewClose()
+    previewClose = null
+    // 确保彻底关闭再移除样式，＜150打开间隔即可
+    setTimeout(()=>document.body.classList.remove('plugin-tabsman-preview'),100)
+}

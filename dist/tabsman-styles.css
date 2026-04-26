@@ -233,3 +233,9 @@
 #headbar.plugin-tabsman-popup-open{
     pointer-events: auto;
 }
+
+/* ————————————————————————————————————————————————预览窗口移动50%不遮挡tab—————————————————————————————————————————————————————— */
+
+.plugin-tabsman-preview>.orca-popup.orca-block-preview-popup {
+    translate: 50%;
+}

@@ -11,6 +11,9 @@ import * as Utils from "./tabsman-utils.js";
 /** @type {HTMLElement} - 标签页容器元素*/
 let tabsmanTabsEle = null;
 
+/** @type {boolean} - 启用tab预览 */
+let enableTabPreview
+
 /** @type {Object} - 标签页缓存对象*/
 let allTabEle = null
 
@@ -84,6 +87,8 @@ function createTabElement(tab, panelId, panelGroupEle) {
 
     panelGroupEle.appendChild(tabElement)
 
+    enableTabPreview && Utils.enableBlockPreview(tabElement, tab,closeBtn)
+
     // 返回包含DOM元素和子元素引用的对象
     return {
         element: tabElement,
@@ -151,7 +156,11 @@ function createPanelItemElement(panelId, panelGroupEle) {
 }
 
 
-// 处理tabsman容器点击事件
+/**
+ * 处理tabsman容器点击事件
+ * @param {MouseEvent} e 
+ * @returns 
+ */
 async function handleTabsmanClick(e) {
     const target = e.target
     const tabElement = target.closest('.plugin-tabsman-tab-item');
@@ -379,9 +388,10 @@ function __renderAll() {
 
 /**
  * 启动标签页渲染系统
+ * @param {string} pluginName - 插件名
  * @returns {Promise<boolean>} 返回启动是否成功
  */
-async function startTabsRender() {
+async function startTabsRender(pluginName) {
     try {
         // 确保容器存在，如果不存在则创建
         const result = await injectTabsmanShell();
@@ -389,6 +399,8 @@ async function startTabsRender() {
             console.error('tabsmanUI外壳注入失败');
             return false;
         }
+
+        enableTabPreview = orca.state.plugins[pluginName]?.settings.enableTabPreview
         
         // 直接获取标签页容器元素
         tabsmanTabsEle = result.tabsmanTabsEl;

@@ -350,7 +350,9 @@ async function updatePersistedTabData() {
     await saveTabArray("recently-closed");
     await saveTabArray("favorite");
 
-    orca.notify("success", "[tabsman] 过时数据已升级完毕（tab本体数据）");
+    if (wsDataKeys && pinnedTabArray.length > 0 && recentlyClosedTabArray.length > 0 && favoriteTabArray.length > 0) {
+        orca.notify("success", "[tabsman] 过时数据已升级完毕（tab本体数据）");
+    }
 }
 
 // 针对3.0.1的数据版本升级的补丁：
@@ -406,7 +408,9 @@ async function fixHistoryItem() {
     await saveTabArray("recently-closed");
     await saveTabArray("favorite");
 
-    orca.notify("success", "[tabsman] 旧版本过时数据已升级完毕（tab历史记录）");
+    if (wsDataKeys && pinnedTabArray.length > 0 && recentlyClosedTabArray.length > 0 && favoriteTabArray.length > 0) {
+        orca.notify("success", "[tabsman] 旧版本过时数据已升级完毕（tab历史记录）");
+    }
 }
 
 /**

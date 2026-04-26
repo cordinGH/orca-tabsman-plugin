@@ -268,7 +268,7 @@ async function load(name) {
         },
         enableTabPreview: {
             label: "标签页悬浮预览（需重启生效）",
-            description: "启用后，按住 Alt 悬停在标签页上时，会显示预览窗口",
+            description: "启用后，按住 Alt 悬停在标签页上时，会显示预览。也可以中键标签页直接进入编辑预览。",
             type: "boolean",
             defaultValue: true
         },

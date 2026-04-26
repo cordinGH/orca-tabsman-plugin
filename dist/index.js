@@ -1,7 +1,7 @@
 // Orca Tabsman Plugin - 插件入口
 // 负责启动核心功能和UI注入
 
-import { start, destroy, switchToNextTab, switchToPreviousTab, switchPreviousActiveTab } from './tabsman-core.js';
+import { start, destroy, switchToNextTab, switchToPreviousTab, switchPreviousActiveTab, openWorkspace } from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
@@ -40,9 +40,11 @@ function clearBindHtmlElement() {
 async function clearAllData() {
     try {
         // 清除持久化数据
-        await orca.plugins.setData('tabsman', 'recently-closed-tabs-data', "[]");
-        await orca.plugins.setData('tabsman', 'pinned-tabs-data', "[]");
-        await orca.plugins.setData('tabsman', 'favorite-blocks-data', "[]");
+        await orca.plugins.clearData("tabsman")
+        await orca.plugins.clearData("tabsman-update")
+        await orca.plugins.clearData("tabsman-workspace")
+        await orca.plugins.clearData("tabsman-workspace-scroll")
+        await orca.plugins.clearData("tabsman-last-workspace")
         
         orca.notify("success", "[tabsman] 持久化数据已清除，请CTRL+R刷新生效");
     } catch (error) {
@@ -269,7 +271,13 @@ async function load(name) {
             description: "启用后，按住 Alt 悬停在标签页上时，会显示预览窗口",
             type: "boolean",
             defaultValue: true
-        }
+        },
+        restoreLastWorkspace: {
+            label: "启动时自动恢复上次工作区",
+            description: "启用后，每当进入该库时，将自动打开上次关闭前所在的工作区。若上次未进入任何工作区，则不做处理。",
+            type: "boolean",
+            defaultValue: true
+        },
     });
 
 

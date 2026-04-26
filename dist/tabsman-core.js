@@ -908,6 +908,7 @@ async function renameWorkspace(newName) {
 
     await orca.plugins.setData('tabsman-workspace', saveName, JSON.stringify(tabs));
     await orca.plugins.setData('tabsman-workspace-scroll', saveName, JSON.stringify(getPanelScrollInfo()));
+    await orca.plugins.setData('tabsman-last-workspace', 'name', saveName);
     return {success: true, key: saveName}
 }
 
@@ -1075,6 +1076,10 @@ async function openWorkspace(name = ""){
     if (renderTabsCallback) await renderTabsCallback();
 
     setTimeout(() => workspaceSwitching = false, 0);
+
+    // 如果是工作区，就保存一下信息，以便意外关闭时可以恢复
+    if (workspaceNow) await orca.plugins.setData('tabsman-last-workspace', 'name', workspaceNow);
+    else await orca.plugins.removeData('tabsman-last-workspace', 'name');
 }
 
 /* —————————————————————————————————————— 插件注册的命令接口（串行执行命令，防止长按导致数据不一致） ———————————————————————————————————————————— */
@@ -1579,7 +1584,7 @@ async function start(callback = null, pluginName) {
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点
     await orca.plugins.removeData("tabsman-workspace","tabsman-workspace-exit")
-    WorkspaceRender.startWSRender()
+    await WorkspaceRender.startWSRender(pluginName)
     // const n = await orca.plugins.getData('tabsman-workspace-feature', 'last-workspace-name')
     // if (n) lastWorkspaceName = JSON.parse(n)
     // WorkspaceRender.startWSRender(lastWorkspaceName)

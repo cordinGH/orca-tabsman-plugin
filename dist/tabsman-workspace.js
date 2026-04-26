@@ -38,8 +38,11 @@ let wsItemsObj = {}
 
 const {createDomWithClass, closePopupwithAnimation} = Utils
 
-// 启动初始渲染
-export async function startWSRender() {
+/**
+ * 启动初始渲染
+ * @param {string} pluginName 插件名
+ */
+export async function startWSRender(pluginName) {
     // 创建固定元素，保存按钮和WS容器
     const orcaHeadbarSidebarTools = document.querySelector(".orca-headbar-sidebar-tools")
 
@@ -95,6 +98,16 @@ export async function startWSRender() {
 
     saveButton.onmouseenter = () => Utils.showTooltip(saveButton, '左键 另存为新工作区\n右键 为当前工作区重命名')
     saveButton.onmouseleave = () => Utils.hideTooltip()
+
+    // 恢复最后一次关闭时所在的工作区
+    setTimeout(async ()=>{
+        const needRestoreWorkSpace = orca.state.plugins[pluginName]?.settings.restoreLastWorkspace
+        const targetName =  await orca.plugins.getData('tabsman-last-workspace', 'name')
+        if (needRestoreWorkSpace && targetName) {
+            openWSByClickEle(wsItemsObj[targetName])
+            orca.notify('success','[tabsman] 已自动打开上次关闭时的工作区')
+        }
+    }, 0)
 }
 
 export function stopWSRender(){

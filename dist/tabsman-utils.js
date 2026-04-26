@@ -112,6 +112,26 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
         orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块')
     }
 
+
+    // 中键直接打开编辑预览
+    tabElement.onpointerdown = (e) => {
+        if (e.button !== 1) return
+        const tabRect = tabElement.getBoundingClientRect();
+        const { top, bottom, right, left, width, height } = tabRect
+        const fakeRect = new DOMRect(
+            right, // 矩形区域的x偏移
+            top + height * 0.5, // 矩形区域的y偏移
+            0, // 矩形的x宽度
+            0 // 矩形的y高度
+        );
+        orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, true);
+        document.body.classList.add('plugin-tabsman-preview')
+        // 下一次事件循环再监听关闭（即 忽略本次pointerdown）
+        setTimeout(()=>document.addEventListener('pointerdown', handlePreviewClose), 0)
+    }
+
+
+    // alt + 悬停打开非编辑预览
     tabElement.onmouseenter = (e) => {
         if (!e.altKey) return
         clearPreview()
@@ -126,20 +146,42 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
             );
             previewClose = orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, false);
             document.body.classList.add('plugin-tabsman-preview')
-        }, 150)
+        }, 200) // 200ms防抖
     }
 
     tabElement.onmouseleave = (e) => {
+        // ctrl e 打开编辑预览后，官方会立刻加入logic。
         const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
         !isEditing && clearPreview(e)
     }
 }
 
+// 手动清除预览（alt + hover）
 function clearPreview() {
     previewTimer && clearTimeout(previewTimer)
     if (!previewClose) return
     previewClose()
     previewClose = null
-    // 确保彻底关闭再移除样式，＜150打开间隔即可
-    setTimeout(()=>document.body.classList.remove('plugin-tabsman-preview'),100)
+    // 确保彻底关闭再移除样式，100经过测试，不稳定，120 小概率不稳定，150稳定。
+    setTimeout(()=>document.body.classList.remove('plugin-tabsman-preview'), 150)
+}
+
+
+/**
+ * 控制中键打开编辑预览后的class移除
+ * @param {MouseEvent} e 
+ */
+function handlePreviewClose(e) {
+    // 但如果正常的间隔点击（点击了外部关闭弹窗，似乎并不能保证本事件触发时，官方class一定被移除，如果延迟了，那这次事件就return了，也就没有后续清理了）
+    // 经过测试，官方的orca-popup-pointer-logic在移除时，可能会等待关闭动画过渡消失后，才移除class，所以150ms后再做判断（100是边界值）。
+    setTimeout(()=>{
+        // 防止对tab连续的中键时，弹窗打开，因为防抖导致下一次中键不触发弹窗关闭，但触发了这里clear，导致class被提前清除。
+        const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
+        // 点击事件发生在弹窗外部，则应当清除
+        const clickInOut = !e.target.closest('.orca-popup.orca-block-preview-popup');
+        if (clickInOut && !isEditing) {
+            document.removeEventListener('pointerdown', handlePreviewClose)
+            document.body.classList.remove('plugin-tabsman-preview')
+        }
+    }, 150)
 }

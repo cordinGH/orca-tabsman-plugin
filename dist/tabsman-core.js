@@ -229,7 +229,8 @@ async function __generateTabNameAndIcon(blockId) {
             name = block.aliases[0];
         } else {
             const {text} = block
-            const shortText = (text?.length > 30) ? (text.slice(0, 30) + "...") : text
+            const shortText = text
+            // const shortText = (text?.length > 30) ? (text.slice(0, 30) + "...") : text
             name = text ? shortText : `(${blockType})`
         }
     } else {

@@ -116,8 +116,11 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
     // 中键直接打开编辑预览
     tabElement.onpointerdown = (e) => {
         if (e.button !== 1) return
+        // 存在预览窗口时，原生直接中键切换，无需额外打开。
+        if (previewClose) return
+
         const tabRect = tabElement.getBoundingClientRect();
-        const { top, bottom, right, left, width, height } = tabRect
+        const { top, right, height } = tabRect
         const fakeRect = new DOMRect(
             right, // 矩形区域的x偏移
             top + height * 0.5, // 矩形区域的y偏移
@@ -152,7 +155,7 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
     tabElement.onmouseleave = (e) => {
         // ctrl e 打开编辑预览后，官方会立刻加入logic。
         const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
-        !isEditing && clearPreview(e)
+        !isEditing && clearPreview()
     }
 }
 

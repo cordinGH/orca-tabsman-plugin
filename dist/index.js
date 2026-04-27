@@ -282,7 +282,7 @@ async function load(name) {
 
 
     // 启动标签页渲染    
-    await startTabsRender(pluginName);
+    startTabsRender(pluginName);
     // 启动标签页系统，传递UI更新回调
     await start(renderTabsByPanel, pluginName);
     

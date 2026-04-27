@@ -682,15 +682,16 @@ async function deleteTab(tabId) {
     const tabIdSet = tabIdSetByPanelId.get(panelId)
     if (tabIdSet.size === 1) {
         navOriginals.method.close.call(navOriginals.thisValue, panelId) // orca全局历史订阅回调已处理：关闭行为而触发的orca全局历史减少，不会引起tab历史填充。
-        
-        // 清理UI再清除数据
-        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId});
-        
+
+        // 清理数据
         delete tabs[tabId]
         tabIdSetByPanelId.delete(panelId)
         delete activeTabs[panelId]
         sortedTabsByPanelId.delete(panelId)
         
+        // 渲染并存入工作区（如果有）
+        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId});
+
         commandDoing = false;
         return
     }
@@ -1510,7 +1511,7 @@ function setupNavWrappers() {
 
     // 包装orca.nav.close，转交给delete完成
     navOriginals.method.close = orca.nav.close;
-    orca.nav.close = async function (id) {
+    orca.nav.close = function (id) {
         const tab = activeTabs[id];
         if (!tab) return
 

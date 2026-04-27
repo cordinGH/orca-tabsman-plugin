@@ -44,9 +44,9 @@ function injectHideableContainer(targetElement) {
 
 /**
  * 注入标签页管理器外壳，包括创建和注入基本UI外壳
- * @returns {Promise<Object|null>} 返回外壳对象或null
+ * @returns {Object} 返回外壳对象或null
  */
-async function injectTabsmanShell() {
+function injectTabsmanShell() {
     try {
         const sidebarTabsEl = document.querySelector('.orca-sidebar-tabs');
         const sidebarTabOptionsEl = document.querySelector('.orca-sidebar-tab-options');

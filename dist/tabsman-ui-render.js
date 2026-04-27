@@ -195,7 +195,7 @@ async function handleTabsmanClick(e) {
                 // 还是await一下，确保状态更新完毕再切换标签页。
                 if (toggleCase1) await orca.commands.invokeCommand("dockpanel.toggleDockedPanel")
             } 
-            TabsmanCore.switchTab(tabId)
+            await TabsmanCore.switchTab(tabId)
             return;
         }
     }
@@ -258,10 +258,11 @@ function __renderClosePanel(panelId) {
     if (!panelGroupEle) return;
     panelGroupEle.remove()
 
-    const tabIdSet = TabsmanCore.getTabIdSetByPanelId().get(panelId)
-    for (const tabId of tabIdSet) {
-        delete allTabEle[tabId]
-    }
+    Object.values(allTabEle).forEach((tabEle)=>{
+        if (tabEle.element.dataset.tabsmanPanelId === panelId) {
+            delete allTabEle[tabEle.element.dataset.tabsmanTabId]
+        }
+    })
 
     delete allPanelGroupEle[panelId]
 }
@@ -394,10 +395,10 @@ function __renderAll() {
  * @param {string} pluginName - 插件名
  * @returns {Promise<boolean>} 返回启动是否成功
  */
-async function startTabsRender(pluginName) {
+function startTabsRender(pluginName) {
     try {
         // 确保容器存在，如果不存在则创建
-        const result = await injectTabsmanShell();
+        const result = injectTabsmanShell();
         if (!result) {
             console.error('tabsmanUI外壳注入失败');
             return false;

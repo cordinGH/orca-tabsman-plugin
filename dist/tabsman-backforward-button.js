@@ -1,11 +1,11 @@
 import * as TabsmanCore from './tabsman-core.js';
 import * as Utils  from "./tabsman-utils.js";
 
-let orcaBackButton = document.querySelector('.orca-button.orca-headbar-back');
-let orcaForwardButton = document.querySelector('.orca-button.orca-headbar-back+.orca-button');
-let backButton = orcaBackButton.cloneNode(true);
-let forwardButton = orcaForwardButton.cloneNode(true);
-let headbar = document.getElementById('headbar');
+let orcaBackButton = null;
+let orcaForwardButton = null;
+let backButton = null;
+let forwardButton = null;
+let headbar = null;
 let currentPopup = null;
 
 // 历史菜单
@@ -36,6 +36,15 @@ function getHistoryCount(stackType) {
  * @returns {Promise<void>}
  */
 function startbackforwardbutton() {
+
+    // 全局变量赋值
+    orcaBackButton = document.querySelector('.orca-button.orca-headbar-back');
+    orcaForwardButton = document.querySelector('.orca-button.orca-headbar-back+.orca-button');
+    backButton = orcaBackButton.cloneNode(true);
+    forwardButton = orcaForwardButton.cloneNode(true);
+    headbar = document.getElementById('headbar');
+
+
     backButton.disabled = false;
     forwardButton.disabled = false;
     
@@ -80,6 +89,15 @@ function stopbackforwardbutton() {
     // 恢复官方的原始按钮
     backButton.replaceWith(orcaBackButton);
     forwardButton.replaceWith(orcaForwardButton);
+
+
+    orcaBackButton = null;
+    orcaForwardButton = null;
+    backButton = null;
+    forwardButton = null;
+    headbar = null;
+    currentPopup = null;
+    backForwardMenu = null
 }
 
 

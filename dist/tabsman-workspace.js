@@ -14,8 +14,8 @@ let wsItems = null
 let wsTools = null
 
 // 插件栏元素和虎鲸headerbar
-let userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
-let headbar = document.getElementById('headbar')
+let userTools = null
+let headbar = null
 
 /** @type {HTMLElement} 确认窗口 */
 let confirmPopup = null
@@ -43,6 +43,11 @@ const {createDomWithClass, closePopupwithAnimation} = Utils
  * @param {string} pluginName 插件名
  */
 export async function startWSRender(pluginName) {
+
+    // 全局变量赋值（不然esbuild后可能null）
+    userTools = document.querySelector('#headbar>.orca-headbar-user-tools')
+    headbar = document.getElementById('headbar')
+
     // 创建固定元素，保存按钮和WS容器
     const orcaHeadbarSidebarTools = document.querySelector(".orca-headbar-sidebar-tools")
 
@@ -120,16 +125,21 @@ export function stopWSRender(){
         document.removeEventListener('pointerdown', handleSavePopupClose)
         document.removeEventListener('keydown', handleSavePopupClose)
     }
-    wsTools = null
+
     saveButton = null
     exitButton = null
     wsItems = null
-    confirmPopup = null
-    savePopup = null
-    wsItemSelected = null
-    wsItemsObj = {}
+    wsTools = null
     userTools = null
     headbar = null
+
+    confirmPopup = null
+    savePopup = null
+    renamePopup = null
+    renamePopup2 = null
+
+    wsItemSelected = null
+    wsItemsObj = {}
 }
 
 

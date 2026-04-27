@@ -28,15 +28,18 @@ let rendering = false;
 
 
 /**
- * 通用退订函数
- * @param {Function|null} unsubscribeFn - 退订函数
- * @returns {null} 返回 null 用于重新赋值
+ * 清理订阅（退订）
  */
-function cleanupSubscription(unsubscribeFn) {
-    if (unsubscribeFn) {
-        unsubscribeFn();
+function cleanupSubscription() {
+    if (pluginDockpanelUnSubscribe) {
+        pluginDockpanelUnSubscribe();
+        pluginDockpanelUnSubscribe = null;
     }
-    return null;
+
+    if (dockedPanelIdUnSubscribe) {
+        dockedPanelIdUnSubscribe();
+        dockedPanelIdUnSubscribe = null
+    }
 }
 
 
@@ -446,10 +449,10 @@ function stopTabsRender() {
     cleanupTabsmanShell();
     
     // 清理订阅
-    cleanupSubscription(pluginDockpanelUnSubscribe);
-    cleanupSubscription(dockedPanelIdUnSubscribe);
+    cleanupSubscription();
     allTabEle = null;
     allPanelGroupEle = null;
+    tabsmanTabsEle = null;
 }
 
 // 导出模块接口

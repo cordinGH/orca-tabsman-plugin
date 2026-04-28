@@ -12,7 +12,7 @@ import * as Utils from "./tabsman-utils.js";
 let tabsmanTabsEle = null;
 
 /** @type {boolean} - 启用tab预览 */
-let enableTabPreview
+let enableTabPreview;
 
 /** @type {Object} - 标签页缓存对象*/
 let allTabEle = null
@@ -27,13 +27,13 @@ let allPanelGroupEle = null
 let pluginDockpanelUnSubscribe = null;
 let dockedPanelIdUnSubscribe = null;
 let pluginDockPanelReady = false
-let lastDocnkPanelId = null;
+let lastDockPanelId = null;
 
 let rendering = false;
 
 
 /**
- * 清理订阅（退订）
+ * 清理订阅
  */
 function cleanupSubscription() {
     if (pluginDockpanelUnSubscribe) {
@@ -247,10 +247,7 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
         case "closePanel":
             __renderClosePanel(panelId);break;
         case 'move':
-            // 200ms内只执行一次
-            moveRenderTimer && clearTimeout(moveRenderTimer);
-            moveRenderTimer = setTimeout(() => __renderMove(moveInfo), 200);
-            break;
+            __renderMove(moveInfo);break;
         default:
             __renderAll();break;
     }
@@ -481,30 +478,7 @@ function startTabsRender(pluginName) {
         // 订阅插件列表变化，为停靠面板的id绑定订阅
         // 检查是否已加载
         checkPluginDockpanelReady()
-        pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, () => checkPluginDockpanelReady())
-        // 订阅面板id的变化，面板id变化时，将上一次的停靠面板icon恢复，并更替本次的icon
-        if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe( window.pluginDockpanel.panel, () => {
-            setTimeout(()=>{
-                if (lastDocnkPanelId){
-                    const oldTargetIcon = allPanelGroupEle[lastDocnkPanelId].querySelector('.plugin-tabsman-panel-collapse-icon')
-                    const oldTargetTitle = allPanelGroupEle[lastDocnkPanelId].querySelector('.plugin-tabsman-panel-title')
-                    oldTargetIcon.classList.remove('ti-picture-in-picture-top-filled')
-                    oldTargetIcon.classList.add('ti-point-filled')
-                    oldTargetIcon.style.color = ''
-                    oldTargetTitle.style.color = ''
-                }
-                const newDockedPanelId = window.pluginDockpanel.panel.id
-                if (newDockedPanelId) {
-                    const newTargetIcon = allPanelGroupEle[newDockedPanelId].querySelector('.plugin-tabsman-panel-collapse-icon')
-                    const newTargetTitle = allPanelGroupEle[newDockedPanelId].querySelector('.plugin-tabsman-panel-title')
-                    newTargetIcon.classList.remove('ti-point-filled')
-                    newTargetIcon.classList.add('ti-picture-in-picture-top-filled')
-                    newTargetIcon.style.color = "var(--orca-color-primary-5)"
-                    newTargetTitle.style.color = "var(--orca-color-primary-5)"
-                    lastDocnkPanelId = newDockedPanelId
-                }
-            },0)
-        })
+        pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, checkPluginDockpanelReady)
 
         allTabEle = {};
         allPanelGroupEle = {};
@@ -535,6 +509,7 @@ function stopTabsRender() {
     allTabEle = null;
     allPanelGroupEle = null;
     tabsmanTabsEle = null;
+    lastDockPanelId = null;
 }
 
 // 导出模块接口
@@ -554,16 +529,47 @@ function checkPluginDockpanelReady() {
     const pluginInfoArray = Object.values(orca.state.plugins)
     for (const pluginInfo of pluginInfoArray) {
 
-        if (!pluginInfo.settings) continue
+        // 未启用或不存在setting
+        if (!Object.hasOwn(pluginInfo, "module") || !pluginInfo.settings) continue
 
-        if (!Object.hasOwn(pluginInfo.settings, "pluginDockPanelDefaultBlockId")) continue
-        
-        // 先重置，防止用户关闭了停靠面板插件
-        pluginDockPanelReady = false
-        if (Object.hasOwn(pluginInfo, "module")) {
+        // 目标正确-dockpanel
+        if (Object.hasOwn(pluginInfo.settings, "pluginDockPanelDefaultBlockId")) {
             pluginDockPanelReady = true
-            break
+            break;
         }
+        
+        // 发生变化时但没找到dockpanel，则应当false视为已关闭
+        pluginDockPanelReady = false
+    }
+
+    // 如果不存在dockpanl插件正在运行，应当释放掉。
+    !pluginDockPanelReady && cleanupSubscription();
+
+    // 订阅面板id的变化，面板id变化时，将上一次的停靠面板icon恢复，并更替本次的icon
+    if (pluginDockPanelReady) {
+        // 适当滞后准备订阅（dockpanel启用后并不会立马出现停靠面板），以确保对象已就位。
+        setTimeout(() =>
+            dockedPanelIdUnSubscribe = window.Valtio.subscribe(window.pluginDockpanel.panel, () => setTimeout(() => {
+                if (lastDockPanelId) {
+                    const oldTargetIcon = allPanelGroupEle[lastDockPanelId].querySelector('.plugin-tabsman-panel-collapse-icon')
+                    const oldTargetTitle = allPanelGroupEle[lastDockPanelId].querySelector('.plugin-tabsman-panel-title')
+                    oldTargetIcon.classList.remove('ti-picture-in-picture-top-filled')
+                    oldTargetIcon.classList.add('ti-point-filled')
+                    oldTargetIcon.style.color = ''
+                    oldTargetTitle.style.color = ''
+                }
+                const newDockedPanelId = window.pluginDockpanel.panel.id
+                if (newDockedPanelId) {
+                    const newTargetIcon = allPanelGroupEle[newDockedPanelId].querySelector('.plugin-tabsman-panel-collapse-icon')
+                    const newTargetTitle = allPanelGroupEle[newDockedPanelId].querySelector('.plugin-tabsman-panel-title')
+                    newTargetIcon.classList.remove('ti-point-filled')
+                    newTargetIcon.classList.add('ti-picture-in-picture-top-filled')
+                    newTargetIcon.style.color = "var(--orca-color-primary-5)"
+                    newTargetTitle.style.color = "var(--orca-color-primary-5)"
+                    lastDockPanelId = newDockedPanelId
+                }
+            }, 0)
+        ), 100)
     }
 }
 

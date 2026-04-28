@@ -75,6 +75,7 @@ export function showTooltip(buttonEle, text) {
         // tooltipPopup.querySelector('.orca-tooltip').innerHTML = text;
         tooltipPopup.querySelector('.orca-tooltip').textContent = text;
         setPopupPosition(tooltipPopup, buttonEle)
+        timer = null
     }, 100)
 
 }

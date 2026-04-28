@@ -25,6 +25,7 @@
 
 import * as TabsmanPersistence from './tabsman-persistence.js';
 import * as WorkspaceRender from './tabsman-workspace.js'
+import * as Utils from './tabsman-utils.js'
 
 // ==================== 常量 ====================
 
@@ -149,25 +150,6 @@ function __getViewAndViewArgsByTab(tab) {
         viewArgs = { blockId: currentBlockId };
     }
     return {view, viewArgs}
-}
-
-
-// 为启动时的初始面板渲染一份基础tab
-async function createTabsForInitialPanels() {
-    const panelIds = []
-    const processPanel = (panel) => {
-        const {id, view, viewArgs} = panel || {}
-        if (view && viewArgs) {
-            panelIds.push(id)
-        } else if (panel?.children) {
-            panel.children.forEach(child => processPanel(child))
-        }
-    }
-    processPanel(orca.state.panels)
-
-    for (const panelId of panelIds) {
-        await createTabForNewPanel(panelId, false);
-    }
 }
 
 
@@ -1554,7 +1536,10 @@ async function start(callback = null, pluginName) {
     setupNavWrappers()
 
     // 为启动时的初始面板创建标签页
-    await createTabsForInitialPanels()
+    for (const panelId of Utils.getPanelIdsInOrder()) {
+        await createTabForNewPanel(panelId, false);
+    }
+    
     
     // 设置面板后退历史
     subscribePanelBackHistory();

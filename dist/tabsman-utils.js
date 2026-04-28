@@ -188,3 +188,23 @@ function handlePreviewClose(e) {
         }
     }, 150)
 }
+
+
+/**
+ * 根据orca.state.panels的中的后代结构，获取一个有序的面板Id数组。
+ * @returns {string[]} 所有 ViewPanel 的 ID 列表
+ */
+export function getPanelIdsInOrder() {
+    // 根据面板的children关系排序面板。
+    const panelIds = []
+    const processPanel = (panel) => {
+        const { id, view, viewArgs } = panel || {}
+        if (view && viewArgs) {
+            panelIds.push(id)
+        } else if (panel?.children) {
+            panel.children.forEach(child => processPanel(child))
+        }
+    }
+    processPanel(orca.state.panels)
+    return panelIds
+}

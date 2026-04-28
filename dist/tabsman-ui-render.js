@@ -269,30 +269,42 @@ function __renderClosePanel(panelId) {
 
 // 创建tab时渲染，轻量渲染
 function __renderCreate(tab) {
-    const {id, panelId} = tab
+    const {id: tabId, panelId} = tab
     let panelGroup = allPanelGroupEle[panelId]
     
     // 该case是在第一次创建面板时构建初始tab。也因此panelTabs期望长度应当是1
     if (!panelGroup) {
-        const panelTabs = TabsmanCore.getOneSortedTabs(panelId)
 
+        // 准备该面板的DOM元素
+        const panelTabs = TabsmanCore.getOneSortedTabs(panelId)
         if (panelTabs.length !== 1) {
             orca.notify("info", "[tabsman] __renderCreate期望值为1，请检查逻辑是否有误")
             return
         }
 
-        panelGroup = Utils.createDomWithClass("div", 'plugin-tabsman-panel-group orca-fav-item', tabsmanTabsEle)
+        // 面板容器
+        panelGroup = document.createElement('div')
+        panelGroup.className = 'plugin-tabsman-panel-group orca-fav-item'
         panelGroup.setAttribute('data-tabsman-panel-id', panelId);
         allPanelGroupEle[panelId] = panelGroup
 
-        // 创建面板标题项
+        // 生成面板标题与标签页元素
         createPanelItemElement(panelId, panelGroup);
         const tab = panelTabs[0]
-
-        // 渲染标签页并加入面板分组容器
         const tabElement = createTabElement(tab, panelId, panelGroup);
-        allTabEle[tab.id] = tabElement;
+        allTabEle[tabId] = tabElement;
         tabElement.element.classList.add('active-tab-item');
+
+        // 插入到正确位置，如果目标面板不是末尾索引，则插入到后一个index的前面，反之则直接append
+        const panelIdsInOrder = Utils.getPanelIdsInOrder()
+        const tailIndex = panelIdsInOrder.length - 1 // 末尾索引
+        const targetIndex = panelIdsInOrder.findIndex(item => item === panelId)
+        const referenceIndex = targetIndex !== tailIndex ? targetIndex + 1 : -1
+        if (referenceIndex !== -1) {
+            const referencePanelGrop = allPanelGroupEle[panelIdsInOrder[referenceIndex]]
+            referencePanelGrop.before(panelGroup)
+        } else tabsmanTabsEle.appendChild(panelGroup)
+
         return
     }
 
@@ -379,8 +391,14 @@ function __renderAll() {
 
     // 一次性插入
     const fragment = document.createDocumentFragment();
-    for (const [panelId, panelTabs] of allSortedTabs) {
-        if (panelTabs.length === 0) continue;
+
+    // 根据面板顺序渲染，以适应一些特殊的面板拖拽事件。
+    for (const panelId of Utils.getPanelIdsInOrder()) {
+        const panelTabs = TabsmanCore.getOneSortedTabs(panelId)
+        if (panelTabs.length === 0) {
+            orca.notify("info", '[tabsman] 存在疏漏，请检查算法，')
+            continue;
+        }
         const panelGroup = __createOnePanelGroup(panelId, panelTabs)
         allPanelGroupEle[panelId] = panelGroup
         fragment.appendChild(panelGroup)
@@ -421,9 +439,11 @@ function startTabsRender(pluginName) {
         tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
         // 订阅插件列表变化，为停靠面板的id绑定订阅
-        pluginDockpanelSubscribe()
-        pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, () => pluginDockpanelSubscribe())
-        if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe(window.pluginDockpanel.panel,  () => renderTabsByPanel())
+        // 检查是否已加载
+        checkPluginDockpanelReady()
+        pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, () => checkPluginDockpanelReady())
+        // 订阅面板id的变化
+        if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe( window.pluginDockpanel.panel, () => renderTabsByPanel())
 
         allTabEle = {};
         allPanelGroupEle = {};
@@ -465,7 +485,7 @@ export {
 
 
 // 检查停靠面板插件
-function pluginDockpanelSubscribe() {
+function checkPluginDockpanelReady() {
     // 已就位不需要处理
     if (pluginDockPanelReady) return
 

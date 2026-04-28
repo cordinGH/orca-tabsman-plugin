@@ -123,7 +123,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
     if (panelId !== dockedPanelId) {
         collapseIcon.className += ' ti ti-chevron-down';
     } else {
-        collapseIcon.className += ' ti ti-window-minimize';
+        collapseIcon.className += ' ti ti-picture-in-picture-top-filled';
         collapseIcon.style.color = "var(--orca-color-primary-5)"
     } 
 
@@ -214,7 +214,7 @@ async function handleTabsmanClick(e) {
 
 
 // 按面板分组渲染所有标签页列表
-function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
+function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = {}) {
     // 防止重复渲染
     if (rendering) return;
 
@@ -239,6 +239,8 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId} = {}) {
             __renderCreate(currentTab);break;
         case "closePanel":
             __renderClosePanel(panelId);break;
+        case 'move':
+            __renderMove(moveInfo);break;
         default:
             __renderAll();break;
     }
@@ -265,6 +267,18 @@ function __renderClosePanel(panelId) {
     })
 
     delete allPanelGroupEle[panelId]
+}
+
+// 交换面板DOM顺序，上和左，代表before，下和右代表after
+function __renderMove(moveInfo) {
+    const {from, to, dir} = moveInfo
+    const fromEle = allPanelGroupEle[from]
+    const toEle = allPanelGroupEle[to]
+    if (dir === "left" || dir === "top") {
+        toEle.before(fromEle)
+    } else if (dir === "right" || dir === "bottom") {
+        toEle.after(fromEle)
+    }
 }
 
 // 创建tab时渲染，轻量渲染
@@ -642,7 +656,7 @@ function handlePanelTitleFocusout(e) {
  * @returns {string} 面板标题
  */
 function getPanelTitle(panelId) {
-    // return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId.slice(0, 5));
-    const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
-    return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId);
+    // const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
+    // return panelTitles.get(panelId) || (panelId === dockedPanelId ? "停靠面板" : "面板 " + panelId);
+    return panelTitles.get(panelId) || "面板 " + panelId;
 }

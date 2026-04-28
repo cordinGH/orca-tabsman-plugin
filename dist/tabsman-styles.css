@@ -17,16 +17,20 @@
 /* 面板条目 */
 .plugin-tabsman-panel-item.orca-fav-item-item {
     grid-template-columns: auto 1fr auto;
+    padding-right: .5rem;
 
     /* 面板折叠按钮 */
     &>.plugin-tabsman-panel-collapse-icon {
         background-color:transparent !important;
-        margin-right:0;
+        margin-right: 2px;
     }
 }
 
 /* tab条目 */
 .plugin-tabsman-tab-item.orca-fav-item-item {
+    margin-left: 1.125rem;
+    padding-right: .5rem;
+
     grid-template-columns: auto auto 1fr auto;
 
     /* tab固定按钮pin */
@@ -86,10 +90,30 @@
     display:none;
 }
 
+/* ——————————————————————————————————侧边栏焦点面板group———————————————————————————————————— */
+.plugin-tabsman-panel-group {
+    position: relative;
+}
+.plugin-tabsman-panel-group::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 30px;
+    bottom: 0;
+    width: 3px;
+    background-color: var(--orca-color-primary-4);
+    border-radius: var(--orca-radius-sm);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.plugin-tabsman-panel-group-active::before {
+    opacity: 1;
+}
 
 /* ———————————————————————————————侧边栏未激活的面板group，可见度减半—————————————————————————————————— */
 .plugin-tabsman-panel-group:not(.plugin-tabsman-panel-group-active){
-    opacity: .39;
+    opacity: .5;
 }
 
 

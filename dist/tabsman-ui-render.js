@@ -17,12 +17,17 @@ let enableTabPreview
 /** @type {Object} - 标签页缓存对象*/
 let allTabEle = null
 
-/** @type {Object} - 面板组缓存对象 */
+/**
+ * 面板组缓存对象
+ * 键为面板ID（panelId），值为对应的面板组 DOM 元素
+ * @type {Object.<string, HTMLElement>}
+ */
 let allPanelGroupEle = null
 
 let pluginDockpanelUnSubscribe = null;
 let dockedPanelIdUnSubscribe = null;
 let pluginDockPanelReady = false
+let lastDocnkPanelId = null;
 
 let rendering = false;
 
@@ -121,7 +126,8 @@ function createPanelItemElement(panelId, panelGroupEle) {
     const collapseIcon = Utils.createDomWithClass("i", 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font', panelItemElement)
     const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
     if (panelId !== dockedPanelId) {
-        collapseIcon.className += ' ti ti-chevron-down';
+        // collapseIcon.className += ' ti ti-chevron-down';
+        collapseIcon.className += ' ti ti-point-filled';
     } else {
         collapseIcon.className += ' ti ti-picture-in-picture-top-filled';
         collapseIcon.style.color = "var(--orca-color-primary-5)"
@@ -214,6 +220,7 @@ async function handleTabsmanClick(e) {
 
 
 // 按面板分组渲染所有标签页列表
+let moveRenderTimer = null;
 function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = {}) {
     // 防止重复渲染
     if (rendering) return;
@@ -240,7 +247,10 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
         case "closePanel":
             __renderClosePanel(panelId);break;
         case 'move':
-            __renderMove(moveInfo);break;
+            // 200ms内只执行一次
+            moveRenderTimer && clearTimeout(moveRenderTimer);
+            moveRenderTimer = setTimeout(() => __renderMove(moveInfo), 200);
+            break;
         default:
             __renderAll();break;
     }
@@ -269,16 +279,32 @@ function __renderClosePanel(panelId) {
     delete allPanelGroupEle[panelId]
 }
 
-// 交换面板DOM顺序，上和左，代表before，下和右代表after
+// // 交换面板DOM顺序（携带动画效果），上和左，代表before，下和右代表after
 function __renderMove(moveInfo) {
     const {from, to, dir} = moveInfo
     const fromEle = allPanelGroupEle[from]
     const toEle = allPanelGroupEle[to]
+
+    // First
+    const firstRects = new Map();
+    Object.values(allPanelGroupEle).forEach(el => firstRects.set(el, el.getBoundingClientRect()));
+
+    // Last：DOM 交换
     if (dir === "left" || dir === "top") {
         toEle.before(fromEle)
     } else if (dir === "right" || dir === "bottom") {
         toEle.after(fromEle)
     }
+
+    // Invert + Play
+    Object.values(allPanelGroupEle).forEach(el => {
+        const dy = firstRects.get(el).top - el.getBoundingClientRect().top;
+        if (dy === 0) return;
+        el.animate(
+            [{ transform: `translateY(${dy}px)` }, { transform: `translateY(0)` }],
+            { duration: 200, easing: 'ease-out' }
+        );
+    });
 }
 
 // 创建tab时渲染，轻量渲染
@@ -456,8 +482,29 @@ function startTabsRender(pluginName) {
         // 检查是否已加载
         checkPluginDockpanelReady()
         pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins, () => checkPluginDockpanelReady())
-        // 订阅面板id的变化
-        if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe( window.pluginDockpanel.panel, () => renderTabsByPanel())
+        // 订阅面板id的变化，面板id变化时，将上一次的停靠面板icon恢复，并更替本次的icon
+        if (pluginDockPanelReady) dockedPanelIdUnSubscribe = window.Valtio.subscribe( window.pluginDockpanel.panel, () => {
+            setTimeout(()=>{
+                if (lastDocnkPanelId){
+                    const oldTargetIcon = allPanelGroupEle[lastDocnkPanelId].querySelector('.plugin-tabsman-panel-collapse-icon')
+                    const oldTargetTitle = allPanelGroupEle[lastDocnkPanelId].querySelector('.plugin-tabsman-panel-title')
+                    oldTargetIcon.classList.remove('ti-picture-in-picture-top-filled')
+                    oldTargetIcon.classList.add('ti-point-filled')
+                    oldTargetIcon.style.color = ''
+                    oldTargetTitle.style.color = ''
+                }
+                const newDockedPanelId = window.pluginDockpanel.panel.id
+                if (newDockedPanelId) {
+                    const newTargetIcon = allPanelGroupEle[newDockedPanelId].querySelector('.plugin-tabsman-panel-collapse-icon')
+                    const newTargetTitle = allPanelGroupEle[newDockedPanelId].querySelector('.plugin-tabsman-panel-title')
+                    newTargetIcon.classList.remove('ti-point-filled')
+                    newTargetIcon.classList.add('ti-picture-in-picture-top-filled')
+                    newTargetIcon.style.color = "var(--orca-color-primary-5)"
+                    newTargetTitle.style.color = "var(--orca-color-primary-5)"
+                    lastDocnkPanelId = newDockedPanelId
+                }
+            },0)
+        })
 
         allTabEle = {};
         allPanelGroupEle = {};

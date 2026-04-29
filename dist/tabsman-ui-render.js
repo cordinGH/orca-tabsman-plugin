@@ -533,10 +533,10 @@ function checkPluginDockpanelReady() {
         if (!pluginInfo.schema?.pluginDockPanelDefaultBlockId) continue;
 
         if (pluginInfo?.enabled) {
-            setSyncDockPanelId()
+            !pluginDockPanelReady && setSyncDockPanelId()
             break;
         } else {
-            closeSyncDockpanelId()
+            pluginDockPanelReady && closeSyncDockpanelId()
             break;
         }
     }
@@ -546,8 +546,6 @@ function checkPluginDockpanelReady() {
  * 样式上同步panelId的变更
  */
 function setSyncDockPanelId() {
-    // 标记就位
-    pluginDockPanelReady = true
     dockedPanelIdUnSubscribe = window.Valtio.subscribe( window.pluginDockpanel.panel,
         () => setTimeout(() => {
             // 发生变化则移除掉旧的样式
@@ -564,8 +562,11 @@ function setSyncDockPanelId() {
             newTargetIcon.classList.add('ti-picture-in-picture-top-filled')
             newTargetIcon.style.color = "var(--orca-color-primary-5)"
             newTargetTitle.style.color = "var(--orca-color-primary-5)"
-        }, 0)
+        }, 0) 
     )
+    
+    // 标记就位
+    pluginDockPanelReady = true
 }
 
 /**

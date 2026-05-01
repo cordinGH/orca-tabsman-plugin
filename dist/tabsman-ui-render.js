@@ -26,6 +26,7 @@ let allPanelGroupEle = null
 
 let pluginDockpanelUnSubscribe = null;
 let dockedPanelIdUnSubscribe = null;
+let pluginDockPanel = null; // 只绑定检测到启用的目标插件，以消除多个插件版本时的数据误修改。
 let pluginDockPanelReady = false
 let lastDockPanelId = null;
 
@@ -462,7 +463,7 @@ function startTabsRender(pluginName) {
         checkPluginDockpanelReady()
         pluginDockpanelUnSubscribe = window.Valtio.subscribe(
             orca.state.plugins,
-            Utils.debounce(checkPluginDockpanelReady, 0)
+            Utils.debounce(checkPluginDockpanelReady, 100) // 100ms延迟检查，确保对象构建完毕。
         )
 
         allTabEle = {};
@@ -522,14 +523,17 @@ function checkPluginDockpanelReady() {
     const pluginInfoArray = Object.values(orca.state.plugins)
     for (const pluginInfo of pluginInfoArray) {
 
-        // 不存在该shcema说明本次不是目标插件
+        // 不存在该shcema说明本次不是目标插件（前提是插件关闭不清空设置）
         if (!pluginInfo.schema?.pluginDockPanelDefaultBlockId) continue;
-
-        if (pluginInfo?.enabled) {
-            !pluginDockPanelReady && setSyncDockPanelId()
+        
+        // 但用户可能不止安装了一个版本，因此有必要保存一下启用的插件。
+        if (!pluginDockPanel && pluginInfo?.enabled) {
+            pluginDockPanel = pluginInfo;
+            setSyncDockPanelId()
             break;
-        } else {
-            pluginDockPanelReady && closeSyncDockpanelId()
+        } else if (pluginDockPanel && !pluginInfo?.enabled) {
+            closeSyncDockpanelId()
+            pluginDockPanel = null
             break;
         }
     }
@@ -557,9 +561,6 @@ function setSyncDockPanelId() {
             newTargetTitle.style.color = "var(--orca-color-primary-5)"
         }, 0) 
     )
-    
-    // 标记就位
-    pluginDockPanelReady = true
 }
 
 /**
@@ -571,7 +572,7 @@ function closeSyncDockpanelId() {
         dockedPanelIdUnSubscribe = null
     }
     removeDockPanelStyle()
-    pluginDockPanelReady = false
+    // pluginDockPanelReady = false
 }
 
 /**

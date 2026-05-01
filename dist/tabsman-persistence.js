@@ -103,9 +103,10 @@ async function removeAndSaveTab(tab, tabType = "") {
     } else {
         index = tabArray.findIndex(item => item.id === tab.id);
     }
-    if (index !== -1) tabArray.splice(index, 1);
-        
+    if (index === -1) return;
+
     // 将变更写入orca库文件
+    tabArray.splice(index, 1);    
     await saveTabArray(tabType);
 }
 

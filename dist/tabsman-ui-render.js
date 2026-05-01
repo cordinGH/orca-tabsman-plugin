@@ -203,7 +203,6 @@ async function handleTabsmanClick(e) {
 
 
 // 按面板分组渲染所有标签页列表
-let moveRenderTimer = null;
 function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = {}) {
     // 防止重复渲染
     if (rendering) return;
@@ -433,7 +432,6 @@ function __renderAll() {
  * @param {string} pluginName - 插件名
  * @returns {Promise<boolean>} 返回启动是否成功
  */
-let dockpanelTimer;
 function startTabsRender(pluginName) {
     try {
         // 确保容器存在，如果不存在则创建
@@ -462,14 +460,9 @@ function startTabsRender(pluginName) {
         // 订阅插件列表变化，为停靠面板的id绑定订阅
         // 检查是否已加载
         checkPluginDockpanelReady()
-        pluginDockpanelUnSubscribe = window.Valtio.subscribe(orca.state.plugins,
-            () => {
-                dockpanelTimer && clearTimeout(dockpanelTimer)
-                dockpanelTimer = setTimeout(() => {
-                    checkPluginDockpanelReady()
-                    dockpanelTimer = null
-                }, 0)
-            }
+        pluginDockpanelUnSubscribe = window.Valtio.subscribe(
+            orca.state.plugins,
+            Utils.debounce(checkPluginDockpanelReady, 0)
         )
 
         allTabEle = {};

@@ -209,3 +209,16 @@ export function getPanelIdsInOrder() {
     processPanel(orca.state.panels)
     return panelIds
 }
+
+
+// ————————————————————————————————————————————封装防抖函数，复用————————————————————————————————————————————————————
+export function debounce(fn, delay = 0) {
+    let timer = null;
+    return (...args) => {
+        timer && clearTimeout(timer)
+        timer = setTimeout(() => {
+            fn(...args);
+            timer = null;
+        }, delay)
+    }
+}

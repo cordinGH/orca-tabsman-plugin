@@ -53,7 +53,7 @@ async function openTabItem(tab) {
 /**
  * 历史与收藏菜单组件 ———— 点击 headbar 按钮后弹出的菜单组件
  */
-function headbarButtonMenu() {
+function HeadbarButtonMenu() {
     const [favoriteList, setFavoriteList] = useState(() => TabsmanPersistence.getTabArray("favorite"));
     const [closedList, setClosedList] = useState(() => TabsmanPersistence.getTabArray("recently-closed"));
 
@@ -178,7 +178,7 @@ function startRecentlyClosed(renderTabsByPanel) {
                 }, 
                 c("i", {className: "ti ti-stack-pop orca-headbar-icon"})
             ),
-            menu: (close) => c(headbarButtonMenu, { close })
+            menu: (close) => c(HeadbarButtonMenu, { close })
         })
     );
 }

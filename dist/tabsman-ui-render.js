@@ -26,8 +26,8 @@ let allPanelGroupEle = null
 
 let pluginDockpanelUnSubscribe = null;
 let dockedPanelIdUnSubscribe = null;
-let pluginDockPanel = null; // 只绑定检测到启用的目标插件，以消除多个插件版本时的数据误修改。
-let pluginDockPanelReady = false
+let dockpanelInfo = null; // 只绑定检测到启用的目标插件，以消除多个插件版本时的数据误修改。
+// let pluginDockPanelReady = false
 let lastDockPanelId = null;
 
 let rendering = false;
@@ -108,7 +108,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
     // 折叠图标
     // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
     const collapseIcon = Utils.createDomWithClass("i", 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font', panelItemElement)
-    const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
+    const dockedPanelId = dockpanelInfo ? window.pluginDockpanel.panel.id : ""
     if (panelId !== dockedPanelId) {
         // collapseIcon.className += ' ti ti-chevron-down';
         collapseIcon.className += ' ti ti-point-filled';
@@ -178,7 +178,7 @@ async function handleTabsmanClick(e) {
             renderTabsByPanel();
         } else {
             // 存在停靠面板则先联动dockpanel插件=>切换停靠面板的折叠状态。
-            const dockedPanelId = pluginDockPanelReady ? window.pluginDockpanel.panel.id : ""
+            const dockedPanelId = dockpanelInfo ? window.pluginDockpanel.panel.id : ""
             if (dockedPanelId) {
                 const toggleCase1 = panelId === dockedPanelId && window.pluginDockpanel.isCollapsed
                 // const toggleCase2 = !panelId === dockedPanelId && !window.pluginDockpanel.isCollapsed
@@ -463,7 +463,7 @@ function startTabsRender(pluginName) {
         checkPluginDockpanelReady()
         pluginDockpanelUnSubscribe = window.Valtio.subscribe(
             orca.state.plugins,
-            Utils.debounce(checkPluginDockpanelReady, 100) // 100ms延迟检查，确保对象构建完毕。
+            checkPluginDockpanelReady
         )
 
         allTabEle = {};
@@ -496,6 +496,7 @@ function stopTabsRender() {
         pluginDockpanelUnSubscribe = null;
     }
     closeSyncDockpanelId()
+    dockpanelInfo = null
 
 
     allTabEle = null;
@@ -514,26 +515,30 @@ export {
 
 // ———————————————————————————————————————— 联动停靠面板插件 ————————————————————————————————————————————————
 
+const checkPluginDockpanelReady = Utils.debounce(__checkPluginDockpanelReady, 100)
 /**
  * 检查停靠面板插件
  */ 
-function checkPluginDockpanelReady() {
+function __checkPluginDockpanelReady() {
 
     // 扫描
     const pluginInfoArray = Object.values(orca.state.plugins)
     for (const pluginInfo of pluginInfoArray) {
 
+        // 如果记录了启用的目标插件，则只处理目标插件的关闭变更        
+        if (dockpanelInfo && pluginInfo !== dockpanelInfo) continue;
+
         // 不存在该shcema说明本次不是目标插件（前提是插件关闭不清空设置）
         if (!pluginInfo.schema?.pluginDockPanelDefaultBlockId) continue;
         
         // 但用户可能不止安装了一个版本，因此有必要保存一下启用的插件。
-        if (!pluginDockPanel && pluginInfo?.enabled) {
-            pluginDockPanel = pluginInfo;
+        if (!dockpanelInfo && pluginInfo?.enabled) {
+            dockpanelInfo = pluginInfo;
             setSyncDockPanelId()
             break;
-        } else if (pluginDockPanel && !pluginInfo?.enabled) {
+        } else if (dockpanelInfo && !dockpanelInfo.enabled) {
             closeSyncDockpanelId()
-            pluginDockPanel = null
+            dockpanelInfo = null
             break;
         }
     }
@@ -572,7 +577,6 @@ function closeSyncDockpanelId() {
         dockedPanelIdUnSubscribe = null
     }
     removeDockPanelStyle()
-    // pluginDockPanelReady = false
 }
 
 /**

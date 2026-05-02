@@ -15,7 +15,7 @@ let tabsmanTabsEle = null;
 let enableTabPreview;
 
 /** @type {Object} - 标签页缓存对象*/
-let allTabEle = null
+let allTabItems = null
 
 /**
  * 面板组缓存对象
@@ -30,54 +30,48 @@ let dockpanelInfo = null; // 只绑定检测到启用的目标插件，以消除
 // let pluginDockPanelReady = false
 let lastDockPanelId = null;
 
-let rendering = false;
-
 /**
  * 创建单个标签页的DOM元素
  * @param {Object} tab - 标签页数据
  * @param {string} panelId - 面板ID
- * @param {HTMLElement} panelGroupEle - 需要append进去的面板组元素
  * @returns {Object} 返回包含DOM元素和子元素引用的对象
  */
-function createTabElement(tab, panelId, panelGroupEle) {
+function createTabItem(tab, panelId) {
     // 判断是否为收藏块
     let isFavorite = false;
     const isFavoriteBlock = Persistence.getTabArray("favorite").find(favoriteTab => favoriteTab.currentBlockId.toString() === tab.currentBlockId.toString())
     if (isFavoriteBlock) isFavorite = true;
 
-    // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
-    // plugin-tabsman-item-item为了适配tune-theme
+    // 标签页条目容器，plugin-tabsman-item-item是为了适配tune-theme
+    // 借用orca-favorites-items样式，元素样式性质类似。
     const tabElement = document.createElement('div')
-    tabElement.className = 'plugin-tabsman-tab-item plugin-tabsman-item-item orca-fav-item-item';
+    tabElement.className = 'plugin-tabsman-tab-item orca-fav-item-item plugin-tabsman-item-item';
     tabElement.setAttribute('data-tabsman-tab-id', tab.id);
     tabElement.setAttribute('data-tabsman-panel-id', panelId);
-    tabElement.setAttribute('draggable', 'true');
+    tabElement.draggable = true;
 
     // 置顶图标
     const pinIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`, tabElement)
     pinIcon.onmouseenter = () => Utils.showTooltip(pinIcon, tab.isPinned ? '点击取消置顶' : '点击置顶')
     pinIcon.onmouseleave = () => Utils.hideTooltip()
 
-    // 块图标
-    // ⭐️⭐️⭐️借用fav-item-icon样式，性质是相同的。
+    // 块图标，借用fav-item-icon样式，元素样式性质类似。
     const blockIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`, tabElement)
     blockIcon.setAttribute('data-tabsman-tab-id', tab.id);
     blockIcon.setAttribute('data-tabsman-panel-id', panelId);
     blockIcon.onmouseenter = () => Utils.showTooltip(blockIcon, isFavorite ? '点击取消收藏' : '点击收藏该标签页')
     blockIcon.onmouseleave = () => Utils.hideTooltip()
 
-    // 标签页标题
-    // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
+    // 标签页标题，借用fav-item-label样式，元素样式性质类似。
     const title = Utils.createDomWithClass("div", 'plugin-tabsman-tab-title orca-fav-item-label', tabElement)
     title.textContent = tab.name || `标签页name为空 ${tab.id}`;
 
-    // 关闭按钮
-    // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
+    // 关闭按钮，借用fav-item-menu样式，元素样式性质类似。
     const closeBtn = Utils.createDomWithClass("i", 'plugin-tabsman-tab-close ti ti-x orca-fav-item-menu', tabElement)
     closeBtn.setAttribute('data-tabsman-tab-id', tab.id);
     closeBtn.setAttribute('data-tabsman-panel-id', panelId);
 
-    panelGroupEle.appendChild(tabElement)
+    // panelGroupEle.appendChild(tabElement)
 
     enableTabPreview && Utils.enableBlockPreview(tabElement, tab,closeBtn)
 
@@ -94,19 +88,17 @@ function createTabElement(tab, panelId, panelGroupEle) {
 /**
  * 创建单个面板item的DOM元素
  * @param {string} panelId - 面板ID
- * @param {HTMLElement} panelGroupEle - 需要append进去的面板组元素
  * @returns {Object} 返回包含DOM元素和子元素引用的对象
  */
-function createPanelItemElement(panelId, panelGroupEle) {
+function createPanelItem(panelId) {
 
-    // ⭐️⭐️⭐️借用fav-item-item样式，性质是相同的。
-    // plugin-tabsman-item-item为了适配tune-theme
+    // 面板条目容器，plugin-tabsman-item-item是为了适配tune-theme
+    // 借用orca-favorites-items样式，元素样式性质类似。
     const panelItemElement = document.createElement('div')
     panelItemElement.className = 'plugin-tabsman-panel-item plugin-tabsman-item-item orca-fav-item-item'
     panelItemElement.setAttribute('data-tabsman-panel-id', panelId);
 
-    // 折叠图标
-    // ⭐️⭐️⭐️借用fav-item-icon样式，性质类似性质类似性质类似（需要微调）。
+    // 折叠图标，借用fav-item-icon样式，元素样式性质类似。
     const collapseIcon = Utils.createDomWithClass("i", 'plugin-tabsman-panel-collapse-icon orca-fav-item-icon orca-fav-item-icon-font', panelItemElement)
     const dockedPanelId = dockpanelInfo ? window.pluginDockpanel.panel.id : ""
     if (panelId !== dockedPanelId) {
@@ -117,8 +109,7 @@ function createPanelItemElement(panelId, panelGroupEle) {
         collapseIcon.style.color = "var(--orca-color-primary-5)"
     } 
 
-    // 面板标题
-    // ⭐️⭐️⭐️借用fav-item-label样式，性质是相同的。
+    // 面板标题，借用fav-item-label样式，元素样式性质类似。
     const title = Utils.createDomWithClass("div", 'plugin-tabsman-panel-title orca-fav-item-label', panelItemElement)
     title.setAttribute("contenteditable", "true");
     // 加载保存的标题，如果没有则使用默认标题
@@ -131,14 +122,13 @@ function createPanelItemElement(panelId, panelGroupEle) {
         title.style.color = "var(--orca-color-primary-5)"
     }
 
-    // 创建新标签页按钮
-    // ⭐️⭐️⭐️借用fav-item-menu样式，性质是相同的。
+    // 创建新标签页按钮，借用fav-item-menu样式，元素样式性质类似。
     const newTabButton = Utils.createDomWithClass("i", 'plugin-tabsman-panel-new-tab ti ti-plus orca-fav-item-menu', panelItemElement)
     newTabButton.setAttribute('data-tabsman-panel-id', panelId);
     newTabButton.onmouseenter = () => Utils.showTooltip(newTabButton, '单击 或 Alt+单击')
     newTabButton.onmouseleave = () => Utils.hideTooltip()
 
-    panelGroupEle.appendChild(panelItemElement)
+    // panelGroupEle.appendChild(panelItemElement)
     // 返回包含DOM元素和子元素引用的对象
     return {
         element: panelItemElement,
@@ -188,10 +178,9 @@ async function handleTabsmanClick(e) {
             await TabsmanCore.switchTab(tabId)
             return;
         }
-    }
 
-    // 处理面板相关事件
-    if (target.closest('.plugin-tabsman-panel-item')) {
+    } else if (target.closest('.plugin-tabsman-panel-item')) {
+        // 处理面板相关事件
         if (target.classList.contains('plugin-tabsman-panel-new-tab')) {
             const panelId = target.getAttribute('data-tabsman-panel-id')
             window.event.altKey ? window.pluginTabsman.createQuickNoteTab(panelId) : window.pluginTabsman.createTodayJournalTab(panelId);
@@ -205,10 +194,6 @@ async function handleTabsmanClick(e) {
 
 // 按面板分组渲染所有标签页列表
 function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = {}) {
-    // 防止重复渲染
-    if (rendering) return;
-
-    rendering = true;
 
     if (!tabsmanTabsEle) {
         orca.notify("info", '[tabsman] 标签页容器元素不存在，无法渲染标签页列表');
@@ -240,20 +225,19 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
     if (activePanelGroup) {
         activePanelGroup.classList.add('plugin-tabsman-panel-group-active');
     }
-    rendering = false;
+
 }
 
 // 关闭面板，轻量渲染
 function __renderClosePanel(panelId) {
     const panelGroupEle = allPanelGroupEle[panelId]
-    // 不重复清理
     if (!panelGroupEle) return;
     panelGroupEle.remove()
 
-    Object.values(allTabEle).forEach((tabEle)=>{
-        if (tabEle.element.dataset.tabsmanPanelId === panelId) {
-            delete allTabEle[tabEle.element.dataset.tabsmanTabId]
-        }
+    // 清除数据缓存
+    Object.values(allTabItems).forEach((tabItem)=>{
+        const elDataset = tabItem.element.dataset
+        if (elDataset.tabsmanPanelId === panelId) delete allTabItems[elDataset.tabsmanTabId];
     })
 
     delete allPanelGroupEle[panelId]
@@ -308,12 +292,14 @@ function __renderCreate(tab) {
         panelGroup.setAttribute('data-tabsman-panel-id', panelId);
         allPanelGroupEle[panelId] = panelGroup
 
-        // 生成面板标题与标签页元素
-        createPanelItemElement(panelId, panelGroup);
-        const tab = panelTabs[0]
-        const tabElement = createTabElement(tab, panelId, panelGroup);
-        allTabEle[tabId] = tabElement;
-        tabElement.element.classList.add('active-tab-item');
+        // 生成面板标题与标签页
+        const panelItemEl = createPanelItem(panelId).element;
+        panelGroup.append(panelItemEl)
+        const tabItem = createTabItem(panelTabs[0], panelId);
+        allTabItems[tabId] = tabItem;
+        const tabItemEl = tabItem.element
+        tabItemEl.classList.add('active-tab-item');
+        panelGroup.append(tabItemEl)
 
         // 插入到正确位置，如果目标面板不是末尾索引，则插入到后一个index的前面，反之则直接append
         const panelIdsInOrder = Utils.getPanelIdsInOrder()
@@ -323,44 +309,47 @@ function __renderCreate(tab) {
         if (referenceIndex !== -1) {
             const referencePanelGrop = allPanelGroupEle[panelIdsInOrder[referenceIndex]]
             referencePanelGrop.before(panelGroup)
-        } else tabsmanTabsEle.appendChild(panelGroup)
+        } else tabsmanTabsEle.append(panelGroup)
 
         return
     }
 
-    const tabElement = createTabElement(tab, panelId, panelGroup);
-    allTabEle[tab.id] = tabElement;
+    const tabItem = createTabItem(tab, panelId);
+    allTabItems[tab.id] = tabItem;
+    panelGroup.append(tabItem.element)
 }
 
 // pin住时更新整个面板，轻量渲染
 function __renderPin(panelId){
-    const fragment = document.createDocumentFragment();
     const newPanelGroupEle = __createOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
     allPanelGroupEle[panelId].replaceWith(newPanelGroupEle)
-    allPanelGroupEle[panelId].remove()
+    // allPanelGroupEle[panelId].remove()
     allPanelGroupEle[panelId] = newPanelGroupEle
 }
 
 // 创建单个group并返回
-function __createOnePanelGroup(panelId, panelTabs) {
+function __createOnePanelGroup(panelId, tabs) {
     // 创建面板分组容器
     const panelGroup = document.createElement("div")
     panelGroup.className = 'plugin-tabsman-panel-group orca-fav-item'
     panelGroup.setAttribute('data-tabsman-panel-id', panelId);
     
     // 创建面板标题项
-    createPanelItemElement(panelId, panelGroup);
+    const panelItemEl = createPanelItem(panelId).element;
+    panelGroup.append(panelItemEl)
     
-    // 将该面板的标签页并加入面板分组容器
-    for (const tab of panelTabs) {
-        const tabElement = createTabElement(tab, panelId, panelGroup);
-        allTabEle[tab.id] = tabElement;
-        // 添加活跃状态样式并加入面板分组容器
-        const activeTabs = TabsmanCore.getActiveTabs();
-        if (activeTabs && activeTabs[panelId].id === tab.id) {
-            tabElement.element.classList.add('active-tab-item');
-        }
-    }
+    // 将该面板的标签页加入面板分组容器
+    const tabItemEls = tabs.map(tab => {
+        const tabItem = createTabItem(tab, panelId);
+        allTabItems[tab.id] = tabItem;
+        return tabItem.element
+    })
+    panelGroup.append(...tabItemEls)
+    
+    // 副作用：标记活跃Tab
+    const activeTabId = TabsmanCore.getActiveTabs()?.[panelId]?.id;
+    const activeTabItem = allTabItems[activeTabId]
+    if (activeTabItem) activeTabItem.element.classList.add('active-tab-item');
 
     return panelGroup
 }
@@ -370,38 +359,36 @@ function __createOnePanelGroup(panelId, panelTabs) {
 function __renderUpdate (tab) {
     const {id, panelId} = tab
 
-    const tabElement = allTabEle[id].element
-    const panelGroupEle = allPanelGroupEle[panelId]
+    const tabItemEl = allTabItems[id].element
 
-    const newTab = createTabElement(tab, panelId, panelGroupEle)
-    const newTabElement = newTab.element
+    const newTabItem = createTabItem(tab, panelId)
+    const newTabItemEl = newTabItem.element
 
-    tabElement.classList.contains('active-tab-item') && newTabElement.classList.add('active-tab-item');
+    if (tabItemEl.classList.contains('active-tab-item')) newTabItemEl.classList.add('active-tab-item');
 
-    allTabEle[id] = newTab
-    tabElement.replaceWith(newTabElement)
-    tabElement.remove()
+    allTabItems[id] = newTabItem
+    tabItemEl.replaceWith(newTabItemEl)
 }
 
 // delete轻量渲染
 // currentTab => 当前活跃的tab，pre是被删除的tab
 function __renderDelete (currentTab, previousTab) {
-    allTabEle[currentTab.id].element.classList.add('active-tab-item');
-    allTabEle[previousTab.id].element.remove()
-    delete allTabEle[previousTab.id]
+    allTabItems[currentTab.id].element.classList.add('active-tab-item');
+    allTabItems[previousTab.id].element.remove()
+    delete allTabItems[previousTab.id]
 }
 
 // switch轻量渲染
 function __renderSwitch (currentTab, previousTab) {
-    allTabEle[previousTab.id].element.classList.remove('active-tab-item');
-    allTabEle[currentTab.id].element.classList.add('active-tab-item');
+    allTabItems[previousTab.id].element.classList.remove('active-tab-item');
+    allTabItems[currentTab.id].element.classList.add('active-tab-item');
 }
 
 // 全部渲染
 function __renderAll() {
     // 清空现有内容
     tabsmanTabsEle.innerHTML = '';
-    allTabEle = {}
+    allTabItems = {}
     allPanelGroupEle = {}
 
     // 获取所有面板的排序标签页列表
@@ -434,46 +421,29 @@ function __renderAll() {
  * @returns {Promise<boolean>} 返回启动是否成功
  */
 function startTabsRender(pluginName) {
-    try {
-        // 确保容器存在，如果不存在则创建
-        const result = injectTabsmanShell();
-        if (!result) {
-            console.error('tabsmanUI外壳注入失败');
-            return false;
-        }
 
-        enableTabPreview = orca.state.plugins[pluginName]?.settings.enableTabPreview
-        
-        // 直接获取标签页容器元素
-        tabsmanTabsEle = result.tabsmanTabsEl;
-        if (!tabsmanTabsEle) {
-            console.error('未找到tabsmanTabsEle');
-            return false;
-        }
+    enableTabPreview = orca.state.plugins[pluginName]?.settings.enableTabPreview
+    
+    // 注册外壳并绑定标签页容器
+    tabsmanTabsEle = injectTabsmanShell().tabsmanTabsEl
 
-        // 注册监听器
-        tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
-        setUpTabDragAndDrop();
-        tabsmanTabsEle.addEventListener('focusout', handlePanelTitleFocusout);
-        tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
-        tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
+    // 注册事件监听
+    tabsmanTabsEle.addEventListener('click', handleTabsmanClick);
+    setUpTabDragAndDrop();
+    tabsmanTabsEle.addEventListener('focusout', handlePanelTitleFocusout);
+    tabsmanTabsEle.addEventListener('keydown', handlePanelTitleEnter);
+    tabsmanTabsEle.addEventListener('input', handlePanelTitleInput);
 
-        // 订阅插件列表变化，为停靠面板的id绑定订阅
-        // 检查是否已加载
-        checkPluginDockpanelReady()
-        pluginDockpanelUnSubscribe = window.Valtio.subscribe(
-            orca.state.plugins,
-            checkPluginDockpanelReady
-        )
+    // 订阅插件列表变化，为停靠面板的id绑定/解绑
+    checkPluginDockpanelReady() // 手动一次，预防已经加载成功
+    pluginDockpanelUnSubscribe = window.Valtio.subscribe(
+        orca.state.plugins,
+        checkPluginDockpanelReady
+    )
 
-        allTabEle = {};
-        allPanelGroupEle = {};
-        return true;
-
-    } catch (error) {
-        console.error('标签页渲染系统启动失败:', error);
-        return false;
-    }
+    allTabItems = {};
+    allPanelGroupEle = {};
+    return true;
 }
 
 /**
@@ -499,7 +469,7 @@ function stopTabsRender() {
     dockpanelInfo = null
 
 
-    allTabEle = null;
+    allTabItems = null;
     allPanelGroupEle = null;
     tabsmanTabsEle = null;
     lastDockPanelId = null;
@@ -648,7 +618,7 @@ function handleTabDragOver(e) {
     e.preventDefault();   
 }
 
-// await会导致返回一个promise从而导致end触发，以至于panelGroupElement提前变为null值
+// 函数会因await直接promise返回，从而令end提前被执行，以至于panelGroupElement提前变为null值
 let isDroping = false
 // 处理drop事件，移动标签页到目标面板。
 async function handleTabDrop(e) {
@@ -682,7 +652,7 @@ const panelTitles = new Map();
  * @param {string} panelId - 面板ID
  */
 function handlePanelTitleInput(e) {
-    if (!e.target.matches('.plugin-tabsman-panel-title')) return;
+    if (!e.target.classList.contains('plugin-tabsman-panel-title')) return;
     const titleElement = e.target;
     const currentText = titleElement.textContent;
 
@@ -704,7 +674,7 @@ function handlePanelTitleInput(e) {
  * @param {Event} e - 事件对象
  */
 function handlePanelTitleEnter(e) {
-    if (!e.target.matches('.plugin-tabsman-panel-title')) return;
+    if (!e.target.classList.contains('plugin-tabsman-panel-title')) return;
     const titleElement = e.target;
     const panelId = titleElement.parentElement.dataset.tabsmanPanelId;
     if (e.key === 'Enter') {
@@ -720,7 +690,7 @@ function handlePanelTitleEnter(e) {
  * @param {Event} e - 事件对象
  */
 function handlePanelTitleFocusout(e) {
-    if (!e.target.matches('.plugin-tabsman-panel-title')) return;
+    if (!e.target.classList.contains('plugin-tabsman-panel-title')) return;
     const titleElement = e.target;
     const panelId = titleElement.parentElement.dataset.tabsmanPanelId;
     titleElement.textContent = getPanelTitle(panelId);

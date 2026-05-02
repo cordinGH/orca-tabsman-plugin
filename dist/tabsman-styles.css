@@ -30,7 +30,6 @@
 .plugin-tabsman-tab-item.orca-fav-item-item {
     margin-left: 1.125rem;
     padding-right: .5rem;
-
     grid-template-columns: auto auto 1fr auto;
 
     /* tab固定按钮pin */
@@ -43,7 +42,8 @@
 
     /* active tab */
     &.active-tab-item{
-        border: 1px solid var(--orca-color-primary-5);
+        border: .5px solid var(--orca-color-primary-5);
+        background-color: color-mix(in srgb, var(--orca-color-primary-5) 10%, transparent)
     }
 }
 
@@ -137,11 +137,10 @@
 .plugin-tabsman-ws-items-item.orca-segmented-item {
     display: flex;
     outline: .5px solid #00000036;
-    background: color-mix(in srgb, var(--orca-color-text-1) 3%, transparent);
     border-radius: var(--orca-radius-md);
     padding: 0 .125em 0 .75em;
     /* color: var(--orca-color-text-2); */
-    transition: background .15s;
+    transition: background-color .15s;
 
     & i {
         padding: 0 .25em;
@@ -161,7 +160,7 @@
 
 /* 选中态：背景+边框变粗变色primary*/
 .plugin-tabsman-ws-items-item.orca-segmented-item.plugin-tabsman-ws-selected {
-    background: color-mix(in srgb, var(--orca-color-primary-5) 14%, transparent);
+    background-color: color-mix(in srgb, var(--orca-color-primary-5) 14%, transparent);
     outline: 1.5px solid var(--orca-color-primary-6);
     color: initial;
 }

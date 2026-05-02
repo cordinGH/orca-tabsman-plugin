@@ -3,22 +3,18 @@
  * 
  * 基本特点：
  * - 各个标签页具有其独立的历史记录，互不影响
- * - 扁平化数据架构
- * - 命令拦截与历史同步
+ * - 扁平化数据架构（不构建面板对象，只维护tab对象及其map）
  * - 实时UI更新
  * 
  * Tab数据结构设计：
  * - tabs: 所有标签页对象的主存储，tabid - tab对象
  * - activeTabs: 每个面板当前活跃的标签页对象，panelid - tab对象
- * - tabIdSetByPanelId: 按面板ID分组的标签页ID集合索引，panelid - tabid集合
- * - sortedTabsByPanelId: 按面板ID分组的已排序标签页列表缓存，panelid - tab对象数组
+ * - tabIdSetByPanelId: 按面板ID分组的标签页ID集合Map，panelid - tabid集合
+ * - sortedTabsByPanelId: 按面板ID分组的已排序标签页数组Map，panelid - tab对象数组
  * 
  * 数据构建：
  * - 初始化时，为每个面板创建初始标签页
- * - 创建标签页时，更新相关数据结构
- * - 删除标签页时，更新相关数据结构
- * - 切换标签页时，更新相关数据结构
- * - 关闭面板时，更新相关数据结构
+ * - 后续对标签页的操作，如创建、删除、关闭、置顶、收藏、移动、历史前进后退等等，均更新core数据结构并刷新
  * - 退出时，清理所有数据结构
  * 
  */

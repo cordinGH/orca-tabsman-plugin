@@ -3,7 +3,6 @@
  * 负责置顶标签页数据的保存和恢复
  */
 
-// 导入 core 模块
 import * as TabsmanCore from './tabsman-core.js';
 
 // 最近关闭标签页最大保存数量

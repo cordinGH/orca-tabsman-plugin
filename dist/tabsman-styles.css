@@ -133,14 +133,21 @@
 
 
 /* ——————————————————————————————————顶部栏工作区item—————————————————————————————————————————— */
+/* —————————— 工作区 item —————————— */
 .plugin-tabsman-ws-items-item.orca-segmented-item {
     display: flex;
     outline: .5px solid #00000036;
-    padding: 0 0 0 .75em;
+    background: color-mix(in srgb, var(--orca-color-text-1) 3%, transparent);
+    border-radius: var(--orca-radius-md);
+    padding: 0 .125em 0 .75em;
+    /* color: var(--orca-color-text-2); */
+    transition: background .15s;
+
     & i {
         padding: 0 .25em;
         color: initial;
         opacity: .1;
+        transition: opacity .15s;
     }
     & i:hover {
         opacity: 1;
@@ -152,8 +159,10 @@
     }
 }
 
-.plugin-tabsman-ws-items-item.orca-segmented-item.plugin-tabsman-ws-selected{
-    outline: 1.5px solid var(--orca-color-primary-5);
+/* 选中态：背景+边框变粗变色primary*/
+.plugin-tabsman-ws-items-item.orca-segmented-item.plugin-tabsman-ws-selected {
+    background: color-mix(in srgb, var(--orca-color-primary-5) 14%, transparent);
+    outline: 1.5px solid var(--orca-color-primary-6);
     color: initial;
 }
 

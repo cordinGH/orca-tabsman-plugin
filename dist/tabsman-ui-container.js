@@ -1,94 +1,96 @@
 // Orca Tabsman Plugin - UI外壳模块
-// 负责创建和注入标签页管理器的UI外壳到Orca侧边栏中
-import * as Utils from "./tabsman-utils.js";
-let tabsmanShell = null;
+// 负责创建和注入tabsman侧边栏的UI外壳
 
-let commandInterceptHandler = null
-let handleSidebarTabOptionsClick = null
+import * as Utils from "./tabsman-utils.js";
 
 /**
- * 创建并注入可隐藏容器到目标元素
- * @param {Element} targetElement - 目标容器元素
- * @returns {Element} 返回注入的可隐藏容器DOM元素
+ * Orca本体的 DOM 元素引用集合
+ * @type {{
+ *   sidebarTabs: HTMLElement | null,
+ *   sidebarTabOptions: HTMLElement | null,
+ *   app: HTMLElement | null
+ * }}
+ * @property {HTMLElement | null} sidebarTabs - 侧边栏内容容器元素
+ * @property {HTMLElement | null} sidebarTabOptions - 侧边栏选项元素
+ * @property {HTMLElement | null} app - 应用根容器元素 (body > #app)
  */
-function injectHideableContainer(targetElement) {
-    // 创建 .orca-hideable 容器
+let orcaEl = null
+
+/**
+ * Tabsman 插件UI外壳，包含侧边栏选项及其内容容器
+ * @type {{
+ *   optionEl: HTMLElement,
+ *   contentEl: HTMLElement
+ * }}
+ * @property {HTMLElement} optionEl - 侧边栏选项按钮（.orca-segmented-item.plugin-tabsman-tab-option）
+ * @property {HTMLElement} contentEl - 可隐藏的内容容器（.orca-hideable），内部包含tabsman根容器，plugin-tabsman-container
+ */
+let tabsmanShell = null;
+
+
+// 命令的侧边栏目标状态
+const targetStateByCommand = {
+    'core.sidebar.goFavorites': 'favorites',
+    'core.sidebar.goTags':      'tags',
+    'core.sidebar.goPages':     'pages'
+}
+
+// 命令拦截注册列表
+let unregisterList = []
+
+/**
+ * 创建tabsman外壳元素
+ */
+function setTabsmanShell() {
+
+    // 可隐藏容器，对齐原生侧边栏结构
     const hideableContainer = document.createElement('div');
     hideableContainer.className = 'orca-hideable';
 
-    // 创建 .plugin-tabsman-container 元素
-    // ⭐️⭐️⭐️借用orca-favorites-list样式，性质是相同的。
+    // tabs栏根容器，.plugin-tabsman-container
+    // 借用orca-favorites-list样式，元素的样式性质类似。
     const tabsmanContainer = Utils.createDomWithClass("div", 'plugin-tabsman-container orca-favorites-list', hideableContainer)
     
-    // 创建 .plugin-tabsman-tabs 元素
-    // ⭐️⭐️⭐️借用orca-favorites-items样式，性质是相同的。
+    // tab面板组组容器，.plugin-tabsman-tabs
+    // 借用orca-favorites-items样式，元素的样式性质类似。
     const tabsmanTabs = Utils.createDomWithClass("div", 'plugin-tabsman-tabs orca-favorites-items', tabsmanContainer)
-    
-    // 注入到.orca-sidebar-tabs
-    targetElement.insertBefore(hideableContainer, targetElement.firstChild);
-    
-    // 返回带有子元素引用的对象，链式调用
-    return {
-        element: hideableContainer,
-        tabsmanContainer: {
-            element: tabsmanContainer,
-            tabsmanTabs: {
-                element: tabsmanTabs
-            }
-        }
-    };
+
+    // Tabs选项栏
+    const optionEl = document.createElement('div');
+    optionEl.className = 'orca-segmented-item plugin-tabsman-tab-option'
+    optionEl.textContent = 'Tabs'
+
+    tabsmanShell = {
+        optionEl,
+        contentEl: hideableContainer,
+        tabsmanTabsEl: tabsmanContainer
+    }
 }
-
-
 
 
 /**
  * 注入标签页管理器外壳，包括创建和注入基本UI外壳
- * @returns {Object} 返回外壳对象或null
+ * @returns {{ optionEl: HTMLElement, contentEl: HTMLElement }} tabsman 外壳引用
  */
-function injectTabsmanShell() {
-    try {
-        const sidebarTabsEl = document.querySelector('.orca-sidebar-tabs');
-        const sidebarTabOptionsEl = document.querySelector('.orca-sidebar-tab-options');
-        
-        // 注入侧边栏内容外壳和tab-option
-        const hideableContainer = injectHideableContainer(sidebarTabsEl);
-        const tabOptionEl = Utils.createDomWithClass("div", 'orca-segmented-item plugin-tabsman-tab-option', sidebarTabOptionsEl)
-        tabOptionEl.textContent = 'Tabs';
-        
-        // 保存完整的外壳对象
-        tabsmanShell = {
-            parentElement: sidebarTabOptionsEl,
-            tabOptionEl: tabOptionEl,
-            hideableContainerEl: hideableContainer.element,
-            tabsmanContainerEl: hideableContainer.tabsmanContainer.element,
-            tabsmanTabsEl: hideableContainer.tabsmanContainer.tabsmanTabs.element,
-        };
-
-
-        handleSidebarTabOptionsClick = (e) => {
-            if (e.target.classList.contains('plugin-tabsman-tab-option')) {
-                // 本就选中则不操作
-                if (sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) return
-                sidebarTabOptionsEl.classList.add('plugin-tabsman-selected');
-                tabOptionEl.classList.add('orca-selected');
-            } else {              
-                if (!sidebarTabOptionsEl.classList.contains('plugin-tabsman-selected')) return
-                sidebarTabOptionsEl.classList.remove('plugin-tabsman-selected');
-                tabOptionEl.classList.remove('orca-selected');
-            }
-        }
-
-        // 监听点击tab-option事件
-        sidebarTabOptionsEl.addEventListener('click', handleSidebarTabOptionsClick);
-        
-        // 设置Orca命令拦截
-        setOrcaCommandIntercept();
-        
-    } catch (error) {
-        console.error('外壳注入失败:', error);
+export function injectTabsmanShell() {
+    orcaEl = {
+        sidebarTabs: document.querySelector('.orca-sidebar-tabs'),
+        sidebarTabOptions: document.querySelector('.orca-sidebar-tab-options'),
+        app: document.querySelector("body>#app")
     }
-    
+
+    setTabsmanShell()
+
+    // 注入到侧边栏内容区和选项卡区
+    orcaEl.sidebarTabs.prepend(tabsmanShell.contentEl)
+    orcaEl.sidebarTabOptions.append(tabsmanShell.optionEl)
+
+    // 注册选项卡点击监听
+    orcaEl.sidebarTabOptions.addEventListener('click', handleOptionsClick)
+
+    // 拦截处理侧边栏命令
+    unregisterList = interceptOrcaSidebarCommands()
+
     return tabsmanShell;
 }
 
@@ -97,69 +99,77 @@ function injectTabsmanShell() {
  * 清理所有注入的标签页管理器外壳
  * @returns {void}
  */
-function cleanupTabsmanShell() {
-    if (!tabsmanShell) return;
+export function cleanupTabsmanShell() {
     
-    // 提取元素引用
-    const hideableContainerEl = tabsmanShell.hideableContainerEl;
-    const tabOptionEl = tabsmanShell.tabOptionEl;
-    
-    // 清理容器外壳
-    if (hideableContainerEl?.parentNode) {
-        hideableContainerEl.parentNode.removeChild(hideableContainerEl);
+    for (const [command, handler] of unregisterList) {
+        orca.commands.unregisterBeforeCommand(command, handler)
     }
+    unregisterList.length = 0
     
-    // 清理tab-option
-    if (tabOptionEl?.parentNode) {
-        tabOptionEl.parentNode.removeChild(tabOptionEl);
-    }
+    orcaEl.sidebarTabOptions.removeEventListener('click', handleOptionsClick)
 
-    if (tabsmanShell.parentElement && handleSidebarTabOptionsClick) {
-        tabsmanShell.parentElement.removeEventListener('click', handleSidebarTabOptionsClick);
-    }
-    
-    // 清理Orca命令拦截
-    cleanupOrcaCommandIntercept();
-    
-    tabsmanShell = null;
+    tabsmanShell.contentEl.remove()
+    tabsmanShell.optionEl.remove()
+
+    tabsmanShell = null
+    orcaEl = null
 }
 
-/** 设置Orca命令拦截 */
-function setOrcaCommandIntercept() {
-    commandInterceptHandler = {
-        removeFn: (optionName) => {
-            const bodyApp = document.querySelector("body>#app");
-            // 如果当前是tabs栏，则先移除tabs栏选中样式，再查看当前是否就是目标栏，不是，就返回true执行切换，是就false不用执行。
-            if (tabsmanShell.parentElement.classList.contains('plugin-tabsman-selected')) {
-                tabsmanShell.parentElement.classList.remove('plugin-tabsman-selected');
-                tabsmanShell.tabOptionEl.classList.remove('orca-selected');
-    
-                // 如果是关闭面板，就正常执行命令
-                if (bodyApp.className === "sidebar-closed") return true
-    
-                return orca.state.sidebarTab !== optionName;
-            }
-            return true;
-        },
-        goFavorites: () => commandInterceptHandler.removeFn("favorites"),
-        goTags: () => commandInterceptHandler.removeFn("tags"),
-        goPages: () => commandInterceptHandler.removeFn("pages")
+
+function handleOptionsClick(e) {
+    const optionEl = e.target.closest('.orca-segmented-item')
+    if (!optionEl) return
+
+    if (optionEl.classList.contains('plugin-tabsman-tab-option')) {
+        // 点击tabsman的选项卡时，如果本就处于选中，则不执行操作，反之则切换tabsman选项卡为选中样式
+        if (__isTabsmanSelected()) return
+        __addTabsmanSelected()
+    } else {
+        // 点击其他选项卡时，如果tabsman选项卡未选中，则不执行操作，反之则移除tabsman选项卡选中样式
+        if (!__isTabsmanSelected()) return
+        __removeTabsmanSelected()
     }
-    orca.commands.registerBeforeCommand("core.sidebar.goFavorites", commandInterceptHandler.goFavorites);
-    orca.commands.registerBeforeCommand("core.sidebar.goTags", commandInterceptHandler.goTags);
-    orca.commands.registerBeforeCommand("core.sidebar.goPages", commandInterceptHandler.goPages);
 }
 
-/** 清理Orca命令拦截 */
-function cleanupOrcaCommandIntercept() {
-    orca.commands.unregisterBeforeCommand("core.sidebar.goFavorites", commandInterceptHandler.goFavorites);
-    orca.commands.unregisterBeforeCommand("core.sidebar.goTags", commandInterceptHandler.goTags);
-    orca.commands.unregisterBeforeCommand("core.sidebar.goPages", commandInterceptHandler.goPages);
-    commandInterceptHandler = null;
+/**
+ * 拦截处理侧边栏命令，返回一个注销列表
+ * @returns 命令注册列表
+ */
+function interceptOrcaSidebarCommands() {
+    
+    const handleCommand = (commandState) => {
+        // 没选中则正常执行
+        if (!__isTabsmanSelected()) return true
+
+        // 清除tabsman选中，清除后当前就在目标，且侧边栏是展开的则无需操作
+        __removeTabsmanSelected()
+        if (orca.state.sidebarTab === commandState && !orcaEl.app.classList.contains('sidebar-closed')) return false
+        
+        return true
+    }
+    
+    const unregisterList = []
+    for (const [command, targetState] of Object.entries(targetStateByCommand)) {
+        const handler = () => handleCommand(targetState)
+        unregisterList.push([command, handler])
+        orca.commands.registerBeforeCommand(command, handler)
+    }
+
+    return unregisterList
+
 }
 
-// 导出模块接口
-export {
-    injectTabsmanShell,
-    cleanupTabsmanShell
-};
+function __isTabsmanSelected() {
+    return orcaEl.sidebarTabOptions.classList.contains('plugin-tabsman-selected')
+}
+
+
+function __addTabsmanSelected() {
+    orcaEl.sidebarTabOptions.classList.add('plugin-tabsman-selected')
+    tabsmanShell.optionEl.classList.add('orca-selected')
+}
+
+function __removeTabsmanSelected() {
+    orcaEl.sidebarTabOptions.classList.remove('plugin-tabsman-selected')
+    tabsmanShell.optionEl.classList.remove('orca-selected')   
+}

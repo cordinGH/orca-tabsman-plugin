@@ -63,7 +63,7 @@ function setTabsmanShell() {
     tabsmanShell = {
         optionEl,
         contentEl: hideableContainer,
-        tabsmanTabsEl: tabsmanContainer
+        tabsmanTabsEl: tabsmanTabs
     }
 }
 

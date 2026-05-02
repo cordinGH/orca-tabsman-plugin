@@ -70,6 +70,11 @@ let prefixString = "date"
 /** @type {boolean} 标记当前正存在该插件命令在执行 */
 let commandDoing = false
 
+// 当前打开工作空间
+let workspaceNow = ""
+// 标记正在切换工作空间
+let workspaceSwitching = false
+
 /**
  * 命令串行化包装：若已有命令执行中则直接返回；否则在 fn 执行期间持有锁，
  * 不论 fn 正常返回、早返回还是抛异常，结束时都会释放锁。
@@ -831,7 +836,7 @@ async function unpinTab(tabId) {
 
 
 /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
-/* ———————————————————————————————————————实现工作区————————————————————————————————————————————————— */
+/* ——————————————————————————————————————————工作区————————————————————————————————————————————————— */
 /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
 
 /**
@@ -937,10 +942,6 @@ function exitWorkspace() {
     openWorkspace()
 }
 
-// 打开工作空间
-let workspaceNow = ""
-// 标记正在切换工作空间
-let workspaceSwitching = false
 // 参数默认值为退出点
 async function openWorkspace(name = ""){
     const sname = String(name)
@@ -1578,20 +1579,10 @@ function destroy() {
     // 清理订阅
     unsubscribeAll()
 
-    // 清理全局状态
-    tabs = {};
-    tabCounter = 0;  // 重置计数器
-    activeTabs = {};
-    tabIdSetByPanelId.clear();
-    sortedTabsByPanelId.clear();  // 清理排序缓存
-    
+    // 清理navAPI的包装
     cleanNavWrappers()
-
-    // 清理注册的命令
-    orca.commands.unregisterCommand('tabsman.goToNextTab');
-    orca.commands.unregisterCommand('tabsman.goToPreviousTab');
     
-    // 注销命令拦截器
+    // 注销命令拦截
     cleanCommandInterception()
     
     // 清理UI渲染回调函数
@@ -1599,6 +1590,22 @@ function destroy() {
     renderTabsByPanel = null;
 
     WorkspaceRender.stopWSRender()
+
+    // 清理选项状态以及工作区状态
+    enableQuickNotePrefix = false
+    enableAutoFoldQuickNotes = false
+    lastQuickNoteBlockId = null;
+    prefixString = "date"
+    commandDoing = false
+    workspaceNow = ""
+    workspaceSwitching = false
+
+    // 清理标签页数据存储
+    tabs = {};
+    tabCounter = 0;  // 重置计数器
+    activeTabs = {};
+    tabIdSetByPanelId.clear();
+    sortedTabsByPanelId.clear();  // 清理排序缓存
 }
 
 

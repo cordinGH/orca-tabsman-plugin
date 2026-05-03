@@ -679,6 +679,9 @@ async function switchTab(tabId, needRender = true) {
     // 切换tab选中样式
     if (needRender && renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: tab , previousTab: activeTab});
 
+    // 非工作区切换到置顶标签页时，更新一下持久化数据
+    if(tab.pinTs !==0 && workspaceNow === "") TabsmanPersistence.addAndSaveTab(tab,'pinned')
+
     // 切换页面显示
     const {view, viewArgs} = __getViewAndViewArgsByTab(tab)
     orca.nav.replace(view, viewArgs, panelId)

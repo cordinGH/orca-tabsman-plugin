@@ -56,6 +56,7 @@ async function addAndSaveTab(tab, tabType = "") {
     // 将tab保存至对应数组等待写入持久化。
     switch (tabType) {
         case "pinned": {
+            if (pinnedTabArray.find(item=>item.id === tab.id)) break;
             pinnedTabArray.push(tab);
             break;
         }

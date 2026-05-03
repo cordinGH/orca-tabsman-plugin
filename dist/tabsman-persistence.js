@@ -165,20 +165,33 @@ async function restoreTabs(rawTabArray, tabType) {
     // 唤醒标签页数据
     const tabArray = wakeTabArray(rawTabArray, tabType);
 
+    // 过滤掉失效tab，将有效tab收集为一个新数组返回
+    const filterValidTabs = async (tabArray) => {
+        const validArray = []
+        for (const tab of tabArray) {
+            // 跳过需要重定向的tab
+            if (await TabsmanCore.__handleTabValidStatus(tab)) continue;
+            validArray.push(tab);
+        }
+        return validArray
+    }
+
     switch (tabType) {
         case "pinned":
             // 持久化数据载入到模块内存对象，并导入到core数据结构
             pinnedTabArray = tabArray;
             TabsmanCore.importTabToActivePanel(pinnedTabArray);
             return pinnedTabArray;
-        case "recently-closed":
-            for (const tab of tabArray) await TabsmanCore.__handleTabValidStatus(tab);
-            recentlyClosedTabArray = tabArray;
+        case "recently-closed": {
+            recentlyClosedTabArray = await filterValidTabs(tabArray);
+            await saveTabArray("recently-closed")
             return recentlyClosedTabArray;
-        case "favorite":
-            for (const tab of tabArray) await TabsmanCore.__handleTabValidStatus(tab);
-            favoriteTabArray = tabArray;
+        }
+        case "favorite": {
+            favoriteTabArray = await filterValidTabs(tabArray);
+            await saveTabArray("favorite")
             return favoriteTabArray;
+        }
     }
 }
 

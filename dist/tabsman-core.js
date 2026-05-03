@@ -283,21 +283,16 @@ async function __generateTabNameAndIcon(blockId) {
 async function __handleTabValidStatus(tab) {
     const {currentBlockId} = tab
     const {name, icon, needRedirect} = await __generateTabNameAndIcon(currentBlockId);
-    let historyItemAssign, tabAssign;
 
     if (typeof currentBlockId === "number" && needRedirect) {
         const date = new Date(name)
-        historyItemAssign = {icon, name, view: "journal", viewArgs: {date}}
-        tabAssign = {currentBlockId: date, name, currentIcon: icon}
-        const tabId = tab.id
-        const tabIndex = getOneSortedTabs(tab.panelId).findIndex((item) => item.id === tabId) + 1
-        orca.notify("info",`[tabsman] 第${tabIndex}个标签页重定向为今日日志，因为其目标块${currentBlockId}已被删除。`)
-    } else {
-        historyItemAssign = {icon, name}
-        tabAssign = {name, currentIcon: icon}    
+        Object.assign(tab.backStack.at(-1), {icon, name, view: "journal", viewArgs: {date}})
+        Object.assign(tab, {currentBlockId: date, name, currentIcon: icon})
+        return true
     }
-    Object.assign(tab.backStack.at(-1), historyItemAssign)
-    Object.assign(tab, tabAssign)
+    Object.assign(tab.backStack.at(-1), {icon, name})
+    Object.assign(tab, {name, currentIcon: icon})
+    return false
 }
 
 
@@ -472,26 +467,46 @@ function subscribePanelBackHistory() {
  */
 async function navigateTabBack(tab) {
     
-    // 检查是否可以后退
-    if (tab.backStack.length <= 1) {
+    const {backStack, forwardStack} = tab
+
+    if (backStack.length <= 1) {
         orca.notify("info", "[tabsman] 当前标签页历史已到开头，无法后退");
         return false;
     }
     
-    // 从后退栈移除当前项，放入前进栈
-    const currentItem = tab.backStack.pop();
+    // 暂存当前访问
+    const currentItem = backStack.pop();
     
-    // 约束前进栈长度：如果达到最大值，先移除最旧元素
-    if (tab.forwardStack.length >= HISTORY_CONFIG.MAX_FORWARD_STACK) {
-        tab.forwardStack.shift(); // 移除最旧的前进历史
+    // 跳过失效的历史(块被删除)
+    let target, targetBlockId;
+    while (backStack.length > 0) {
+        target = backStack.at(-1)
+        targetBlockId = __getBlockIdByViewAndViewArgs(target.view, target.viewArgs)
+        const {icon, name, needRedirect} = await __generateTabNameAndIcon(targetBlockId);
+        // 失效就弹出，没失效则更新并跳出循环
+        if (needRedirect) {
+            backStack.pop()
+        } else {
+            Object.assign(target, { icon, name })
+            break;
+        }
     }
-    tab.forwardStack.push(currentItem);
+    
+    // 没有有效的，则放回并告知用户
+    if (backStack.length === 0) {
+        backStack.push(currentItem)
+        orca.notify("info",'[tabsman] 后退历史中的块已被删除')
+        return false
+    }
+
+    // 将当前访问放入前进栈，并约束前进栈最大长度
+    if (forwardStack.length >= HISTORY_CONFIG.MAX_FORWARD_STACK) forwardStack.shift();
+    forwardStack.push(currentItem);
     
     // 切换页面显示
-    const target = tab.backStack.at(-1)
-    const {view, viewArgs} = target;
-    tab.currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
-    await __handleTabValidStatus(tab)
+    tab.currentBlockId = targetBlockId
+    tab.currentIcon = target.icon
+    tab.name = target.name
     orca.nav.replace(target.view, target.viewArgs, tab.panelId);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
@@ -504,21 +519,40 @@ async function navigateTabBack(tab) {
  */
 async function navigateTabForward(tab) {
     
-    // 检查是否可以前进
-    if (tab.forwardStack.length === 0) {
+    const {backStack, forwardStack} = tab
+
+    if (forwardStack.length === 0) {
         orca.notify("info", "[tabsman] 当前标签页历史已到末尾，无法前进");
         return false;
     }
     
-    // 从前进栈刚才放入的项放回后退栈栈顶
-    const item = tab.forwardStack.pop();
-    tab.backStack.push(item);
+    // 检查是否有有效的前进记录，失效就pop
+    let target, targetBlockId;
+    while (forwardStack.length > 0) {
+        target = forwardStack.at(-1)
+        targetBlockId = __getBlockIdByViewAndViewArgs(target.view, target.viewArgs)
+        const {icon, name, needRedirect} = await __generateTabNameAndIcon(targetBlockId);
+        // 失效就弹出，没失效则更新并跳出循环
+        if (needRedirect) {
+            forwardStack.pop()
+        } else {
+            Object.assign(target, { icon, name })
+            break;
+        }
+    }
+    
+    // 没有有效的，则告知用户并返回
+    if (forwardStack.length === 0) {
+        orca.notify("info",'[tabsman] 前进历史中的块已被删除')
+        return false
+    }
+
+    backStack.push(forwardStack.pop());
     
     // 切换页面显示
-    const target = tab.backStack.at(-1)
-    const {view, viewArgs} = target;
-    tab.currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
-    await __handleTabValidStatus(tab)
+    tab.currentBlockId = targetBlockId
+    tab.currentIcon = target.icon
+    tab.name = target.name
     orca.nav.replace(target.view, target.viewArgs, tab.panelId);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
     return true;
@@ -625,8 +659,10 @@ async function switchTab(tabId, needRender = true) {
     if (currentTab === tab) return
 
     // 处理tab有效性
-    await __handleTabValidStatus(currentTab)
-    await __handleTabValidStatus(tab)
+    const blockId1Before = currentTab.currentBlockId
+    if (await __handleTabValidStatus(currentTab)) orca.notify("info", `[tabsman]目标块 ${blockId1Before}已删除, 已重定向为今日日志`);
+    const blockId2Before = tab.currentBlockId
+    if (await __handleTabValidStatus(tab)) orca.notify("info", `[tabsman]目标块 ${blockId2Before}已删除, 已重定向为今日日志`);
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: currentTab});
     if (renderTabsCallback) await renderTabsCallback({type: "update", currentTab: tab});
 
@@ -1014,6 +1050,8 @@ async function openWorkspace(name = ""){
     sortedTabsByPanelId.clear()
     for (const tab of activeTabsValue) {
         await __handleTabValidStatus(tab)
+        const blockIdBefore = tab.currentBlockId
+        if (await __handleTabValidStatus(tab)) orca.notify("info", `[tabsman]目标块 ${blockIdBefore}已删除, 已重定向为今日日志`);
 
         // 准备新面板
         const {view, viewArgs} = __getViewAndViewArgsByTab(tab)

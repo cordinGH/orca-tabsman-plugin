@@ -814,6 +814,11 @@ async function pinTab(tabId) {
         console.warn(`[tabsman] 尝试置顶不存在的标签页: ${tabId}`);
         return false;
     }
+
+    if (tab.isPinned) {
+        console.log(`[tabsman] 标签页 ${tabId} 已置顶`);
+        return true;
+    }
     
     // 设置置顶状态
     tab.isPinned = true;
@@ -1190,7 +1195,12 @@ async function switchToPreviousTab() {
 async function switchPreviousActiveTab(panelId, needRender = true) {
     return withCommandLock(async () => {
         let previewActiveTab;
-        for (const tab of getOneSortedTabs(panelId)) {
+        const panelTabs = getOneSortedTabs(panelId)
+        if (panelTabs.length === 1) {
+            orca.notify("info", '[tabsman] 当前面板无其他标签页')
+            return false
+        }
+        for (const tab of panelTabs) {
             if (tab.isActive) continue
             const isNewestActiveTab = !previewActiveTab || tab.lastAccessedTs > previewActiveTab.lastAccessedTs
             if (isNewestActiveTab) previewActiveTab = tab

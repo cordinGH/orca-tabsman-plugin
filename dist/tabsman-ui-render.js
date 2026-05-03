@@ -8,27 +8,47 @@ import { injectTabsmanShell, cleanupTabsmanShell } from './tabsman-ui-container.
 import * as Utils from "./tabsman-utils.js";
 
 
-/** @type {HTMLElement} - 标签页容器元素*/
-let tabsmanTabsEle = null;
-
+// 设置选项
 /** @type {boolean} - 启用tab预览 */
 let enableTabPreview;
 
+/* ——————————————————————————————————————— tabsman DOM元素 ——————————————————————————————————————————————— */
+/** @type {HTMLElement} - 标签页容器元素*/
+let tabsmanTabsEle = null;
 /** @type {Object} - 标签页缓存对象*/
 let allTabItems = null
-
 /**
  * 面板组缓存对象
  * 键为面板ID（panelId），值为对应的面板组 DOM 元素
  * @type {Object.<string, HTMLElement>}
  */
 let allPanelGroupEle = null
+// 面板自定义标题（本次会话有效）
+const panelTitles = new Map();
 
+/* —————————————————————————————————————  dockpanel插件联动 ————————————————————————————————————— */
 let pluginDockpanelUnSubscribe = null;
 let dockedPanelIdUnSubscribe = null;
 let dockpanelInfo = null; // 只绑定检测到启用的目标插件，以消除多个插件版本时的数据误修改。
 // let pluginDockPanelReady = false
 let lastDockPanelId = null;
+
+/* ————————————————————————拖拽标签页或者拖拽创建标签页所需的数据 ————————————————————————————————————— */
+/** @type {HTMLDivElement} - 存放从drag-start中行为监听到的orca-block元素 */
+let orcaBlockfromDrag;
+
+/**
+ * @type {object} - dragState 拖拽状态记录
+ * @property {string | null} tabId - 正在拖拽的标签页 ID
+ * @property {HTMLDivElement | null} targetPanelGroupEl - 当前拖入的面板组元素
+ */
+let dragState = {
+    tabId: null,
+    targetPanelGroupEl: null,
+}
+
+/* —————————————————————————————————————————————————————————————————————————————————— */
+
 
 /**
  * 创建单个标签页的DOM元素
@@ -460,19 +480,24 @@ function stopTabsRender() {
     // 清理注入的外壳（包含所有渲染元素）
     cleanupTabsmanShell();
     
-    // 清理订阅
+    // 清理dockpanel订阅
     if (pluginDockpanelUnSubscribe) {
         pluginDockpanelUnSubscribe();
         pluginDockpanelUnSubscribe = null;
     }
     closeSyncDockpanelId()
     dockpanelInfo = null
+    lastDockPanelId = null;
 
+    // 清理拖拽数据
+    dragState = {}
+    orcaBlockfromDrag = null
 
+    // 清理tabs DOM元素
     allTabItems = null;
     allPanelGroupEle = null;
     tabsmanTabsEle = null;
-    lastDockPanelId = null;
+    panelTitles.clear();
 }
 
 // 导出模块接口
@@ -578,6 +603,10 @@ function setUpTabDragAndDrop() {
     tabsmanTabsEle.addEventListener('dragenter', handleTabDragEnter);
     tabsmanTabsEle.addEventListener('drop', handleTabDrop);
     tabsmanTabsEle.addEventListener('dragend', handleTabDragEnd);
+
+    // 拖拽创建标签页
+    document.addEventListener('dragstart', recordBlockId)
+    tabsmanTabsEle.addEventListener('drop', createTabByDrop)
 }
 
 function cleanupTabDragAndDrop() {
@@ -586,65 +615,99 @@ function cleanupTabDragAndDrop() {
     tabsmanTabsEle.removeEventListener('dragenter', handleTabDragEnter);
     tabsmanTabsEle.removeEventListener('drop', handleTabDrop);
     tabsmanTabsEle.removeEventListener('dragend', handleTabDragEnd);
+
+    document.removeEventListener('dragstart', recordBlockId)
+    tabsmanTabsEle.removeEventListener('drop', createTabByDrop)
 }
 
-/** 标签页拖拽和放置事件处理函数 */
-let dragTabId = null;
-let panelGroupElement = null;
+
+function recordBlockId(e) {
+    orcaBlockfromDrag = e.target.closest(".orca-block.orca-container")
+}
+function createTabByDrop(e) {
+    e.preventDefault();
+
+    // 不存在目标块则不执行
+    if (!orcaBlockfromDrag) return
+
+    //获取放置的面板
+    const panelGroupEl = e.target.closest('.plugin-tabsman-panel-group');
+    if (!panelGroupEl) return
+    const panelId = panelGroupEl.dataset.tabsmanPanelId
+
+    // 获取拖拽id
+    let {type, id: blockId} = orcaBlockfromDrag.dataset
+    blockId = parseInt(blockId)
+
+    // 生成创建参数
+    let initHistoryInfo;
+    if (type === 'journal') {
+        const block = orca.state.blocks[blockId]
+        const {date} = block.properties.find(prop => prop.name === '_repr').value
+        initHistoryInfo = {view: 'journal', viewArgs: {date}}
+    } else {
+        initHistoryInfo = {view: 'block', viewArgs: {blockId}}
+    }
+
+    TabsmanCore.createTab({currentBlockId: blockId, panelId, initHistoryInfo}).finally(()=>orcaBlockfromDrag = null)
+}
+
 function handleTabDragStart(e) {
     const tabElement = e.target.closest('.plugin-tabsman-tab-item');
-    if (tabElement) {
-        dragTabId = tabElement.getAttribute('data-tabsman-tab-id');
-        panelGroupElement = e.target.closest('.plugin-tabsman-panel-group');
-        panelGroupElement.classList.add('plugin-tabsman-panel-group-drag-over');
-    }
+    if (!tabElement) return;
+    dragState.tabId = tabElement.getAttribute('data-tabsman-tab-id');
+    dragState.targetPanelGroupEl = e.target.closest('.plugin-tabsman-panel-group');
+    dragState.targetPanelGroupEl.classList.add('plugin-tabsman-panel-group-drag-over');
 }
 
 /** 标签页拖入事件处理函数 */
 function handleTabDragEnter(e) {
-    // 约束只有切到新的group时，才执行逻辑，避免重复执行。
-    const newPanelElement = e.target.closest('.plugin-tabsman-panel-group');
-    if (newPanelElement && newPanelElement !== panelGroupElement) {
-        // 清理旧的group的样式
-        panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
-        // 设置新的group的样式
-        newPanelElement.classList.add('plugin-tabsman-panel-group-drag-over');
-        panelGroupElement = newPanelElement;
+    // 忽略外部拖拽
+    if (!dragState.tabId) return
+
+    // 切换到新目标则触发变更
+    const newPanelGroupEl = e.target.closest('.plugin-tabsman-panel-group');
+    if (newPanelGroupEl && newPanelGroupEl !== dragState.targetPanelGroupEl) {
+        dragState.targetPanelGroupEl.classList.remove('plugin-tabsman-panel-group-drag-over');
+        newPanelGroupEl.classList.add('plugin-tabsman-panel-group-drag-over');
+        dragState.targetPanelGroupEl = newPanelGroupEl;
     }
 }
 
-// 持续阻止默认行为，以支持drop事件。
+// 持续阻止默认的禁止拖放，但没有tab拖拽则保持禁止
 function handleTabDragOver(e) {
-    e.preventDefault();   
-}
-
-// 函数会因await直接promise返回，从而令end提前被执行，以至于panelGroupElement提前变为null值
-let isDroping = false
-// 处理drop事件，移动标签页到目标面板。
-async function handleTabDrop(e) {
-    isDroping = true
+    if (!dragState.tabId && !orcaBlockfromDrag) return
     e.preventDefault();
-    const newPanelId = panelGroupElement.getAttribute('data-tabsman-panel-id')
-    await TabsmanCore.moveTabToPanel(dragTabId, newPanelId);
-    orca.nav.switchFocusTo(newPanelId)
-    // 清理数据，因为drop到可拖拽区域是不会触发end事件的。
-    panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
-    panelGroupElement = null;
-    dragTabId = null;
 }
 
-// 确保任何情况都清理，例如没有触发drop事件时，也清理。
-async function handleTabDragEnd(e) {
-    if (!isDroping && panelGroupElement) {
-        panelGroupElement.classList.remove('plugin-tabsman-panel-group-drag-over');
-        panelGroupElement = null;
-        dragTabId = null;
+// 处理drop事件，移动标签页到目标面板。
+function handleTabDrop(e) {
+    e.preventDefault();
+    const {tabId, targetPanelGroupEl} = dragState
+    if (!tabId || !targetPanelGroupEl) return
+    const newPanelId = dragState.targetPanelGroupEl.getAttribute('data-tabsman-panel-id')
+    targetPanelGroupEl.classList.remove('plugin-tabsman-panel-group-drag-over');
+    TabsmanCore.moveTabToPanel(tabId, newPanelId)
+    .then((success) => success && orca.nav.switchFocusTo(newPanelId))
+    .catch((err) => {
+        orca.notify("error", `[tabsman] 移动标签页失败，请Ctrl R刷新`);
+        console.log('[tabsman] 报错：', err);
+    })
+    // 清理数据，因为当dom元素成功拖走时，不会触发end事件，反之则会继续触发end
+    dragState.tabId = null;
+    dragState.targetPanelGroupEl = null;
+}
+
+// end清理
+function handleTabDragEnd(e) {
+    if (dragState.targetPanelGroupEl) {
+        dragState.targetPanelGroupEl.classList.remove('plugin-tabsman-panel-group-drag-over');
     }
+    dragState.tabId = null;
+    dragState.targetPanelGroupEl = null;
 }
 
 // ========== 面板标题编辑处理函数 ==========
-// 内存中存储面板标题（本次会话有效）
-const panelTitles = new Map();
 
 /**
  * 处理面板标题输入事件（实时监听）

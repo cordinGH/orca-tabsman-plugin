@@ -951,8 +951,9 @@ async function renameWorkspace(newName) {
 
 // 显示所有的工作空间name
 async function getAllWorkspace(){
+    /** @type {Array<string>} */
     const keys = await orca.plugins.getDataKeys("tabsman-workspace")
-    return keys.sort()
+    return keys.filter(key => key !== 'tabsman-workspace-exit').sort()
 }
 
 // 删除指定name的工作空间，返回值1用于删除时是否正处于该工作区
@@ -1607,10 +1608,12 @@ async function start(callback = null, pluginName) {
     window.pluginTabsman.createQuickNoteTab = createQuickNoteTab
     window.pluginTabsman.createTodayJournalTab = createTodayJournalTab
     window.pluginTabsman.reopenClosedTabsInOrder = reopenClosedTabsInOrder
+    window.pluginTabsman.archiveWorkspace = TabsmanPersistence.archiveWorkspace
+    window.pluginTabsman.getArchivedWorkspaceNames = TabsmanPersistence.getArchivedWorkspaceNames
+    window.pluginTabsman.unarchiveWorkspace = TabsmanPersistence.unarchiveWorkspace
 
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点
-    await orca.plugins.removeData("tabsman-workspace","tabsman-workspace-exit")
     await WorkspaceRender.startWSRender(pluginName)
     // const n = await orca.plugins.getData('tabsman-workspace-feature', 'last-workspace-name')
     // if (n) lastWorkspaceName = JSON.parse(n)

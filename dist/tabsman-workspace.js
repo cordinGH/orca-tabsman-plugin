@@ -1,5 +1,6 @@
 import * as Utils from './tabsman-utils.js'
 import * as TabsmanCore from './tabsman-core.js'
+import * as TabsmanPersistence from './tabsman-persistence.js'
 
 /** @type {HTMLInputElement} */
 let saveButton = null
@@ -58,13 +59,12 @@ export async function startWSRender(pluginName) {
 
     // 提取用户的工作区
     const allUserWS = await TabsmanCore.getAllWorkspace()
-    // const allUserWS = allWS.filter(item => item !== "tabsman-workspace-exit")
+    const archived = TabsmanPersistence.getArchivedWorkspaceNames()
+    const targetWS = allUserWS.filter(name => !archived.has(name))
 
     // 创建userWS（选项卡）
     const fragment = document.createDocumentFragment()
-    for(const name of allUserWS){
-        appendWSItemEle(name, fragment)
-    }
+    targetWS.forEach(name => appendWSItemEle(name, fragment)) 
     wsItems.appendChild(fragment)
 
     // ws工具栏监听委托
@@ -72,7 +72,8 @@ export async function startWSRender(pluginName) {
         const target = e.target
         const {classList} = target
         if (target.classList.contains("plugin-tabsman-ws-items-item")) {
-            openWSByClickEle(target)
+            e.preventDefault() // 浏览器原生右键禁止
+            e.button === 2 ? openConfirmPopupByClickEle(target, 'archive') : openWSByClickEle(target)
         } else if (classList.contains("plugin-tabsman-ws-items-item-delete")) {
             // 连接状态下，当再次点击关闭时，由于可能是想关闭其他工作区，因此应当先清理掉弹窗。
             // 这种情况下先前挂在document上的关闭监听就不能再处理了。否则执行栈会出bug导致弹窗秒开秒关，具体的执行栈原因分析见笔记date260423
@@ -81,12 +82,13 @@ export async function startWSRender(pluginName) {
                 e.stopPropagation()  
                 await removePopup(confirmPopup)
             }
-            openDeletePopupByClickEle(target.closest(".plugin-tabsman-ws-items-item"))
+            openConfirmPopupByClickEle(target.closest(".plugin-tabsman-ws-items-item"), 'delete')
 
         } else if (target.closest(".plugin-tabsman-ws-exit")) {
             exitWSByClickEle()
 
         } else if (target.closest(".plugin-tabsman-ws-save")) {
+            e.preventDefault() // 浏览器原生右键禁止
             // 重命名当前工作区
             if (e.button === 2) {
                 if (renamePopup2?.isConnected) return
@@ -198,6 +200,30 @@ function renameWSItem(newName){
 
 
 /**
+ * 
+ * @param {string} name - 将恢复的工作区item加进顶部栏UI
+ */
+export async function insertWSItem(name) {
+    const allUserWS = await TabsmanCore.getAllWorkspace()
+    const archived = TabsmanPersistence.getArchivedWorkspaceNames()
+    const itemIndex = allUserWS.findIndex(n => n === name)
+    let refWorkspaceName = '';
+    for (let index = itemIndex + 1; index < allUserWS.length; index++) {
+        if (archived.has(allUserWS[index])) continue;
+        refWorkspaceName = allUserWS[index];
+        break;
+    }
+    
+    // 在item索引的后方存在未归档元素正在显示，则插入到其前面
+    const item = appendWSItemEle(name);
+    if (refWorkspaceName !== '') {
+        const refEl = wsItemsObj[refWorkspaceName]
+        refEl.before(item)
+    }
+}
+
+
+/**
  * 点击元素打开工作区
  * @param {HTMLElement} wsItem 需要打开的目标工作区
  */
@@ -252,13 +278,14 @@ function openRenamePopupByClickEle() {
 
 
 /**
- * 点击打开删除工作区的弹窗
- * @param {HTMLElement} wsItem 需要打开的目标工作区
+ * 点击打开删除/归档工作区的确认弹窗
+ * @param {HTMLElement} wsItem - 需要打开的目标工作区
+ * @param {'delete'|'archive'} type - 确认窗的确认类型
  */
-function openDeletePopupByClickEle(wsItem) {
+function openConfirmPopupByClickEle(wsItem, type) {
 
     // 加入DOM并监听关闭触发
-    appendConfirmPopup()
+    appendConfirmPopup(type)
 
     setTimeout(() => {
         document.addEventListener('pointerdown', handleConfirmPopupClose);
@@ -375,9 +402,33 @@ function appendRenamePopup() {
 }    
 
 
-// 获取确认窗对象，确认窗result保存处理的wsName
-function appendConfirmPopup() {
+/**
+ * 获取确认窗对象，确认窗result保存处理的wsName
+ * @param {'delete'|'archive'} type - 确认窗的确认类型
+ * @returns 
+ */
+function appendConfirmPopup(type) {
+    // 确认窗的显示文本
+    let text;
+    let yesBtnClass;
+    let iconClass;
+    switch (type) {
+        case 'archive':
+            text = '请确认要归档该工作区。'
+            yesBtnClass = 'orca-button solid'
+            iconClass = 'ti ti-archive orca-confirm-box-icon'
+            break;
+        case 'delete':
+            text = '请确认你要删除这个工作区！'
+            yesBtnClass = 'orca-button dangerous'
+            iconClass = 'ti ti-trash orca-confirm-box-icon'
+        break;
+    }
+
     if (confirmPopup) {
+        confirmPopup.messageIcon.className = iconClass
+        confirmPopup.confirmBoxText.textContent = text
+        confirmPopup.yesBtn.className = yesBtnClass
         headbar.appendChild(confirmPopup)
         return
     }
@@ -389,24 +440,37 @@ function appendConfirmPopup() {
 
     // 弹窗的内容盒子
     const confirmBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-confirm-box', confirmPopup)
-    confirmBox.innerHTML = '<div class="orca-confirm-box-message"><i class="ti ti-alert-circle orca-confirm-box-icon"></i><p class="orca-confirm-box-text">请确认你要删除这个工作区！</p></div>'
+    const confirmBoxMessage = createDomWithClass("div", 'orca-confirm-box-message', confirmBox)
+    confirmPopup.messageIcon = createDomWithClass("i", iconClass, confirmBoxMessage)
+    confirmPopup.confirmBoxText = createDomWithClass("p", 'orca-confirm-box-text', confirmBoxMessage)
+    confirmPopup.confirmBoxText.textContent = text
     
     const noBtn = createDomWithClass("div", 'orca-button outline', confirmBox)
     noBtn.textContent = "取消"
-    const yesBtn = createDomWithClass("div", 'orca-button dangerous', confirmBox)
+    const yesBtn = createDomWithClass("div", yesBtnClass, confirmBox)
+    confirmPopup.yesBtn = yesBtn;
     yesBtn.textContent = "确认"
     noBtn.onclick = () => removePopup(confirmPopup)
     yesBtn.onclick = () => {
         const wsName = confirmPopup.result
         removePopup(confirmPopup)
-        TabsmanCore.deleteWorkspace(wsName).then((deleteKind) => {
-            // 删除活跃工作区会返回1，需要移除按钮并清理选中
-            if ( deleteKind === 1) {
-                exitButton.remove()
-                clearWSItemSelected()
-            }
-            removeWSItemEle(wsName)
-        })
+        switch (type) {
+            case 'delete':
+                TabsmanCore.deleteWorkspace(wsName).then((deleteKind) => {
+                    // 删除活跃工作区会返回1，需要移除按钮并清理选中
+                    if ( deleteKind === 1) {
+                        exitButton.remove()
+                        clearWSItemSelected()
+                    }
+                    removeWSItemEle(wsName)
+                });
+                break;
+            case 'archive':
+                if (wsItemSelected?.dataset.pluginTabsmanWsName === wsName) exitWSByClickEle();
+                TabsmanPersistence.archiveWorkspace(wsName)
+                .then(()=>removeWSItemEle(wsName))
+                break;
+        }
     };
 
     headbar.appendChild(confirmPopup)

@@ -15,6 +15,9 @@ let recentlyClosedTabArray = [];
 /** @type {Array} 标签页数组，存储需要被[持久化存储]的所有收藏标签页 */
 let favoriteTabArray = [];
 
+/** @type {Set<string>}  归档的工作区Set */
+let archivedWorkspaceNames = new Set()
+
 // 设置最近关闭标签页的最大保存数量，由core代码中订阅设置。
 function setMaxRecentlyClosedTabs(value) {
     if (value < 2 || value > 10) maxRecentlyClosedTabs = 5;
@@ -204,22 +207,30 @@ async function restorePersistedData() {
         const pinnedTabsData = await orca.plugins.getData('tabsman', 'pinned-tabs-data');
         if (pinnedTabsData) {
             const pinnedTabs = await restoreTabs(JSON.parse(pinnedTabsData), "pinned");
-            console.log(`[tabsman] 恢复置顶标签页完成，共恢复 ${pinnedTabs.length} 个标签页`);
+            console.log(`[tabsman] 恢复置顶标签页完成，共 ${pinnedTabs.length} 个置顶`);
         }
 
         // 2. 恢复收藏标签页数据
         const favoriteTabsData = await orca.plugins.getData('tabsman', 'favorite-tab-data');
         if (favoriteTabsData) {
             const favoriteTabs = await restoreTabs(JSON.parse(favoriteTabsData), "favorite");
-            console.log(`[tabsman] 恢复收藏标签页数据完成，共恢复 ${favoriteTabs.length} 个标签页`);
+            console.log(`[tabsman] 恢复收藏标签页数据完成，共 ${favoriteTabs.length} 个收藏`);
         }
 
         // 3. 恢复最近关闭标签页
         const recentlyClosedData = await orca.plugins.getData('tabsman', 'recently-closed-tabs-data');
         if (recentlyClosedData) {
             const closedTabs = await restoreTabs(JSON.parse(recentlyClosedData), "recently-closed");
-            console.log(`[tabsman] 恢复最近关闭标签页完成，共恢复 ${closedTabs.length} 个标签页`);
+            console.log(`[tabsman] 恢复最近关闭标签页完成，共 ${closedTabs.length} 个最近关闭`);
         }
+
+        // 4. 恢复归档的工作区    
+        const raw = await orca.plugins.getData('tabsman', 'archived-workspace-names')
+        if (raw) {
+            archivedWorkspaceNames = new Set(JSON.parse(raw));
+            console.log(`[tabsman] 恢复归档的工作区完成，共 ${archivedWorkspaceNames.size} 个归档`);
+        }
+
     } catch (error) {
         console.error('[tabsman] 恢复持久化数据失败:', error);
     }
@@ -239,7 +250,7 @@ async function restorePersistedData() {
     }
 }
 
-
+/*————————————————————————————————————————————  更新旧版本的数据—————————————————————————————————————————————————————— */
 // 3.0.1，更新持久化数据中的Tab对象字段版本，以适配TabsmanCore中Tab对象结构的变更
 async function updatePersistedTabData() {
 
@@ -426,6 +437,32 @@ async function fixHistoryItem() {
         orca.notify("success", "[tabsman] 旧版本过时数据已升级完毕（tab历史记录）");
     }
 }
+
+/*———————————————————————————————————————————— 归档工作区 —————————————————————————————————————————————————————— */
+
+/**
+ * 归档工作区
+ */
+export async function archiveWorkspace(name) {
+    archivedWorkspaceNames.add(name)
+    await orca.plugins.setData('tabsman', 'archived-workspace-names', JSON.stringify([...archivedWorkspaceNames]));
+}
+
+/**
+ * 
+ * @param {string} name - 取消归档的工作区
+ * @returns {Promise<string>} - 取消归档的工作区
+ */
+export async function unarchiveWorkspace(name) {
+    archivedWorkspaceNames.delete(name)
+    await orca.plugins.setData('tabsman', 'archived-workspace-names', JSON.stringify([...archivedWorkspaceNames]));
+    return name
+}
+
+export function getArchivedWorkspaceNames() {
+    return archivedWorkspaceNames;
+}
+
 
 /**
  * 获取指定类型的标签页数组

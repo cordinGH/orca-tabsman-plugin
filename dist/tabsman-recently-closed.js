@@ -4,6 +4,7 @@ const { Button, ContextMenu, Menu, MenuText } = orca.components;
 import * as TabsmanCore from './tabsman-core.js';
 import * as TabsmanPersistence from './tabsman-persistence.js';
 import * as Utils from './tabsman-utils.js'
+import * as Workspace from './tabsman-workspace.js'
 
 let renderTabsByPanelCallback;
 
@@ -56,6 +57,7 @@ async function openTabItem(tab) {
 function HeadbarButtonMenu() {
     const [favoriteList, setFavoriteList] = useState(() => TabsmanPersistence.getTabArray("favorite"));
     const [closedList, setClosedList] = useState(() => TabsmanPersistence.getTabArray("recently-closed"));
+    const [archivedNames, setArchivedNames] = useState(() => [...TabsmanPersistence.getArchivedWorkspaceNames()]);
 
     return [
         c(MenuText, { key: "fav", title: "收藏的标签页", preIcon: "ti ti-star" },
@@ -92,7 +94,24 @@ function HeadbarButtonMenu() {
                     )
                 )
             )
-        )
+        ),
+        c(MenuText, { key: "archived", title: "归档的工作区", preIcon: "ti ti-archive"},
+            c(Menu, {}, 
+                archivedNames.length === 0
+                ? c(EmptyState, {text: "暂无归档的工作区"})
+                : archivedNames.map(name => 
+                    c(WorkspaceItem, {
+                        key: name, 
+                        name, 
+                        onClick: async () => {
+                            await TabsmanPersistence.unarchiveWorkspace(name)
+                            await Workspace.insertWSItem(name)
+                            setArchivedNames([...TabsmanPersistence.getArchivedWorkspaceNames()]);
+                        }
+                    })
+                )
+            )
+        ),
     ];
 }
 
@@ -122,6 +141,25 @@ function TabItem({tab, onClick, listType, setList}) {
                     setList([...TabsmanPersistence.getTabArray(listType)]);   
                 }
             })
+        ),
+        onClick
+    })
+}
+
+function WorkspaceItem({ name, onClick}) {
+    return c(MenuText, {
+        style: { cursor: 'default' },
+        title: c("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' } },
+            c("span", {
+                style: {
+                    fontFamily: 'var(--orca-fontfamily-code)',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '20em',
+                    flex: 1
+                }
+            }, name)
         ),
         onClick
     })
@@ -173,7 +211,7 @@ function startRecentlyClosed(renderTabsByPanel) {
                 {
                     variant: "plugin-tabsman-fav-and-closed plain",
                     onClick: open, 
-                    onMouseEnter: (e) => Utils.showTooltip(e.currentTarget, '收藏&最近关闭'),
+                    onMouseEnter: (e) => Utils.showTooltip(e.currentTarget, '收藏&最近关闭&归档'),
                     onMouseLeave: () => Utils.hideTooltip()
                 }, 
                 c("i", {className: "ti ti-stack-pop orca-headbar-icon"})

@@ -104,8 +104,9 @@ function HeadbarButtonMenu() {
                         key: name, 
                         name, 
                         onClick: async () => {
-                            await TabsmanPersistence.unarchiveWorkspace(name)
                             await Workspace.insertWSItem(name)
+                            // 数据层面的删除应当在UI发生后执行。
+                            await TabsmanPersistence.unarchiveWorkspace(name)
                             setArchivedNames([...TabsmanPersistence.getArchivedWorkspaceNames()]);
                         }
                     })

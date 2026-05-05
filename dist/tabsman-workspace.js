@@ -18,7 +18,15 @@ let wsTools = null
 let userTools = null
 let headbar = null
 
-/** @type {HTMLElement} 确认窗口 */
+/**
+ * 确认窗口（删除/归档共用）
+ * @type {HTMLElement & {
+ *   messageIcon: HTMLElement,
+ *   confirmBoxText: HTMLElement,
+ *   yesBtn: HTMLElement,
+ *   result: string
+ * }}
+ */
 let confirmPopup = null
 
 /** @type {HTMLElement} 保存窗口 */
@@ -412,21 +420,25 @@ function appendConfirmPopup(type) {
     let text;
     let yesBtnClass;
     let iconClass;
+    let iconColor;
     switch (type) {
         case 'archive':
             text = '请确认要归档该工作区。'
             yesBtnClass = 'orca-button solid'
             iconClass = 'ti ti-archive orca-confirm-box-icon'
+            iconColor = 'var(--orca-color-primary-6)'
             break;
         case 'delete':
             text = '请确认你要删除这个工作区！'
             yesBtnClass = 'orca-button dangerous'
             iconClass = 'ti ti-trash orca-confirm-box-icon'
+            iconColor = 'var(--orca-color-dangerous-5)'
         break;
     }
 
     if (confirmPopup) {
         confirmPopup.messageIcon.className = iconClass
+        confirmPopup.messageIcon.style.color = iconColor
         confirmPopup.confirmBoxText.textContent = text
         confirmPopup.yesBtn.className = yesBtnClass
         headbar.appendChild(confirmPopup)
@@ -442,6 +454,7 @@ function appendConfirmPopup(type) {
     const confirmBox = createDomWithClass("div", 'orca-menu orca-context-menu orca-confirm-box', confirmPopup)
     const confirmBoxMessage = createDomWithClass("div", 'orca-confirm-box-message', confirmBox)
     confirmPopup.messageIcon = createDomWithClass("i", iconClass, confirmBoxMessage)
+    confirmPopup.messageIcon.style.color = iconColor
     confirmPopup.confirmBoxText = createDomWithClass("p", 'orca-confirm-box-text', confirmBoxMessage)
     confirmPopup.confirmBoxText.textContent = text
     
@@ -450,6 +463,7 @@ function appendConfirmPopup(type) {
     const yesBtn = createDomWithClass("div", yesBtnClass, confirmBox)
     confirmPopup.yesBtn = yesBtn;
     yesBtn.textContent = "确认"
+    yesBtn.style.color = 'var(--orca-color-bg-1)'
     noBtn.onclick = () => removePopup(confirmPopup)
     yesBtn.onclick = () => {
         const wsName = confirmPopup.result

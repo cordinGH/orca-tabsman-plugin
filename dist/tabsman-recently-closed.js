@@ -98,7 +98,7 @@ function HeadbarButtonMenu() {
         c(MenuText, { key: "archived", title: "归档的工作区", preIcon: "ti ti-archive"},
             c(Menu, {}, 
                 archivedNames.length === 0
-                ? c(EmptyState, {text: "暂无归档的工作区"})
+                ? c(EmptyState, {text: "右键工作区可对其归档"})
                 : archivedNames.map(name => 
                     c(WorkspaceItem, {
                         key: name, 

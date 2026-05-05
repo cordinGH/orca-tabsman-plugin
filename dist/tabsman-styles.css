@@ -283,3 +283,48 @@
 .plugin-tabsman-preview>.orca-popup.orca-block-preview-popup {
     translate: 50%;
 }
+
+/* ————————————————————————————————————————————————— 删除、归档、新建动画 ————————————————————————————————————————————————————— */
+@keyframes plugin-tabsman-ws-item-insert {
+    0%, 50% {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    100% {
+        /* opacity: 1; */
+        transform: translateY(0);
+    }
+}
+@keyframes plugin-tabsman-ws-item-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    
+    to {
+        /* opacity: 1; */
+        transform: translateY(0);
+    }
+}
+@keyframes plugin-tabsman-ws-item-leave {
+    from {
+        /* opacity: 1; */
+        transform: translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
+
+.plugin-tabsman-ws-items-item.inserting {
+    /* 等待flip的.15结束之后再播放 */
+    animation: plugin-tabsman-ws-item-insert 0.3s ease-out;
+}
+.plugin-tabsman-ws-items-item.entering {
+    animation: plugin-tabsman-ws-item-enter 0.15s ease-out;
+}
+.plugin-tabsman-ws-items-item.leaving {
+    animation: plugin-tabsman-ws-item-leave 0.15s ease-in forwards;
+}

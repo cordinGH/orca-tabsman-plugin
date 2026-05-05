@@ -222,3 +222,39 @@ export function debounce(fn, delay = 0) {
         }, delay)
     }
 }
+
+
+/* ——————————————————————————————————————— FLIP 动画过渡 ————————————————————————————————————— */
+
+/**
+ * 为一组元素的位置变化添加平滑过渡动画
+ * @param {Element[]} elements 需要追踪位移的元素集合
+ * @param {() => void} mutate 同步执行 DOM 变更的回调
+ * @param {Object} [options]
+ * @param {number} [options.duration=180] - 动画时长(ms)
+ * @param {string} [options.easing='ease-out'] - 缓动函数
+ *
+ */
+export function withFlip(elements, mutate, {duration = 150, easing = 'ease-out'} = {}) {
+    const firstRects = new Map()
+    elements.forEach(el => firstRects.set(el, el.getBoundingClientRect()))
+
+    mutate()
+
+    elements.forEach(el => {
+        const firstRect = firstRects.get(el)
+        const lastRect = el.getBoundingClientRect()
+        const dx = firstRect.left - lastRect.left
+        const dy = firstRect.top - lastRect.top
+
+        if (dx === 0 && dy === 0) return
+
+        el.animate(
+            [
+                {transform: `translate(${dx}px, ${dy}px)`},
+                {transform: `translate(0, 0)`},
+            ],
+            {duration, easing}
+        )
+    })
+}

@@ -263,32 +263,24 @@ function __renderClosePanel(panelId) {
     delete allPanelGroupEle[panelId]
 }
 
-// // 交换面板DOM顺序（携带动画效果），上和左，代表before，下和右代表after
+
+// 交换面板DOM顺序（flip动画），上和左，代表before，下和右代表after
 function __renderMove(moveInfo) {
     const {from, to, dir} = moveInfo
     const fromEle = allPanelGroupEle[from]
     const toEle = allPanelGroupEle[to]
 
-    // First
-    const firstRects = new Map();
-    Object.values(allPanelGroupEle).forEach(el => firstRects.set(el, el.getBoundingClientRect()));
-
-    // Last：DOM 交换
-    if (dir === "left" || dir === "top") {
-        toEle.before(fromEle)
-    } else if (dir === "right" || dir === "bottom") {
-        toEle.after(fromEle)
-    }
-
-    // Invert + Play
-    Object.values(allPanelGroupEle).forEach(el => {
-        const dy = firstRects.get(el).top - el.getBoundingClientRect().top;
-        if (dy === 0) return;
-        el.animate(
-            [{ transform: `translateY(${dy}px)` }, { transform: `translateY(0)` }],
-            { duration: 200, easing: 'ease-out' }
-        );
-    });
+    Utils.withFlip(Object.values(
+        allPanelGroupEle),
+        () => {
+            // Last：DOM 交换
+            if (dir === "left" || dir === "top") {
+                toEle.before(fromEle)
+            } else if (dir === "right" || dir === "bottom") {
+                toEle.after(fromEle)
+            }
+        }
+    )
 }
 
 // 创建tab时渲染，轻量渲染

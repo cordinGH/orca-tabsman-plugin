@@ -186,11 +186,16 @@ function removeWSItemEle(name) {
     const wsItem = wsItemsObj[name]
 
     // 移除元素数据
-    wsItem.remove()
-    delete wsItemsObj[name]
-
-    // 如果移除的当前工作区，则清除class并重置selected元素。
-    if (wsItem === wsItemSelected) clearWSItemSelected()
+    wsItem.classList.add('leaving')
+    wsItem.addEventListener('animationend', () => {
+        Utils.withFlip(
+            Object.values(wsItemsObj),
+            () => wsItem.remove()
+        )
+        delete wsItemsObj[name]
+        // 如果移除的当前工作区，则清除class并重置selected元素。
+        if (wsItem === wsItemSelected) clearWSItemSelected();
+    }, { once: true })
 }
 
 // 添加工作区元素
@@ -235,8 +240,9 @@ function renameWSItem(newName){
  */
 export async function insertWSItem(name) {
     const allUserWS = await TabsmanCore.getAllWorkspace()
-    const archived = TabsmanPersistence.getArchivedWorkspaceNames()
     const itemIndex = allUserWS.findIndex(n => n === name)
+    // 定位插入时的相对位置（插入在后方未归档的item前面）
+    const archived = TabsmanPersistence.getArchivedWorkspaceNames()
     let refWorkspaceName = '';
     for (let index = itemIndex + 1; index < allUserWS.length; index++) {
         if (archived.has(allUserWS[index])) continue;
@@ -244,11 +250,19 @@ export async function insertWSItem(name) {
         break;
     }
     
-    // 在item索引的后方存在未归档元素正在显示，则插入到其前面
     const item = appendWSItemEle(name);
+    item.classList.add('inserting')
     if (refWorkspaceName !== '') {
-        const refEl = wsItemsObj[refWorkspaceName]
-        refEl.before(item)
+        // 存在则移动到相对位置前面，先flip移走再渐显插入的item
+        Utils.withFlip(
+            Object.values(wsItemsObj),
+            () => wsItemsObj[refWorkspaceName].before(item)
+        )
+        item.addEventListener(
+            'animationend', 
+            () => item.classList.remove('inserting'),
+            { once: true }
+        )
     }
 }
 
@@ -584,9 +598,9 @@ function appendSavePopup() {
             // 添加后如果使得顶部栏空间溢出，则自动删除并提示UI空间不足。
             const baseRight = userTools.getBoundingClientRect().right
             const wsItem = appendWSItemEle(saveReturn)
+
             const wsItemsRight = wsItem.getBoundingClientRect().right;
             const { left: userToolsLeft, right: newRight } = userTools.getBoundingClientRect();
-
             // 如果挤压了userTools，使得right变大说明溢出了，防止浮点误差，提供1px误差。 或者userToolsLeft和item重叠，也说明溢出
             if (newRight -1 > baseRight || userToolsLeft < wsItemsRight) {
                 removeWSItemEle(saveReturn)
@@ -594,6 +608,13 @@ function appendSavePopup() {
                 orca.notify("warn", "[tabsman] 顶部栏UI空间不足，请拉宽窗口或删除一些工作区。");
                 return;
             }
+
+            wsItem.classList.add('entering')
+            wsItem.addEventListener(
+                'animationend', 
+                () => wsItem.classList.remove('entering'), 
+                { once: true }
+            )
 
             orca.notify("success", "[tabsman]新工作区创建成功！");
 

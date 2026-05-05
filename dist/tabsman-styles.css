@@ -17,7 +17,7 @@
 /* 面板条目 */
 .plugin-tabsman-panel-item.orca-fav-item-item {
     grid-template-columns: auto 1fr auto;
-    padding-right: .5rem;
+    padding-right: .25rem;
 
     /* 面板折叠按钮 */
     &>.plugin-tabsman-panel-collapse-icon {
@@ -29,8 +29,9 @@
 /* tab条目 */
 .plugin-tabsman-tab-item.orca-fav-item-item {
     margin-left: 1.125rem;
-    padding-right: .5rem;
+    padding-right: .25rem;
     grid-template-columns: auto auto 1fr auto;
+    transition: margin-left 0.15s ease; /* 切换为多面板时有一个缩进过渡 */
 
     /* tab固定按钮pin */
     &>.plugin-tabsman-tab-pin{
@@ -105,6 +106,17 @@
     border-radius: var(--orca-radius-sm);
     opacity: 0;
     transition: opacity 0.15s ease;
+}
+
+/* 单面板时，不显示缩进 */
+.plugin-tabsman-panel-group:only-child{
+    
+    &::before{
+        opacity:0;
+    }
+    & .plugin-tabsman-tab-item.orca-fav-item-item {
+        margin-left: 0;
+    }
 }
 
 .plugin-tabsman-panel-group-active::before {

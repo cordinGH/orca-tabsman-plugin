@@ -2,10 +2,10 @@ import * as Utils from './tabsman-utils.js'
 import * as TabsmanCore from './tabsman-core.js'
 import * as TabsmanPersistence from './tabsman-persistence.js'
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLButtonElement} */
 let saveButton = null
 
-/** @type {HTMLInputElement} */
+/** @type {HTMLButtonElement} */
 let exitButton = null
 
 /** @type {HTMLElement} 选项卡 */
@@ -29,11 +29,33 @@ let headbar = null
  */
 let confirmPopup = null
 
-/** @type {HTMLElement} 保存窗口 */
+
+/**
+ * 保存工作区弹窗
+ * @type {HTMLElement & {
+ *   orcaInput: HTMLElement,
+ *   orcaInputActualinput: HTMLInputElement,
+ *   orcaInputError: HTMLElement,
+ *   extendBtn: HTMLElement,
+ *   onlyActiveTab: boolean,
+ *   result: string
+ * }}
+ */
 let savePopup = null
 
-/** @type {HTMLElement} 重命名窗口 */
+/**
+ * 重命名当前工作区的弹窗
+ * @type {HTMLElement & {
+ *   orcaInputActualinput: HTMLInputElement,
+ *   result: string
+ * }}
+ */
 let renamePopup = null;
+
+/**
+ * 不在工作区时点击重命名时的提示弹窗
+ * @type {HTMLElement}
+ */
 let renamePopup2 = null; // 不在工作区
 
 /** @type {HTMLElement}  当前被打开的工作区（元素）*/
@@ -271,7 +293,7 @@ function openRenamePopupByClickEle() {
         setTimeout(() => {
             document.addEventListener('pointerdown', handleRenamePopupClose);
             document.addEventListener('keydown', handleRenamePopupClose);
-            renamePopup.inputActualinput.focus()
+            renamePopup.orcaInputActualinput.focus()
         }, 0);
         
         Utils.setPopupPosition(renamePopup, wsItemSelected)
@@ -323,7 +345,7 @@ function openSavePopupByClickEle() {
     setTimeout(() => {
         document.addEventListener('pointerdown', handleSavePopupClose);
         document.addEventListener('keydown', handleSavePopupClose);
-        savePopup.inputActualinput.focus()
+        savePopup.orcaInputActualinput.focus()
     }, 0);
 
     Utils.setPopupPosition(savePopup, saveButton)
@@ -380,7 +402,7 @@ function appendRenamePopup() {
     const inputInput = createDomWithClass("span", 'orca-input-input', input)
     inputInput.innerHTML = '<i class="ti ti-forms orca-input-box-icon orca-input-pre"></i>'
     const inputActualinput = createDomWithClass("input", 'orca-input-actualinput', inputInput)
-    renamePopup.inputActualinput = inputActualinput
+    renamePopup.orcaInputActualinput = inputActualinput
     inputActualinput.placeholder = "重命名 | 请输入新名称..."
     // const nameNow = wsItemSelected.dataset.pluginTabsmanWsName
     // inputActualinput.placeholder = '当前名称：'+nameNow.slice(nameNow.indexOf('_') + 1)
@@ -394,7 +416,7 @@ function appendRenamePopup() {
     
     noBtn.onclick = () => removePopup(renamePopup)
     yesBtn.onclick = () => {
-        let newName = renamePopup.inputActualinput.value
+        let newName = renamePopup.orcaInputActualinput.value
         if (!newName) {
             const dateToday = new Date()
             newName = String(dateToday.getMonth() + 1) + "-" + dateToday.getDate()
@@ -402,7 +424,7 @@ function appendRenamePopup() {
         TabsmanCore.renameWorkspace(newName).then(
             (renameResult) => renameResult.success && renameWSItem(renameResult.key)
         )
-        renamePopup.inputActualinput.value = ""
+        renamePopup.orcaInputActualinput.value = ""
         removePopup(renamePopup)
     };
 
@@ -508,11 +530,11 @@ function appendSavePopup() {
 
     // 弹窗的命名输入区
     const input = createDomWithClass("span", 'orca-input', saveInputBox)
-    savePopup.input = input
+    savePopup.orcaInput = input
     const inputInput = createDomWithClass("span", 'orca-input-input', input)
     inputInput.innerHTML = '<i class="ti ti-forms orca-input-box-icon orca-input-pre"></i>'
     const inputActualinput = createDomWithClass("input", 'orca-input-actualinput', inputInput)
-    savePopup.inputActualinput = inputActualinput
+    savePopup.orcaInputActualinput = inputActualinput
     inputActualinput.placeholder = "请为新工作区命名..."
     inputActualinput.type = "text"
 
@@ -535,14 +557,14 @@ function appendSavePopup() {
 
     // 提示高频重复创建
     const inputError = createDomWithClass("span", 'orca-input-error', input)
-    savePopup.inputError = inputError
+    savePopup.orcaInputError = inputError
     inputError.remove()
     inputError.textContent = "1毫秒内创建多次？emmm"
 
     extendBtn.onclick = () => savePopup.onlyActiveTab = savePopup.extendBtn.classList.toggle('orca-switch-on')
 
     yesBtn.onclick = async () => {
-        const inputValue = savePopup.inputActualinput.value
+        const inputValue = savePopup.orcaInputActualinput.value
         
         // 未填写默认采用日期作为命名
         if (inputValue === "") {
@@ -556,7 +578,7 @@ function appendSavePopup() {
 
         if (saveReturn) {
             // 清空输入框内容
-            savePopup.inputActualinput.value = ""
+            savePopup.orcaInputActualinput.value = ""
             removePopup(savePopup)
             
             // 添加后如果使得顶部栏空间溢出，则自动删除并提示UI空间不足。
@@ -576,8 +598,8 @@ function appendSavePopup() {
             orca.notify("success", "[tabsman]新工作区创建成功！");
 
         } else {
-            savePopup.input.classList.add("orca-input-has-error")
-            savePopup.input.appendChild(savePopup.inputError)
+            savePopup.orcaInput.classList.add("orca-input-has-error")
+            savePopup.orcaInput.appendChild(savePopup.orcaInputError)
         }
     };
 

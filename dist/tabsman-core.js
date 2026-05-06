@@ -1670,6 +1670,10 @@ function getTab(tabId) {
     return tabs[tabId]
 }
 
+function getTabs() {
+    return tabs;
+}
+
 function getActiveTabs() {
     return activeTabs;
 }
@@ -1701,6 +1705,7 @@ export {
     // 数据访问函数
     getTabIdSetByPanelId,
     getTab,
+    getTabs,
     getActiveTabs,
     getOneSortedTabs,
     getAllSortedTabs,

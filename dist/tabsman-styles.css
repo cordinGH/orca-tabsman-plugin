@@ -31,7 +31,9 @@
     margin-left: 1.125rem;
     padding-right: .25rem;
     grid-template-columns: auto auto 1fr auto;
-    transition: margin-left 0.15s ease; /* 切换为多面板时有一个缩进过渡 */
+    /* 切换为多面板时有一个缩进过渡 */
+    border: .5px solid transparent;
+    transition: margin-left 0.15s ease;
 
     /* tab固定按钮pin */
     &>.plugin-tabsman-tab-pin{
@@ -41,11 +43,11 @@
         line-height: 22px;
     }
 
-    /* active tab */
-    &.active-tab-item{
-        border: .5px solid var(--orca-color-primary-5);
-        background-color: color-mix(in srgb, var(--orca-color-primary-5) 10%, transparent)
-    }
+}
+/* active tab */
+.plugin-tabsman-tab-item.orca-fav-item-item.active-tab-item{
+    border-color: var(--orca-color-primary-5);
+    background-color: color-mix(in srgb, var(--orca-color-primary-5) 10%, transparent)
 }
 
 .plugin-tabsman-tab-title, .plugin-tabsman-panel-title{
@@ -328,4 +330,43 @@
 }
 .plugin-tabsman-ws-items-item.leaving {
     animation: plugin-tabsman-ws-item-leave 0.15s ease-in forwards;
+}
+
+/* —————————————————————————————————————— 生成和删除tab时的动画 —————————————————————————————————————————— */
+@keyframes plugin-tabsman-tab-item-insert {
+    0%, 50% {
+        opacity: 0;
+    }
+    100% {
+        /* opacity: 1; */
+    }
+}
+@keyframes plugin-tabsman-tab-item-enter {
+    from {
+        opacity: 0;
+    }
+    
+    to {
+        /* opacity: 1; */
+    }
+}
+@keyframes plugin-tabsman-tab-item-leave {
+    from {
+        /* opacity: 1; */
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+.plugin-tabsman-tab-item.inserting {
+    /* 等待flip的.15结束之后再播放 */
+    animation: plugin-tabsman-tab-item-insert .3s ease-out;
+}
+.plugin-tabsman-tab-item.entering {
+    animation: plugin-tabsman-tab-item-enter .1s ease-out;
+}
+.plugin-tabsman-tab-item.leaving {
+    animation: plugin-tabsman-tab-item-leave .1s ease-in;
 }

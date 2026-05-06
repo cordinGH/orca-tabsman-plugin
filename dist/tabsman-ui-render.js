@@ -57,10 +57,6 @@ let dragState = {
  * @returns {Object} 返回包含DOM元素和子元素引用的对象
  */
 function createTabItem(tab, panelId) {
-    // 判断是否为收藏块
-    let isFavorite = false;
-    const isFavoriteBlock = Persistence.getTabArray("favorite").find(favoriteTab => favoriteTab.currentBlockId.toString() === tab.currentBlockId.toString())
-    if (isFavoriteBlock) isFavorite = true;
 
     // 标签页条目容器，plugin-tabsman-item-item是为了适配tune-theme
     // 借用orca-favorites-items样式，元素样式性质类似。
@@ -76,10 +72,13 @@ function createTabItem(tab, panelId) {
     pinIcon.onmouseleave = () => Utils.hideTooltip()
 
     // 块图标，借用fav-item-icon样式，元素样式性质类似。
-    const blockIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon} ${isFavorite ? 'plugin-tabsman-tab-favorite' : ''}`, tabElement)
+    const blockIcon = Utils.createDomWithClass("i", `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon}`, tabElement)
+    // 判断是否为收藏
+    const isFav = !!Persistence.getTabArray("favorite").find(favTab => favTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf())
+    blockIcon.classList.toggle('plugin-tabsman-tab-favorite', isFav)
     blockIcon.setAttribute('data-tabsman-tab-id', tab.id);
     blockIcon.setAttribute('data-tabsman-panel-id', panelId);
-    blockIcon.onmouseenter = () => Utils.showTooltip(blockIcon, isFavorite ? '点击取消收藏' : '点击收藏该标签页')
+    blockIcon.onmouseenter = () => Utils.showTooltip(blockIcon, '点击收藏/取消收藏')
     blockIcon.onmouseleave = () => Utils.hideTooltip()
 
     // 标签页标题，借用fav-item-label样式，元素样式性质类似。
@@ -185,7 +184,8 @@ async function handleTabsmanClick(e) {
             // 点击块图标切换收藏状态
             const isFavorite = target.classList.contains('plugin-tabsman-tab-favorite');
             isFavorite ? await Persistence.removeAndSaveTab(tab, "favorite") : await Persistence.addAndSaveTab(tab, "favorite");
-            renderTabsByPanel();
+            // renderTabsByPanel();
+            renderTabsByPanel({type: 'fav', currentTab: tab})
         } else {
             // 存在停靠面板则先联动dockpanel插件=>切换停靠面板的折叠状态。
             const dockedPanelId = dockpanelInfo ? window.pluginDockpanel.panel.id : ""
@@ -236,6 +236,9 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
             __renderClosePanel(panelId);break;
         case 'move':
             __renderMove(moveInfo);break;
+        case 'fav':
+            __renderFav(currentTab);
+            break;
         default:
             __renderAll();break;
     }
@@ -328,7 +331,14 @@ function __renderCreate(tab) {
 
     const tabItem = createTabItem(tab, panelId);
     allTabItems[tab.id] = tabItem;
-    panelGroup.append(tabItem.element)
+    const tabItemEl = tabItem.element
+    tabItemEl.classList.add('entering')
+    tabItemEl.addEventListener(
+        'animationend', 
+        () => tabItemEl.classList.remove('entering'),
+        { once: true }
+    )
+    panelGroup.append(tabItemEl)
 }
 
 // pin住时移动tab位置，轻量渲染
@@ -338,21 +348,32 @@ function __renderPin(tab, isReopen){
 
     let movedTabItemEl;
     const panelGroupEle = allPanelGroupEle[tab.panelId]
+
+    // 如果是处理重新打开最近关闭，则先补齐dom再移位，反之则是处理置顶，直接移位
     if (isReopen) {
         const tabItem = createTabItem(tab, tab.panelId)
         allTabItems[tab.id] = tabItem
         movedTabItemEl = tabItem.element
+        movedTabItemEl.classList.add('inserting')
+        // 追加item插入的样式过渡
+        movedTabItemEl.addEventListener(
+            'animationend', 
+            () => movedTabItemEl.classList.remove('inserting'),
+            { once: true }
+        )
         panelGroupEle.append(movedTabItemEl)
-    } else movedTabItemEl = allTabItems[tab.id].element;
-    // 定位排序数组中的下一个元素，用于将置顶/取消置顶的标签页插入到其前面
+    } else {
+        movedTabItemEl = allTabItems[tab.id].element;
+    }
+    // 定位排序数组中的下一个元素，用于将被移动元素插入到其前面
     const nextTab = sortedTabs[tabIndex + 1]
     const nextTabItemEl = nextTab ? allTabItems[nextTab.id].element : null
-
-    // flip将被移动元素插入到next后
     Utils.withFlip(
         [...allPanelGroupEle[tab.panelId].children].slice(1),
         ()=> panelGroupEle.insertBefore(movedTabItemEl, nextTabItemEl)  // null = 末尾
     )
+
+
     // 样式变更
     const tabItemPinIcon = allTabItems[tab.id].pinIcon
     tabItemPinIcon.classList.toggle('ti-pinned')
@@ -391,15 +412,31 @@ function __createOnePanelGroup(panelId, tabs) {
 function __renderUpdate (tab) {
     const {id, panelId} = tab
 
-    const tabItemEl = allTabItems[id].element
+    const {element, pinIcon, blockIcon , title} = allTabItems[id]
+    
+    element.classList.toggle('active-tab-item', tab.isActive)
+    element.setAttribute('data-tabsman-panel-id', panelId);
 
-    const newTabItem = createTabItem(tab, panelId)
-    const newTabItemEl = newTabItem.element
+    pinIcon.className = `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`
+    
+    const isFav = !!Persistence.getTabArray("favorite").find(favTab => favTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf())
+    blockIcon.className = `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon}`
+    blockIcon.classList.toggle('plugin-tabsman-tab-favorite', isFav)
 
-    if (tabItemEl.classList.contains('active-tab-item')) newTabItemEl.classList.add('active-tab-item');
+    title.textContent = tab.name || `标签页name为空 ${tab.id}`;
+}
 
-    allTabItems[id] = newTabItem
-    tabItemEl.replaceWith(newTabItemEl)
+/**
+ * @param {Object} tab - 标记处理目标
+ */
+function __renderFav (tab) {
+    // 根据是否存在favTab来决定class的强制追加或移除
+    const isFav = !!Persistence.getTabArray("favorite").find(favTab => favTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf())
+    Object.values(TabsmanCore.getTabs()).forEach(t => {
+        if (t.currentBlockId.valueOf() === tab.currentBlockId.valueOf()) {
+            allTabItems[t.id].blockIcon.classList.toggle('plugin-tabsman-tab-favorite', isFav)
+        }
+    })
 }
 
 // delete轻量渲染
@@ -407,14 +444,15 @@ function __renderUpdate (tab) {
 function __renderDelete (currentTab, previousTab) {
     allTabItems[currentTab.id].element.classList.add('active-tab-item');
 
-    // 提供一个flip动画
+    const targetEl = allTabItems[previousTab.id].element
     const elements = []
-    Object.values(allPanelGroupEle).forEach(
-        panelGroupEle => elements.push(...panelGroupEle.children)
-    )
-    Utils.withFlip(
-        elements,
-        ()=>allTabItems[previousTab.id].element.remove()
+    Object.values(allPanelGroupEle).forEach(panelGroupEle => elements.push(...panelGroupEle.children))
+    targetEl.classList.add('leaving')
+    targetEl.addEventListener(
+        'animationend', 
+        // 删除时为其他tab的移位，提供一个flip动画
+        () => Utils.withFlip(elements, ()=>targetEl.remove() ), 
+        { once: true }
     )
     delete allTabItems[previousTab.id]
 }

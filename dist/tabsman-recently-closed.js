@@ -36,7 +36,7 @@ async function deleteTabItem(tab, listType) {
 
     // 持久化之后刷新侧边栏收藏图标
     await TabsmanPersistence.removeAndSaveTab(tab, listType);
-    listType === "favorite" && renderTabsByPanelCallback?.();
+    listType === "favorite" && renderTabsByPanelCallback?.({type: 'fav', currentTab: tab});
 }
 
 /**

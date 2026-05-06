@@ -407,17 +407,11 @@ function __createOnePanelGroup(panelId, tabs) {
     return panelGroup
 }
 
-// update更新单个标签页，轻量渲染
-// currentTab => 需要被处理的标签页
+// update更新单个标签页的title和icon，轻量渲染
 function __renderUpdate (tab) {
-    const {id, panelId} = tab
+    const {id} = tab
 
-    const {element, pinIcon, blockIcon , title} = allTabItems[id]
-    
-    element.classList.toggle('active-tab-item', tab.isActive)
-    element.setAttribute('data-tabsman-panel-id', panelId);
-
-    pinIcon.className = `plugin-tabsman-tab-pin ti ${tab.isPinned ? 'ti-pinned-filled' : 'ti-pinned'}`
+    const {blockIcon , title} = allTabItems[id]
     
     const isFav = !!Persistence.getTabArray("favorite").find(favTab => favTab.currentBlockId.valueOf() === tab.currentBlockId.valueOf())
     blockIcon.className = `plugin-tabsman-tab-icon orca-fav-item-icon orca-fav-item-icon-font ${tab.currentIcon}`

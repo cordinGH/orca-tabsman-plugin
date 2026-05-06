@@ -376,8 +376,8 @@ function __renderPin(tab, isReopen){
 
     // 样式变更
     const tabItemPinIcon = allTabItems[tab.id].pinIcon
-    tabItemPinIcon.classList.toggle('ti-pinned')
-    tabItemPinIcon.classList.toggle('ti-pinned-filled')
+    tabItemPinIcon.classList.toggle('ti-pinned', !tab.isPinned)
+    tabItemPinIcon.classList.toggle('ti-pinned-filled', tab.isPinned)
 }
 
 // 创建单个group并返回

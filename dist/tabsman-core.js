@@ -1196,9 +1196,8 @@ async function switchToPreviousTab() {
 /** 
  * 返回上一次的activeTab，如果最后的lastAccessedTs == 0，则中止切换。
  * @param {string} panelId - 面板ID
- * @param {boolean}  needRender - 是否需要渲染UI，false则不会渲染，这一般是其他函数借用该函数来切换到上一个活跃tab。
 */
-async function switchPreviousActiveTab(panelId, needRender = true) {
+async function switchPreviousActiveTab(panelId) {
     return withCommandLock(async () => {
         let previewActiveTab;
         const panelTabs = getOneSortedTabs(panelId)
@@ -1211,8 +1210,8 @@ async function switchPreviousActiveTab(panelId, needRender = true) {
             const isNewestActiveTab = !previewActiveTab || tab.lastAccessedTs > previewActiveTab.lastAccessedTs
             if (isNewestActiveTab) previewActiveTab = tab
         }
-        if (previewActiveTab.lastAccessedTs === 0) return false
-        await switchTab(previewActiveTab.id, needRender)
+        if (previewActiveTab.lastAccessedTs === 0) return false;
+        await switchTab(previewActiveTab.id)
         return true
     })
 }

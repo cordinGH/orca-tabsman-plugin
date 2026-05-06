@@ -442,8 +442,7 @@ function __renderFav (tab) {
 // delete轻量渲染
 // currentTab => 当前活跃的tab，pre是被删除的tab
 function __renderDelete (currentTab, previousTab) {
-    allTabItems[currentTab.id].element.classList.add('active-tab-item');
-
+    
     const targetEl = allTabItems[previousTab.id].element
     const elements = []
     Object.values(allPanelGroupEle).forEach(panelGroupEle => elements.push(...panelGroupEle.children))
@@ -451,7 +450,10 @@ function __renderDelete (currentTab, previousTab) {
     targetEl.addEventListener(
         'animationend', 
         // 删除时为其他tab的移位，提供一个flip动画
-        () => Utils.withFlip(elements, ()=>targetEl.remove() ), 
+        () => {
+            Utils.withFlip(elements, ()=>targetEl.remove())
+            allTabItems[currentTab.id].element.classList.add('active-tab-item');
+        },
         { once: true }
     )
     delete allTabItems[previousTab.id]

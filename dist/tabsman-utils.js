@@ -235,7 +235,7 @@ export function debounce(fn, delay = 0) {
  * @param {string} [options.easing='ease-out'] - 缓动函数
  *
  */
-export function withFlip(elements, mutate, {duration = 150, easing = 'ease-out'} = {}) {
+export function withFlip(elements, mutate, {duration = 180, easing = 'ease-out'} = {}) {
     const firstRects = new Map()
     elements.forEach(el => firstRects.set(el, el.getBoundingClientRect()))
 

@@ -24,7 +24,8 @@ let headbar = null
  *   messageIcon: HTMLElement,
  *   confirmBoxText: HTMLElement,
  *   yesBtn: HTMLElement,
- *   result: string
+ *   result: string,
+ *   confirmType: string,
  * }}
  */
 let confirmPopup = null
@@ -103,7 +104,13 @@ export async function startWSRender(pluginName) {
         const {classList} = target
         if (target.classList.contains("plugin-tabsman-ws-items-item")) {
             e.preventDefault() // 浏览器原生右键禁止
-            e.button === 2 ? openConfirmPopupByClickEle(target, 'archive') : openWSByClickEle(target)
+            if (e.button === 2) {
+                if (confirmPopup?.isConnected) {
+                    e.stopPropagation()  
+                    await removePopup(confirmPopup)
+                }
+                openConfirmPopupByClickEle(target, 'archive')
+            } else openWSByClickEle(target);
         } else if (classList.contains("plugin-tabsman-ws-items-item-delete")) {
             // 连接状态下，当再次点击关闭时，由于可能是想关闭其他工作区，因此应当先清理掉弹窗。
             // 这种情况下先前挂在document上的关闭监听就不能再处理了。否则执行栈会出bug导致弹窗秒开秒关，具体的执行栈原因分析见笔记date260423
@@ -477,6 +484,7 @@ function appendConfirmPopup(type) {
         confirmPopup.messageIcon.style.color = iconColor
         confirmPopup.confirmBoxText.textContent = text
         confirmPopup.yesBtn.className = yesBtnClass
+        confirmPopup.confirmType = type
         headbar.appendChild(confirmPopup)
         return
     }
@@ -504,7 +512,7 @@ function appendConfirmPopup(type) {
     yesBtn.onclick = () => {
         const wsName = confirmPopup.result
         removePopup(confirmPopup)
-        switch (type) {
+        switch (confirmPopup.confirmType) {
             case 'delete':
                 TabsmanCore.deleteWorkspace(wsName).then((deleteKind) => {
                     // 删除活跃工作区会返回1，需要移除按钮并清理选中

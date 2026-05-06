@@ -509,6 +509,7 @@ function appendConfirmPopup(type) {
     yesBtn.textContent = "确认"
     yesBtn.style.color = 'var(--orca-color-bg-1)'
     noBtn.onclick = () => removePopup(confirmPopup)
+    confirmPopup.confirmType = type // 设置本次的type类型
     yesBtn.onclick = () => {
         const wsName = confirmPopup.result
         removePopup(confirmPopup)

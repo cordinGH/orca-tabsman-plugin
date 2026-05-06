@@ -55,30 +55,31 @@ async function saveTabArray(tabType = "") {
  * @returns {Promise<void>} 返回Promise
  */
 async function addAndSaveTab(tab, tabType = "") {
-    
-    // 将tab保存至对应数组等待写入持久化。
-    switch (tabType) {
-        case "pinned": {
-            if (pinnedTabArray.find(item=>item.id === tab.id)) break;
-            pinnedTabArray.push(tab);
-            break;
-        }
-        case "recently-closed": {
-            if (recentlyClosedTabArray.length >= maxRecentlyClosedTabs) {
-                recentlyClosedTabArray.splice(maxRecentlyClosedTabs - 1);
+    if (tab){
+        // 将tab保存至对应数组等待写入持久化。
+        switch (tabType) {
+            case "pinned": {
+                if (pinnedTabArray.find(item=>item.id === tab.id)) break;
+                pinnedTabArray.push(tab);
+                break;
             }
-            tab.isActive = false;
-            recentlyClosedTabArray.unshift(tab);
-            break;
-        }
-        case "favorite": {
-            const existSameFavorite = favoriteTabArray.find(favoriteTab => favoriteTab.currentBlockId === tab.currentBlockId);
-            if (existSameFavorite) {
-                orca.notify("warn", "已存在内容相同的标签页，无需重复收藏");
-                return;
+            case "recently-closed": {
+                if (recentlyClosedTabArray.length >= maxRecentlyClosedTabs) {
+                    recentlyClosedTabArray.splice(maxRecentlyClosedTabs - 1);
+                }
+                tab.isActive = false;
+                recentlyClosedTabArray.unshift(tab);
+                break;
             }
-            favoriteTabArray.unshift(tab);
-            break;
+            case "favorite": {
+                const existSameFavorite = favoriteTabArray.find(favoriteTab => favoriteTab.currentBlockId === tab.currentBlockId);
+                if (existSameFavorite) {
+                    orca.notify("warn", "已存在内容相同的标签页，无需重复收藏");
+                    return;
+                }
+                favoriteTabArray.unshift(tab);
+                break;
+            }
         }
     }
 

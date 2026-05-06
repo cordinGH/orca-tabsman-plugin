@@ -1221,14 +1221,21 @@ async function switchPreviousActiveTab(panelId) {
 async function reopenClosedTabsInOrder() {
     return withCommandLock(async () => {
         const recentlyClosedTabs = TabsmanPersistence.getTabArray("recently-closed")
-        if (recentlyClosedTabs.length === 0) {
-            orca.notify("info","[tabsman] 最近关闭的标签页已还原完毕（最大支持5条）")
-            return
+        
+        // 小特性：不主动对最近关闭列表进行持久化，以便用户在下次启动后依旧可以继续恢复（主要在非工作区）。
+        // 这里放置工作区中恢复后，ctrl r刷新后再次恢复。
+        let targetTab;
+        for (const tab of recentlyClosedTabs) {
+            targetTab = recentlyClosedTabs.shift();
+            if (!tabs[tab.id]) {
+                importTabToActivePanel(tab)
+                if (renderTabsCallback) await renderTabsCallback({type:"reopen", currentTab: tab});
+                await switchTab(tab.id)
+                return;
+            }
         }
-        const tab = recentlyClosedTabs.shift()
-        importTabToActivePanel(tab)
-        if (renderTabsCallback) await renderTabsCallback({type:"reopen", currentTab: tab});
-        await switchTab(tab.id)
+
+        orca.notify("info","[tabsman] 最近关闭列表已无记录")
     })
 }
 

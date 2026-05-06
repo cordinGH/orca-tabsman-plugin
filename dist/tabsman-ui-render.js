@@ -345,13 +345,13 @@ function __renderPin(tab, isReopen){
         panelGroupEle.append(movedTabItemEl)
     } else movedTabItemEl = allTabItems[tab.id].element;
     // 定位排序数组中的下一个元素，用于将置顶/取消置顶的标签页插入到其前面
-    const nextTab = tabIndex !== sortedTabs.length - 1 ? sortedTabs[tabIndex + 1] : null
+    const nextTab = sortedTabs[tabIndex + 1]
     const nextTabItemEl = nextTab ? allTabItems[nextTab.id].element : null
 
     // flip将被移动元素插入到next后
     Utils.withFlip(
         [...allPanelGroupEle[tab.panelId].children].slice(1),
-        ()=> panelGroupEle.insertBefore(movedTabItemEl, anchorEl)  // null = 末尾
+        ()=> panelGroupEle.insertBefore(movedTabItemEl, nextTabItemEl)  // null = 末尾
     )
     // 样式变更
     const tabItemPinIcon = allTabItems[tab.id].pinIcon

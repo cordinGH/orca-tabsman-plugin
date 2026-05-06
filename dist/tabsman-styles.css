@@ -323,7 +323,7 @@
 
 .plugin-tabsman-ws-items-item.inserting {
     /* 等待flip的.15结束之后再播放 */
-    animation: plugin-tabsman-ws-item-insert 0.3s ease-out;
+    animation: plugin-tabsman-ws-item-insert 0.24s ease-out;
 }
 .plugin-tabsman-ws-items-item.entering {
     animation: plugin-tabsman-ws-item-enter 0.15s ease-out;
@@ -362,7 +362,7 @@
 
 .plugin-tabsman-tab-item.inserting {
     /* 等待flip的.15结束之后再播放 */
-    animation: plugin-tabsman-tab-item-insert .3s ease-out;
+    animation: plugin-tabsman-tab-item-insert .24s ease-out;
 }
 .plugin-tabsman-tab-item.entering {
     animation: plugin-tabsman-tab-item-enter .1s ease-out;

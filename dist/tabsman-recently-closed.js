@@ -99,14 +99,14 @@ function HeadbarButtonMenu() {
             c(Menu, {}, 
                 archivedNames.length === 0
                 ? c(EmptyState, {text: "右键工作区可对其归档"})
-                : archivedNames.map(name => 
+                : archivedNames.map(wsName => 
                     c(WorkspaceItem, {
-                        key: name, 
-                        name, 
+                        key: wsName, 
+                        name: new Date(parseInt(wsName)).toLocaleDateString() +' | '+ wsName.slice(wsName.indexOf('_') + 1), 
                         onClick: async () => {
-                            await Workspace.insertWSItem(name)
+                            await Workspace.insertWSItem(wsName)
                             // 数据层面的删除应当在UI发生后执行。
-                            await TabsmanPersistence.unarchiveWorkspace(name)
+                            await TabsmanPersistence.unarchiveWorkspace(wsName)
                             setArchivedNames([...TabsmanPersistence.getArchivedWorkspaceNames()]);
                         }
                     })

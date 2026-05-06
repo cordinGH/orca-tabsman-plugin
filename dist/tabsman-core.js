@@ -1563,6 +1563,11 @@ function cleanNavWrappers() {
  * 启动标签页系统
  * 初始化历史订阅、命令拦截和当前面板的标签页
  */
+const debouncedWorkspaceUpdate = Utils.debounce(async () => {
+    console.log('执行持久化')
+    orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));
+}, 50)
+
 async function start(callback = null, pluginName) {
     renderTabsByPanel = callback
     
@@ -1571,9 +1576,7 @@ async function start(callback = null, pluginName) {
     renderTabsCallback = async (options) => {
         callback(options);
         // 进入具体工作空间后每次刷新ui都更新数据
-        if (workspaceNow !== ""){
-            await orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));
-        }
+        if (workspaceNow !== "") debouncedWorkspaceUpdate();
     }
 
     setupNavWrappers()

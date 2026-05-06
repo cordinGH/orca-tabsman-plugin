@@ -97,6 +97,7 @@
 }
 .plugin-tabsman-panel-group::before {
     content: '';
+    pointer-events: none;
     position: absolute;
     left: 10px;
     top: 30px;

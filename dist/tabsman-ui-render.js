@@ -351,7 +351,7 @@ function __renderPin(tab, isReopen){
     // flip将被移动元素插入到next后
     Utils.withFlip(
         [...allPanelGroupEle[tab.panelId].children].slice(1),
-        ()=> {if (nextTabItemEl) nextTabItemEl.before(movedTabItemEl);}
+        ()=> panelGroupEle.insertBefore(movedTabItemEl, anchorEl)  // null = 末尾
     )
     // 样式变更
     const tabItemPinIcon = allTabItems[tab.id].pinIcon

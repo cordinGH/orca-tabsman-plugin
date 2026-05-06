@@ -381,17 +381,17 @@ function updateSortedTabsCache(panelId) {
     
     // 获取所有标签页并按优先级排序
     const panelTabs = Array.from(tabIdSet).map(tabId => tabs[tabId]).sort((a, b) => {
-            // 负数说明a索引更小更靠前，正数说明b索引更小更靠前
-            // 返回pinOrder差值，越晚置顶的索引越靠后，越靠近底部。
-            if (a.isPinned && b.isPinned) return  a.pinTs - b.pinTs;
-            
-            // 置顶的标签页排在前面
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            
-            // 两个都没被置顶：越晚创建的索引越靠后，越靠近底部。
-            return a.createdAt - b.createdAt;
-        });
+        // 负数说明a索引更小更靠前，正数说明b索引更小更靠前
+        // 返回pinOrder差值，越晚置顶的索引越靠后，越靠近底部。
+        if (a.isPinned && b.isPinned) return  a.pinTs - b.pinTs;
+        
+        // 置顶的标签页排在前面
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        
+        // 两个都没被置顶：越晚创建的索引越靠后，越靠近底部。
+        return a.createdAt - b.createdAt;
+    });
     
     // 更新缓存
     sortedTabsByPanelId.set(panelId, panelTabs);
@@ -832,7 +832,8 @@ async function pinTab(tabId) {
     updateSortedTabsCache(panelId);
 
     // 通知UI更新（置顶标签页会改变排序，需要重新渲染标签页列表）
-    if (renderTabsCallback) await renderTabsCallback({type: "pin", panelId});
+    // if (renderTabsCallback) await renderTabsCallback({type: "pin", panelId});
+    if (renderTabsCallback) await renderTabsCallback({type: "pin", currentTab: tab});
     
     // 持久化
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
@@ -866,7 +867,8 @@ async function unpinTab(tabId) {
     updateSortedTabsCache(panelId);
 
     // 通知UI更新（取消置顶标签页会改变排序，需要重新渲染标签页列表）
-    if (renderTabsCallback) await renderTabsCallback({type: "pin", panelId});
+    // if (renderTabsCallback) await renderTabsCallback({type: "pin", panelId});
+    if (renderTabsCallback) await renderTabsCallback({type: "pin", currentTab: tab});
     
     // 移除对应数据
     // 2025-11-23 不在工作区时，持久化处理。在工作区不需要，因为工作区自带持久化
@@ -1226,7 +1228,7 @@ async function reopenClosedTabsInOrder() {
         }
         const tab = recentlyClosedTabs.shift()
         importTabToActivePanel(tab)
-        if (renderTabsCallback) await renderTabsCallback({type:"OnPanel", panelId: tab.panelId});
+        if (renderTabsCallback) await renderTabsCallback({type:"reopen", currentTab: tab});
         await switchTab(tab.id)
     })
 }

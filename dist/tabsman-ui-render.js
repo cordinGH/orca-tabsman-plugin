@@ -227,9 +227,9 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
             __renderSwitch(currentTab, previousTab);break;
         case "update":
             __renderUpdate(currentTab);break;
-        case "OnPanel":
+        case "reopen":
         case "pin":
-            __renderPin(panelId);break;
+            __renderPin(currentTab, type === 'reopen');break;
         case "create":
             __renderCreate(currentTab);break;
         case "closePanel":
@@ -331,12 +331,32 @@ function __renderCreate(tab) {
     panelGroup.append(tabItem.element)
 }
 
-// pin住时更新整个面板，轻量渲染
-function __renderPin(panelId){
-    const newPanelGroupEle = __createOnePanelGroup(panelId, TabsmanCore.getOneSortedTabs(panelId))
-    allPanelGroupEle[panelId].replaceWith(newPanelGroupEle)
-    // allPanelGroupEle[panelId].remove()
-    allPanelGroupEle[panelId] = newPanelGroupEle
+// pin住时移动tab位置，轻量渲染
+function __renderPin(tab, isReopen){
+    const sortedTabs = TabsmanCore.getOneSortedTabs(tab.panelId)
+    const tabIndex = TabsmanCore.getOneSortedTabs(tab.panelId).findIndex(i=>tab.id === i.id)
+
+    let movedTabItemEl;
+    const panelGroupEle = allPanelGroupEle[tab.panelId]
+    if (isReopen) {
+        const tabItem = createTabItem(tab, tab.panelId)
+        allTabItems[tab.id] = tabItem
+        movedTabItemEl = tabItem.element
+        panelGroupEle.append(movedTabItemEl)
+    } else movedTabItemEl = allTabItems[tab.id].element;
+    // 定位排序数组中的下一个元素，用于将置顶/取消置顶的标签页插入到其前面
+    const nextTab = tabIndex !== sortedTabs.length - 1 ? sortedTabs[tabIndex + 1] : null
+    const nextTabItemEl = nextTab ? allTabItems[nextTab.id].element : null
+
+    // flip将被移动元素插入到next后
+    Utils.withFlip(
+        [...allPanelGroupEle[tab.panelId].children].slice(1),
+        ()=> {if (nextTabItemEl) nextTabItemEl.before(movedTabItemEl);}
+    )
+    // 样式变更
+    const tabItemPinIcon = allTabItems[tab.id].pinIcon
+    tabItemPinIcon.classList.toggle('ti-pinned')
+    tabItemPinIcon.classList.toggle('ti-pinned-filled')
 }
 
 // 创建单个group并返回
@@ -358,7 +378,7 @@ function __createOnePanelGroup(panelId, tabs) {
     })
     panelGroup.append(...tabItemEls)
     
-    // 副作用：标记活跃Tab
+    // 标记活跃Tab
     const activeTabId = TabsmanCore.getActiveTabs()?.[panelId]?.id;
     const activeTabItem = allTabItems[activeTabId]
     if (activeTabItem) activeTabItem.element.classList.add('active-tab-item');
@@ -386,7 +406,16 @@ function __renderUpdate (tab) {
 // currentTab => 当前活跃的tab，pre是被删除的tab
 function __renderDelete (currentTab, previousTab) {
     allTabItems[currentTab.id].element.classList.add('active-tab-item');
-    allTabItems[previousTab.id].element.remove()
+
+    // 提供一个flip动画
+    const elements = []
+    Object.values(allPanelGroupEle).forEach(
+        panelGroupEle => elements.push(...panelGroupEle.children)
+    )
+    Utils.withFlip(
+        elements,
+        ()=>allTabItems[previousTab.id].element.remove()
+    )
     delete allTabItems[previousTab.id]
 }
 

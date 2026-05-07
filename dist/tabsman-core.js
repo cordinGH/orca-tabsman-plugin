@@ -643,10 +643,11 @@ async function createTab({ currentBlockId, panelId = orca.state.activePanel, nee
 /**
  * 切换标签页
  * @param {string} tabId - 标签页ID
- * @param {boolean}  needRender - 是否需要渲染UI，false则不会渲染，这一般是其他函数借用该函数来切换到上一个活跃tab。
+ * @param {boolean}  needRender - 是否需要渲染UI，false则不会渲染。用于其他函数借用该函数来切换到上一个活跃tab。
+ * @param {boolean} [needSwitchPanel=true]  - 是否需要切换到对应面板。用于其他函数借用该函数来切换到上一个活跃tab。
  * @returns {Promise<void>}
  */
-async function switchTab(tabId, needRender = true) {
+async function switchTab(tabId, needRender = true, needSwitchPanel = true) {
     const tab = tabs[tabId];
 
     // 不存在tab，不处理
@@ -674,7 +675,7 @@ async function switchTab(tabId, needRender = true) {
     tab.lastAccessedTs = Date.now();
     activeTabs[panelId] = tab
     
-    if (panelId !== activePanelId) orca.nav.switchFocusTo(panelId);
+    if (panelId !== activePanelId && needSwitchPanel) orca.nav.switchFocusTo(panelId); 
     
     // 切换tab选中样式
     if (needRender && renderTabsCallback) await renderTabsCallback({type:"switch", currentTab: tab , previousTab: activeTab});
@@ -715,6 +716,7 @@ async function deleteTab(tabId) {
         const {panelId} = tab
         const tabIdSet = tabIdSetByPanelId.get(panelId)
         if (tabIdSet.size === 1) {
+            // 原生的orcaNav关闭面板
             navOriginals.method.close.call(navOriginals.thisValue, panelId) // orca全局历史订阅回调已处理：关闭行为而触发的orca全局历史减少，不会引起tab历史填充。
 
             // 清理数据
@@ -742,7 +744,7 @@ async function deleteTab(tabId) {
 
 // 辅助函数，当一个活跃tab准备从面板中被移出前，调用该函数可切换到符合期望的新tab上。
 // 先检查是否存在上一个访问过的活跃tab，如果没有，则根据位置给出新tab，是0就给1，否则就给下一个，以维持选中位置的不变。
-async function __switchTabBeforeDelete(panelId, activeTabId) {
+async function __switchTabBeforeDelete(panelId, activeTabId, needRender = false, needSwitchPanel = true) {
     const tabsOfPanel = getOneSortedTabs(panelId)
     const isTailIndex = tabsOfPanel.length - 1
     let activeTabIndex, targetIndex = -1;
@@ -761,7 +763,7 @@ async function __switchTabBeforeDelete(panelId, activeTabId) {
         targetIndex = index
     }
     if (targetIndex === -1) targetIndex = (activeTabIndex === isTailIndex) ? isTailIndex - 1 : activeTabIndex + 1;
-    await switchTab(tabsOfPanel[targetIndex].id, false)
+    await switchTab(tabsOfPanel[targetIndex].id, needRender, needSwitchPanel)
 }
 
 
@@ -782,26 +784,24 @@ async function moveTabToPanel(tabId, newPanelId) {
     tabIdSetByPanelId.get(newPanelId).add(tabId);
     updateSortedTabsCache(newPanelId);
 
-    // 如果被移走的是唯一一个标签页，则先清UI，再清理数据库数据（UI清理需要读取数据库）。
+    // 清除对应数据
     if (tabIdSetByPanelId.get(oldPanelId).size === 1) {
-        if (renderTabsCallback) await renderTabsCallback({type: "closePanel", panelId: oldPanelId});
         delete activeTabs[oldPanelId];
         tabIdSetByPanelId.delete(oldPanelId);
         sortedTabsByPanelId.delete(oldPanelId);
-        
+        // 原生orcaNav关闭面板
         navOriginals.method.close.call(navOriginals.thisValue, oldPanelId)
-        return true;
-    }
+    } else{
+        // 如果被移走的是active面板的active-tab，则先执行switchTab。
+        if (tab.isActive) await __switchTabBeforeDelete(oldPanelId, tabId, true, false);
 
-    // 如果被移走的是active面板的active-tab，则先执行switchTab。
-    if (tab.isActive) await __switchTabBeforeDelete(oldPanelId, tabId);
+        tabIdSetByPanelId.get(oldPanelId).delete(tabId);
+        const sortedTabs = getOneSortedTabs(oldPanelId)
+        const index = sortedTabs.findIndex(tab => tab.id === tabId)
+        if (index !== -1) sortedTabs.splice(index, 1);
+    }
     
-    // 将tab数据从旧面板移除并刷新UI
-    tabIdSetByPanelId.get(oldPanelId).delete(tabId);
-    const sortedTabs = getOneSortedTabs(oldPanelId)
-    const index = sortedTabs.findIndex(tab => tab.id === tabId)
-    if (index !== -1) sortedTabs.splice(index, 1);
-    if (renderTabsCallback) await renderTabsCallback();
+    if (renderTabsCallback) await renderTabsCallback({type: 'moveTab', currentTab: tab});
     return true;
 }
 
@@ -1421,9 +1421,7 @@ function setupCommandInterception() {
         for (const [panelId, tabIdSet] of tabIdSetByPanelId) {
             if (panelId !== activePanelId) {
                 // 删除该面板的所有标签页数据
-                tabIdSet.forEach(tabId => {
-                    delete tabs[tabId];
-                });
+                tabIdSet.forEach(tabId => delete tabs[tabId]);
                 tabIdSetByPanelId.delete(panelId);
                 delete activeTabs[panelId];
                 sortedTabsByPanelId.delete(panelId);
@@ -1571,7 +1569,6 @@ function cleanNavWrappers() {
  * 初始化历史订阅、命令拦截和当前面板的标签页
  */
 const debouncedWorkspaceUpdate = Utils.debounce(async () => {
-    console.log('执行持久化')
     orca.plugins.setData('tabsman-workspace', workspaceNow, JSON.stringify(tabs));
 }, 50)
 

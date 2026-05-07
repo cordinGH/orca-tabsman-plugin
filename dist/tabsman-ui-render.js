@@ -237,8 +237,9 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
         case 'move':
             __renderMove(moveInfo);break;
         case 'fav':
-            __renderFav(currentTab);
-            break;
+            __renderFav(currentTab);break;
+        case 'moveTab':
+            __renderMoveTab(currentTab);break;
         default:
             __renderAll();break;
     }
@@ -285,6 +286,40 @@ function __renderMove(moveInfo) {
         }
     )
 }
+
+
+function __renderMoveTab(tab) {
+    // 找到其后一位作为参考点，然后插入在其前面，如果后面没有，则插入到末尾。
+    const {id, panelId} = tab
+    const sortedTabs = TabsmanCore.getOneSortedTabs(panelId)
+    // 参考点
+    const tabIndex = sortedTabs.findIndex(t => t.id === id)
+    const refTab = sortedTabs[tabIndex + 1]
+    const refTabEl = refTab ? allTabItems[refTab.id].element : null
+    
+    // 更新DOM中的面板id，并移除激活class
+    const movedTabItemEl = allTabItems[id].element
+    movedTabItemEl.classList.remove('active-tab-item')
+    const oldPanelId = movedTabItemEl.dataset.tabsmanPanelId
+    movedTabItemEl.dataset.tabsmanPanelId = panelId
+
+    
+    const allItemEls = []
+    Object.values(allPanelGroupEle).forEach(el => allItemEls.push(...el.children))
+    Utils.withFlip(
+        allItemEls,
+        () => {
+            allPanelGroupEle[panelId].insertBefore(movedTabItemEl, refTabEl)
+            
+            // 如果只剩下面板元素，则将旧面板对象删除
+            if (allPanelGroupEle[oldPanelId].children.length === 1) {
+                allPanelGroupEle[oldPanelId].remove()
+                delete allPanelGroupEle[oldPanelId]
+            }
+        }
+    )
+}
+
 
 // 创建tab时渲染，轻量渲染
 function __renderCreate(tab) {
@@ -743,11 +778,7 @@ function handleTabDrop(e) {
     const newPanelId = dragState.targetPanelGroupEl.getAttribute('data-tabsman-panel-id')
     targetPanelGroupEl.classList.remove('plugin-tabsman-panel-group-drag-over');
     TabsmanCore.moveTabToPanel(tabId, newPanelId)
-    .then((success) => success && orca.nav.switchFocusTo(newPanelId))
-    .catch((err) => {
-        orca.notify("error", `[tabsman] 移动标签页失败，请Ctrl R刷新`);
-        console.log('[tabsman] 报错：', err);
-    })
+    
     // 清理数据，因为当dom元素成功拖走时，不会触发end事件，反之则会继续触发end
     dragState.tabId = null;
     dragState.targetPanelGroupEl = null;

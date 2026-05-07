@@ -105,6 +105,35 @@ let tabIdSetByPanelId = new Map();
 let sortedTabsByPanelId = new Map();
 
 
+/* ————————————————————————————————————————— 捕获鼠标点击事件 ——————————————————————————————————————————————————— */
+// 记录最后一次的点击事件，用于替代不可靠的window.event
+let lastClickIntent = null;
+function captureIntent(e) {
+    lastClickIntent = {
+        ctrlKey: e.ctrlKey || e.metaKey,
+        shiftKey: e.shiftKey,
+        button: e.button,
+        ts: performance.now(),
+    };
+};
+
+// 取用点击事件
+//  - 连续的新跳转 —> 由 captureIntent 总是写最新值保证。
+//  - 同一次跳转api不会重复消费 —> 由 consume 时 null 保证。
+//  - 懒清理：跳转读取事件时，如果发现事件是时间阈值以外的，则认为不是本次跳转触发事件，而是上次的残留（例如一个普通的点击行为）。
+function consumeClickIntent() {
+    if (!lastClickIntent) return null;
+    if (performance.now() - lastClickIntent.ts > 200) {
+        lastClickIntent = null
+        return null;
+    }
+    const intent = lastClickIntent;
+    lastClickIntent = null;     // 一次性消费，避免下一次外部跳转误用
+    return intent;
+}
+
+
+
 // =======================================================
 
 // 提供给外部模块的API，帮助外部模块将Tab对象或者tab对象数组，导入进数据结构
@@ -261,6 +290,7 @@ async function __generateTabNameAndIcon(blockId) {
         case 'image': icon = 'ti ti-photo'; break;
         case 'video': icon = 'ti ti-movie'; break;
         case 'whiteboard': icon = 'ti ti-chalkboard'; break;
+        case 'aichat' : icon = 'ti ti-message-dots'; break;
     }
 
     // 版本1.8.0，判断是否为标签从而覆盖icon，如果块有别名，但不在别名列表，则说明是标签，反之说明是别名块
@@ -1465,9 +1495,13 @@ function setupNavWrappers() {
         }
     }
     
-    // 包装 orca.nav.goTo 以支持 Ctrl+点击创建后台标签页，且确保始终是当前面板跳转
+    // 包装 orca.nav.goTo 以支持创建前后台标签页
     navOriginals.method.goTo = orca.nav.goTo
     orca.nav.goTo = function(view, viewArgs, panelId) {
+
+        // 取出本次的一次性点击事件
+        const clickIntent = consumeClickIntent()
+
         // 如果没传panelId，或者传了个未被记录的panelId，则panelId定向为当前UI上的activePanelId
         if (!panelId || !Object.hasOwn(activeTabs, panelId)) {
             panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
@@ -1477,45 +1511,43 @@ function setupNavWrappers() {
         // 典型场景：官方在全局搜索视图中打开预览编辑，在里面跳转将会无效。下方switch之后，就可以正常跳转。
         if (orca.state.activePanel !== panelId) orca.nav.switchFocusTo(panelId);
 
-        // 处理Ctrl+Click（未按shift）：创建后台标签页
-        if (window.event?.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
-            // 根据视图类型确定目标内容ID
-            const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
-            createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
-            .then(() => orca.notify("success", "[tabsman] 已创建后台标签页"))
+        if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
+            // 处理Ctrl+Click：创建后台标签页
+            __createBackgroundTab(view, viewArgs, panelId)
 
-        } else if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
+        } else if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
-            orca.nav.openInLastPanel(view, viewArgs);
-
+            __createForegroundTab(view, viewArgs, panelId)
         } else {
-            // 检查panelId是否locked，如果locked，则单独用openInLastPanel封装，不然UI渲染会有问题。
+            // 常规调用原始函数goto
+            // 检查panelId是否locked，没锁才算是常规调用，锁了则转应给openInLastPanel，以便记录新面板新tab
             const panel = orca.nav.findViewPanel(panelId, orca.state.panels);
             panel.locked
                 ? orca.nav.openInLastPanel(view, viewArgs)
                 : navOriginals.method.goTo.call(this, view, viewArgs, panelId)
-        }   
+        }
     };
     
-    // 包装 openInLastPanel API（空返回）
+    // 包装 openInLastPanel API，以支持创建前后台标签页
     navOriginals.method.openInLastPanel = orca.nav.openInLastPanel;
     orca.nav.openInLastPanel = function(view, viewArgs) {
-        // 处理 Ctrl+Shift+Click：创建前台标签页
-        if (window.event?.ctrlKey && window.event.shiftKey && window.event.button === 0) {
-            const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
-            // 取当前UI上的activePanelId
-            const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-            const tabPromise  = createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
-            tabPromise
-                .then(newTab => switchTab(newTab.id))
-                .then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
+        
+        // 取出本次的一次性点击事件
+        const clickIntent = consumeClickIntent()
+
+        // 新标签页的目标面板取当前UI上的activePanelId
+        const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+        
+        if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
+            // 处理 Ctrl+Shift+Click：创建前台标签页
+            __createForegroundTab(view, viewArgs, panelId)
             
-        } else if (window.event?.ctrlKey && !window.event.shiftKey && window.event.button === 0) {
+        } else if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Click：创建后台标签页
-            orca.nav.goTo(view, viewArgs);
+            __createBackgroundTab(view, viewArgs, panelId)
 
         } else {
-            // 调用原始函数前往面板
+            // 常规调用原始函数打开
             navOriginals.method.openInLastPanel.call(this, view, viewArgs);
             
             // 如果还没有这个面板的标签页，则初始化一份默认的标签页
@@ -1560,6 +1592,35 @@ function cleanNavWrappers() {
     })
 
     navOriginals = null
+}
+
+/**
+ * 创建后台标签页：在指定面板里建一个新tab，不切换焦点过去（用户当前看的页面不变）。
+ * 用于 Ctrl+Click 这种"先开着，待会儿再看"的场景。
+ * @param {string} view - Orca视图类型（如 "block" / "journal" 等）
+ * @param {*} viewArgs - 视图参数，结构随view而变
+ * @param {string} panelId - 目标面板ID
+ */
+function __createBackgroundTab(view, viewArgs, panelId) {
+    // 根据视图类型确定目标内容ID
+    const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
+    createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
+    .then(() => orca.notify("success", "[tabsman] 已创建后台标签页"))
+}
+
+
+/**
+ * 创建前台标签页：在指定面板里建一个新tab，会自动切换焦点过去。
+ * 用于 Ctrl+Shift+Click 这种"开了就要看"的场景
+ * @param {string} view - Orca视图类型（如 "block" / "journal" 等）
+ * @param {*} viewArgs - 视图参数，结构随view而变
+ * @param {string} panelId - 目标面板ID
+ */
+function __createForegroundTab(view, viewArgs, panelId) {
+    const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
+    createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
+    .then(newTab => switchTab(newTab.id))
+    .then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
 }
 
 
@@ -1627,6 +1688,8 @@ async function start(callback = null, pluginName) {
     // if (n) lastWorkspaceName = JSON.parse(n)
     // WorkspaceRender.startWSRender(lastWorkspaceName)
     /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
+    // 捕获一次性鼠标事件，用于处理后台和前台标签页的创建
+    window.addEventListener('click', captureIntent, true);
 }
 
 /**
@@ -1664,6 +1727,8 @@ function destroy() {
     activeTabs = {};
     tabIdSetByPanelId.clear();
     sortedTabsByPanelId.clear();  // 清理排序缓存
+
+    window.removeEventListener('click', captureIntent, true);
 }
 
 

@@ -256,7 +256,19 @@ function renderTabsByPanel({type, currentTab, previousTab, panelId, moveInfo} = 
 function __renderClosePanel(panelId) {
     const panelGroupEle = allPanelGroupEle[panelId]
     if (!panelGroupEle) return;
-    panelGroupEle.remove()
+
+    panelGroupEle.classList.add('leaving')
+    panelGroupEle.addEventListener(
+        'animationend', 
+        () => {
+            Utils.withFlip(
+                Object.values(allPanelGroupEle).filter(el => el !== panelGroupEle),
+                () => panelGroupEle.remove()
+            )
+        },
+        { once: true }
+    )
+    
 
     // 清除数据缓存
     Object.values(allTabItems).forEach((tabItem)=>{
@@ -274,8 +286,8 @@ function __renderMove(moveInfo) {
     const fromEle = allPanelGroupEle[from]
     const toEle = allPanelGroupEle[to]
 
-    Utils.withFlip(Object.values(
-        allPanelGroupEle),
+    Utils.withFlip(
+        Object.values(allPanelGroupEle),
         () => {
             // Last：DOM 交换
             if (dir === "left" || dir === "top") {
@@ -356,10 +368,31 @@ function __renderCreate(tab) {
         const tailIndex = panelIdsInOrder.length - 1 // 末尾索引
         const targetIndex = panelIdsInOrder.findIndex(item => item === panelId)
         const referenceIndex = targetIndex !== tailIndex ? targetIndex + 1 : -1
-        if (referenceIndex !== -1) {
-            const referencePanelGrop = allPanelGroupEle[panelIdsInOrder[referenceIndex]]
-            referencePanelGrop.before(panelGroup)
-        } else tabsmanTabsEle.append(panelGroup)
+
+
+        Utils.withFlip(
+            Object.values(allPanelGroupEle).filter(el => el !== panelGroup),
+            () => {
+                if (referenceIndex !== -1) {
+                    const referencePanelGrop = allPanelGroupEle[panelIdsInOrder[referenceIndex]]
+                    panelGroup.classList.add('inserting')
+                    panelGroup.addEventListener(
+                        'animationend', 
+                        () => tabItemEl.classList.remove('inserting'),
+                        { once: true }
+                    )
+                    referencePanelGrop.before(panelGroup)
+                } else {
+                    panelGroup.classList.add('entering')
+                    panelGroup.addEventListener(
+                        'animationend', 
+                        () => panelGroup.classList.remove('entering'),
+                        { once: true }
+                    )
+                    tabsmanTabsEle.append(panelGroup)
+                }
+            }
+        )
 
         return
     }

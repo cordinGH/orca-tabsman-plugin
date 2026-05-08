@@ -1,11 +1,4 @@
-/* 干掉顶部栏后退按钮 */
-/* .orca-button.orca-headbar-back{
-    pointer-events: none;
-    color: var(--orca-color-text-1) !important;
-    opacity:.2 !important;
-} */
-
-/* group容器 */
+/* 面板group的上层容器 */
 .plugin-tabsman-tabs.orca-favorites-items{
     display: flex;
     flex-direction: column;
@@ -14,7 +7,7 @@
     height: 100%;
 }
 
-/* 面板条目 */
+/* 面板标题item */
 .plugin-tabsman-panel-item.orca-fav-item-item {
     grid-template-columns: auto 1fr auto;
     padding-right: .25rem;
@@ -28,33 +21,26 @@
 
 /* tab条目 */
 .plugin-tabsman-tab-item.orca-fav-item-item {
-    margin-left: 1.125rem;
     padding-right: .25rem;
     grid-template-columns: auto auto 1fr auto;
     /* 切换为多面板时有一个缩进过渡 */
-    border: .5px solid transparent;
+    margin-left: 0;
     transition: margin-left 0.15s ease;
-
-    /* tab固定按钮pin */
-    &>.plugin-tabsman-tab-pin{
-        width: 22px;
-        aspect-ratio: 1;
-        text-align: center;
-        line-height: 22px;
+    
+    /* 当前tab追加选中样式 */
+    border: .5px solid transparent;
+    &.active-tab-item {
+        border-color: var(--orca-color-primary-5);
+        background-color: color-mix(in srgb, var(--orca-color-primary-5) 10%, transparent)
     }
-
-}
-/* active tab */
-.plugin-tabsman-tab-item.orca-fav-item-item.active-tab-item{
-    border-color: var(--orca-color-primary-5);
-    background-color: color-mix(in srgb, var(--orca-color-primary-5) 10%, transparent)
 }
 
+/* tabs栏的item名称 */
 .plugin-tabsman-tab-title, .plugin-tabsman-panel-title{
     font-family: var(--orca-fontfamily-code);
 }
 
-/* tab关闭按钮、新建tab按钮、pin按钮 */
+/* tabs栏功能按钮通用样式 */
 .plugin-tabsman-tab-close, .plugin-tabsman-panel-new-tab, .plugin-tabsman-tab-pin{
     opacity: .15;
     transition: opacity .2s ease-in-out;
@@ -64,15 +50,56 @@
     }
 }
 
+/* pin按钮绘制 */
+.plugin-tabsman-tab-pin{
+    width: 22px;
+    aspect-ratio: 1;
+    text-align: center;
+    line-height: 22px;
+}
+
 /* 成功pin住的按钮 */
 .plugin-tabsman-tab-pin.ti-pinned-filled{
     opacity: 1;
     color: var(--orca-color-primary-5);
 }
 
-/* 未pin的非hover隐藏 */
+/* 标签页未hover时，非pin按钮极低可见度 */
 .plugin-tabsman-tab-item:not(:hover) .plugin-tabsman-tab-pin.ti-pinned{
-    opacity:0.05 !important;
+    opacity: .1 !important;
+}
+
+
+/* ———————————————————————————————————————— 多面板样式变更 —————————————————————————————————————————— */
+.plugin-tabsman-panel-group {
+    position: relative;
+}
+.plugin-tabsman-panel-group::before {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    left: 10px;
+    top: 30px;
+    bottom: 0;
+    width: 3px;
+    background-color: var(--orca-color-primary-4);
+    border-radius: var(--orca-radius-sm);
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+/* 多面板时，焦点面板显示缩进线和缩进，非焦点面板半透明 */
+.plugin-tabsman-panel-group:not(:only-child){
+    &.plugin-tabsman-panel-group-active:before { opacity: 1; }
+    &>.plugin-tabsman-tab-item.orca-fav-item-item { margin-left: 1.125rem; }
+    &:not(.plugin-tabsman-panel-group-active) {opacity: .5;}
+}
+
+
+/* 唯二面板，当其中一个进入leaving后，缩进线立刻透明 */
+.plugin-tabsman-panel-group:first-child:has(+.leaving:last-child):before,
+.leaving:first-child+.plugin-tabsman-panel-group:last-child:before{
+    opacity: 0;
 }
 
 
@@ -91,44 +118,6 @@
 }
 .orca-sidebar-tab-options.plugin-tabsman-selected~.orca-sidebar-tabs .orca-hideable:not(:first-child){
     display:none;
-}
-
-/* ——————————————————————————————————侧边栏焦点面板group———————————————————————————————————— */
-.plugin-tabsman-panel-group {
-    position: relative;
-}
-.plugin-tabsman-panel-group::before {
-    content: '';
-    pointer-events: none;
-    position: absolute;
-    left: 10px;
-    top: 30px;
-    bottom: 0;
-    width: 3px;
-    background-color: var(--orca-color-primary-4);
-    border-radius: var(--orca-radius-sm);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
-/* 单面板时，不显示缩进 */
-.plugin-tabsman-panel-group:only-child{
-    
-    &::before{
-        opacity:0;
-    }
-    & .plugin-tabsman-tab-item.orca-fav-item-item {
-        margin-left: 0;
-    }
-}
-
-.plugin-tabsman-panel-group-active::before {
-    opacity: 1;
-}
-
-/* ———————————————————————————————侧边栏未激活的面板group，可见度减半—————————————————————————————————— */
-.plugin-tabsman-panel-group:not(.plugin-tabsman-panel-group-active){
-    opacity: .5;
 }
 
 
@@ -276,7 +265,7 @@
     opacity: 1;
 }
 
-/* ——————————————————————————————————————————————— 弹窗事件控制 ——————————————————————————————————————————————————— */
+/* ———————————————————————————————— tabsman顶部栏弹窗时允许点击顶部栏触发其他弹窗 ———————————————————————————————————————————— */
 #headbar.plugin-tabsman-popup-open{
     pointer-events: auto;
 }
@@ -360,13 +349,13 @@
     }
 }
 
-.plugin-tabsman-tab-item.inserting {
-    /* 等待flip的.15结束之后再播放 */
+:is(.plugin-tabsman-panel-group, .plugin-tabsman-tab-item).inserting {
+    /* 等待flip的.12结束之后再播放 */
     animation: plugin-tabsman-tab-item-insert .24s ease-out;
 }
-.plugin-tabsman-tab-item.entering {
-    animation: plugin-tabsman-tab-item-enter .1s ease-out;
+:is(.plugin-tabsman-panel-group, .plugin-tabsman-tab-item).entering {
+    animation: plugin-tabsman-tab-item-enter .15s ease-out;
 }
-.plugin-tabsman-tab-item.leaving {
+:is(.plugin-tabsman-panel-group, .plugin-tabsman-tab-item).leaving {
     animation: plugin-tabsman-tab-item-leave .1s ease-in;
 }

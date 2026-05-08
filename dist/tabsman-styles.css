@@ -45,7 +45,7 @@
     opacity: .15;
     transition: opacity .2s ease-in-out;
     &:hover{
-        opacity: 1;
+        opacity: 1 !important;
         font-weight: var(--orca-fontweight-xl);
     }
 }
@@ -64,9 +64,14 @@
     color: var(--orca-color-primary-5);
 }
 
-/* 标签页未hover时，非pin按钮极低可见度 */
-.plugin-tabsman-tab-item:not(:hover) .plugin-tabsman-tab-pin.ti-pinned{
-    opacity: .1 !important;
+/* pin按钮未悬停 */
+.plugin-tabsman-tab-pin.ti-pinned:not(:hover) {
+    opacity: .1;
+}
+
+/* 标签页悬停但pin未悬停 */
+.plugin-tabsman-tab-item:hover .plugin-tabsman-tab-pin.ti-pinned:not(:hover){
+    opacity: .5;
 }
 
 

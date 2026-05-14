@@ -92,7 +92,7 @@ function createTabItem(tab, panelId) {
 
     // panelGroupEle.appendChild(tabElement)
 
-    enableTabPreview && Utils.enableBlockPreview(tabElement, tab,closeBtn)
+    enableTabPreview && Utils.enableBlockPreview(tabElement, tab)
 
     // 返回包含DOM元素和子元素引用的对象
     return {

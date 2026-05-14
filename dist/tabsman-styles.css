@@ -31,7 +31,7 @@
     border: .5px solid transparent;
     &.active-tab-item {
         border-color: var(--orca-color-primary-5);
-        background-color: color-mix(in srgb, var(--orca-color-primary-5) 10%, transparent)
+        background-color: color-mix(in srgb,var(--orca-color-primary-5) 10%,transparent) !important;
     }
 }
 

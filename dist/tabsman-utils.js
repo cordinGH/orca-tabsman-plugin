@@ -120,6 +120,12 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
         // 非中键
         if (e.button !== 1) return;
 
+        // 滞后移除class，滞后过程中触发新预览打开则无需执行
+        if (removeTimer) {
+            clearTimeout(removeTimer)
+            removeTimer = null
+        }
+
         // 存在悬停预览时，官方原生就支持中键进入编辑模式，无需重复打开。
         if (previewClose) return;
 
@@ -137,14 +143,23 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
         orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, true);
         
         // 下一次事件循环再处理class移除，即 忽略本次pointerdown，防止秒开秒关
-        setTimeout(()=>document.addEventListener('pointerdown', handlePreviewClass), 0)
+        setTimeout(()=> {
+            document.addEventListener('pointerdown', removeEditPreview)
+            document.addEventListener('keydown', removeEditPreview)
+        }, 0)
     }
 
 
     // alt + hover，打开悬停预览
     tabElement.onmouseenter = (e) => {
         if (!e.altKey) return
-        clearPreview()
+
+        // 滞后移除class，滞后过程中触发新预览打开则无需执行
+        if (removeTimer) {
+            clearTimeout(removeTimer)
+            removeTimer = null
+        }
+
         previewTimer = setTimeout(()=>{
             const tabRect = tabElement.getBoundingClientRect();
             const { top, bottom, right, left, width, height } = tabRect
@@ -158,6 +173,7 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
             // 选择器会在class加入后立刻生效，而不会等待执行栈清空，因此class先add进去
             document.body.classList.add('plugin-tabsman-preview')
             previewClose = orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, false);
+            previewTimer = null
         }, 200) // 200ms防抖
     }
 
@@ -165,34 +181,57 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
     // 悬停预览转为编辑预览后，官方会自动加入orca-popup-pointer-logic（用于禁止外部点击），因此光标离开时如果是编辑态，则无需关闭窗口。
     // 官方的ctrl e 或者中键，都会触发光标离开
     tabElement.onmouseleave = (e) => {
+        // 当前还没打开则直接关闭并结束
+        if (previewTimer) {
+            clearTimeout(previewTimer)
+            previewTimer = null
+            return
+        }
+
         // 本没有预览则无需处理
         if (!previewClose) return
-
-        const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
-        if (isEditing) return;
         
-        clearPreview()
+        // 官方的ctrl e 或官方中键进入编辑模式，无需处理，且则应当绑定handler处理class的移除
+        const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
+        if (isEditing) {
+            document.addEventListener('pointerdown', removeEditPreview)
+            document.addEventListener('keydown', removeEditPreview)
+            
+            return
+        }
+        
+        // 关闭预览
+        removePreview();
     }
 }
 
-// 清除alt hover的悬浮预览，在光标移出时手动调用
-function clearPreview() {
-    previewTimer && clearTimeout(previewTimer)
-    if (!previewClose) return
+
+// 移除预览及其辅助位移的class
+let removeTimer;
+function removePreview() {
+    // 官方的api关闭
     previewClose()
     previewClose = null
-    // 确保彻底关闭再remove位移class，100经过测试不稳定，120 小概率不稳定，150稳定。
-    setTimeout(()=>document.body.classList.remove('plugin-tabsman-preview'), 150)
+    
+    // 滞后300ms关闭
+    removeTimer = setTimeout(()=> {
+        document.body.classList.remove('plugin-tabsman-preview')
+        removeTimer = null
+    }, 300) // 同removeEditPreview为300ms
 }
 
 
 /**
- * 绑在document确保能够接收事件。
- * 用于处理class plugin-tabsman-preview的移除，该class用于对预览窗口平移
- * 虎鲸的编辑预览会在点击外部区域后自动关闭预览，关闭后应当撤销对预览窗口的平移
- * @param {MouseEvent} e 
+ * 处理编辑预览中的plugin-tabsman-preview的class移除，该class用于对预览窗口平移。绑在document确保能够接收事件。
+ * 虎鲸的编辑预览会在点击外部区域后自动关闭预览，关闭后应当撤销对预览窗口的平移class，并null掉暂存的close变量
+ * @param {Event} e 
  */
-function handlePreviewClass(e) {
+function removeEditPreview(e) {
+    // 只处理esc和click
+    const isEscClose = e.type === 'keydown' && e.key === 'Escape'
+    const isClickClose = e.type === 'pointerdown'
+    if (!isEscClose && !isClickClose) return
+
     setTimeout(()=>{
         // 点击内部不移除
         if (e.target.closest('.orca-popup.orca-block-preview-popup')) return
@@ -202,9 +241,11 @@ function handlePreviewClass(e) {
         // 但事实是官方会忽略第二次中键（不会关闭预览），因此需要本handler自行处理该情况下的class维持（不清理class）
         if (document.body.classList.contains('orca-popup-pointer-logic')) return
 
-        document.removeEventListener('pointerdown', handlePreviewClass)
         document.body.classList.remove('plugin-tabsman-preview')
-    }, 300) // 确保晚移除，300足够在下次打开前移除了
+        document.removeEventListener('pointerdown', removeEditPreview)
+        document.removeEventListener('keydown', removeEditPreview)
+        previewClose = null
+    }, 300) // 晚移除，确保在下次打开前移除
 }
 
 

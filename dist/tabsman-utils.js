@@ -98,27 +98,17 @@ let previewClose;
 let previewTimer;
 export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, tab) {
 
-    // 按住alt 时，tab元素触发悬停预览（可编辑模式）
-    const blockId = tab.currentBlockId
-
-    let targetBlockId;
-    if (blockId instanceof Date) {
-        // journal
-        const journalBlock = await orca.invokeBackend("get-journal-block", blockId);
-        targetBlockId = journalBlock.id;
-    } else if (Number.isInteger(Number(blockId))) {
-        // block
-        targetBlockId = blockId
-    } else {
-        orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块')
-    }
-
-
     // 中键直接打开编辑预览，不考虑防抖，因为防抖有响应延迟
     // 也无需节流防止连点，因为第一次中键时官方会立刻加上orca-popup-pointer-logic禁止点击事件，所以第二次点击根本无效
-    tabElement.onpointerdown = (e) => {
+    tabElement.onpointerdown = async (e) => {
         // 非中键
         if (e.button !== 1) return;
+
+        const targetBlockId = await __getBlockId(tab)
+        if (targetBlockId === -1) {
+            orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块');
+            return;
+        }
 
         // 滞后移除class，滞后过程中触发新预览打开则无需执行
         if (removeTimer) {
@@ -151,8 +141,14 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
 
 
     // alt + hover，打开悬停预览
-    tabElement.onmouseenter = (e) => {
+    tabElement.onmouseenter = async (e) => {
         if (!e.altKey) return
+
+        const targetBlockId = await __getBlockId(tab)
+        if (targetBlockId === -1) {
+            orca.notify("info", '[tabsman] 无法触发预览，因为非块');
+            return;
+        }
 
         // 滞后移除class，滞后过程中触发新预览打开则无需执行
         if (removeTimer) {
@@ -203,6 +199,29 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
         // 关闭预览
         removePreview();
     }
+}
+
+
+/**
+ * 从Tab对象中获取BlockId用于悬浮预览
+ */
+async function __getBlockId(tab) {
+
+    const blockId = tab.currentBlockId
+
+    let targetBlockId;
+    if (blockId instanceof Date) {
+        // journal
+        const journalBlock = await orca.invokeBackend("get-journal-block", blockId);
+        targetBlockId = journalBlock.id;
+    } else if (Number.isInteger(Number(blockId))) {
+        // block
+        targetBlockId = blockId
+    } else {
+        targetBlockId = -1
+    }
+
+    return targetBlockId
 }
 
 

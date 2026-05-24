@@ -116,12 +116,12 @@ function registerTabsmanCommand(){
         {
             name: 'tabsman.createBackgroundTab',
             fn: TabsmanCore.createBackgroundTab,
-            description: '[tabsman] 创建后台标签页（基于光标所在块）'
+            description: '[tabsman] 创建后台标签页（基于光标块或悬停在全局搜索条目）'
         },
         {
             name: 'tabsman.createForegroundTab',
             fn: TabsmanCore.createForegroundTab,
-            description: '[tabsman] 创建前台标签页（基于光标所在块）'
+            description: '[tabsman] 创建前台标签页（基于光标块或悬停在全局搜索条目）'
         }
     ]
 

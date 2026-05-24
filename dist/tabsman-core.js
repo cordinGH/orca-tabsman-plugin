@@ -1428,6 +1428,8 @@ function createBackgroundTab() {
     const view = 'block'
     const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
     const viewArgs = __resolveViewArgsFromUI()
+    // 没解析出目标块（无光标、且悬停处不是搜索结果）就什么都不做，避免创建无效tab
+    if (!viewArgs.blockId) return orca.notify("info", "[tabsman] 未找到可创建标签页的目标块")
 
     __createBackgroundTab(view, viewArgs, panelId)
 }
@@ -1436,6 +1438,8 @@ function createForegroundTab() {
     const view = 'block'
     const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
     const viewArgs = __resolveViewArgsFromUI()
+    // 没解析出目标块（无光标、且悬停处不是搜索结果）就什么都不做，避免创建无效tab
+    if (!viewArgs.blockId) return orca.notify("info", "[tabsman] 未找到可创建标签页的目标块")
 
     __createForegroundTab(view, viewArgs, panelId)
 }
@@ -1456,13 +1460,13 @@ function __resolveViewArgsFromUI() {
         // 没有光标，则检查当前pointer是否位于全局搜索
         // 当前是否悬停在条目上，不再则检查是否位于搜索预览上
         const pointerEl = document.elementFromPoint(lastPointerX, lastPointerY)
-        const searchItem = pointerEl.closest('.orca-search-modal-block-item[data-block-id]')
+        const searchItem = pointerEl?.closest('.orca-search-modal-block-item[data-block-id]')
         if (searchItem) {
             viewArgs.blockId = parseInt(searchItem.dataset.blockId)
         } else {
-            const blockEditor = pointerEl.closest('.orca-search-modal-result-preview>.orca-panel[data-panel-id="_globalSearch"]>.orca-hideable>.orca-block-editor')
-            if (!blockEditor) return;
-            viewArgs.blockId = parseInt(blockEditor.dataset.blockId);
+            const blockEditor = pointerEl?.closest('.orca-search-modal-result-preview>.orca-panel[data-panel-id="_globalSearch"]>.orca-hideable>.orca-block-editor')
+            // 悬停处不是搜索预览：不设blockId，落到末尾返回空对象（由调用方守卫处理）
+            if (blockEditor) viewArgs.blockId = parseInt(blockEditor.dataset.blockId);
         }
     }
 

@@ -111,8 +111,13 @@ function registerTabsmanCommand(){
         {
             name: 'tabsman.refreshCurrentEditor',
             fn: TabsmanCore.refreshCurrentEditor,
-            description: '[tabsman] 重新打开当前面板的当前编辑器'
+            description: '[tabsman] 刷新当前面板的当前编辑器'
         },
+        {
+            name: 'tabsman.reopenClosedTabsInOrder',
+            fn: TabsmanCore.reopenClosedTabsInOrder,
+            description: '[tabsman] 重新打开刚才关闭的标签页（按照关闭顺序）'
+        }, 
         {
             name: 'tabsman.createBackgroundTab',
             fn: TabsmanCore.createBackgroundTab,

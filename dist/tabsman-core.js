@@ -1471,6 +1471,69 @@ function __resolveViewArgsFromUI() {
 
 
 /**
+ * 把主键名归一到与 Orca combo 写法一致的规范形式。
+ * 主要抹平 e.key 与 Orca 配置的命名差异：箭头键 e.key 给 "ArrowUp"，Orca 写 "up"。
+ * 其余（tab/enter/标点）两边已天然一致，default 分支小写返回即可。
+ * @param {string} raw - 原始键名（来自 e.code 截取、e.key，或 combo 字符串）
+ * @returns {string}
+ */
+function __canonKey(raw) {
+    const k = raw.toLowerCase();
+    switch (k) {
+        case 'arrowup': case 'up': return 'up';
+        case 'arrowdown': case 'down': return 'down';
+        case 'arrowleft': case 'left': return 'left';
+        case 'arrowright': case 'right': return 'right';
+        case ' ': case 'spacebar': case 'space': return 'space';
+        case 'esc': case 'escape': return 'escape';
+        case 'return': case 'enter': return 'enter';
+        case 'del': case 'delete': return 'delete';
+        default: return k;
+    }
+}
+
+/**
+ * 判断一次 keydown 是否匹配 Orca 快捷键配置里的某个 combo 字符串（如 "alt+b"）。
+ * 用「物理键码 + 修饰键集合」比对，规避 Alt 改变 e.key 取值、以及修饰键书写顺序带来的误差。
+ * @param {KeyboardEvent} e
+ * @param {string} combo - 形如 "alt+b" / "ctrl+shift+k" 的快捷键字符串（来自 orca.state.shortcuts）
+ * @returns {boolean}
+ */
+function __matchShortcut(e, combo) {
+    // orca快捷键combo转为全小写、无空格、无假值（空字符串）的按键名数组
+    if (!combo) return false;
+    const parts = combo.toLowerCase().split('+').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return false;
+    
+    // orca快捷键combo的主键进行归一（虎鲸目前只支持单主键）
+    const keyFromCombo = __canonKey(parts.pop());
+
+    // orca快捷键combo的修饰键放入Set，确保顺序不影响）
+    const mods = new Set(parts.map(m =>
+        m === 'control' ? 'ctrl'
+        : (m === 'cmd' || m === 'command' || m === 'super' || m === 'win') ? 'meta'
+        : m === 'option' ? 'alt'
+        : m
+    ));
+
+
+    // 事件上触发的主键进行归一：字母/数字用物理键码（规避按住 Alt/Shift 时字符变化，如 shift+4 变 "$"），其余用 e.key
+    let raw;
+    if (/^Key[A-Z]$/.test(e.code)) raw = e.code.slice(3);
+    else if (/^Digit[0-9]$/.test(e.code)) raw = e.code.slice(5);
+    else raw = e.key;
+    const keyFromEvent = __canonKey(raw);
+
+    // 比对event按键与combo是否一致
+    return keyFromEvent === keyFromCombo
+        && e.ctrlKey === mods.has('ctrl')
+        && e.altKey === mods.has('alt')
+        && e.shiftKey === mods.has('shift')
+        && e.metaKey === mods.has('meta');
+}
+
+
+/**
  * 设置全局搜索窗口的afterHook，使得可以悬停在搜索结果上创建标签页
  */
 let lastPointerX = -1, lastPointerY = -1;
@@ -1485,9 +1548,25 @@ function setAfterOpenSearch() {
         lastPointerY = e.clientY;
     }
 
+    // 搜索框抢占了键盘焦点时，Orca 命令系统不会派发快捷键，
+    // 所以在搜索打开期间自己捕获 keydown，命中绑定的 combo 时手动触发创建。
+    const onSearchKeydown = (e) => {
+        const shortcuts = orca.state.shortcuts || {};
+        if (__matchShortcut(e, shortcuts['tabsman.createBackgroundTab'])) {
+            e.preventDefault();
+            e.stopPropagation();
+            createBackgroundTab();
+        } else if (__matchShortcut(e, shortcuts['tabsman.createForegroundTab'])) {
+            e.preventDefault();
+            e.stopPropagation();
+            createForegroundTab();
+        }
+    }
+
     const afterOpenSearch = (e) => {
         document.addEventListener('pointermove', recordMove, { passive: true, capture: true });
-    
+        document.addEventListener('keydown', onSearchKeydown, { capture: true });
+
         // 记录body直接子元素的移除事件（搜索窗口）
         const observer = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
@@ -1496,8 +1575,9 @@ function setAfterOpenSearch() {
                 for (const el of [...mutation.removedNodes]) {
                     el.classList.contains('orca-modal-overlay');
                     if (!el.querySelector('.orca-menu.orca-search-modal')) continue;
-                    // 是搜索窗关闭，则移除move监听和observer
+                    // 是搜索窗关闭，则移除监听和observer
                     document.removeEventListener('pointermove', recordMove, { passive: true, capture: true });
+                    document.removeEventListener('keydown', onSearchKeydown, { capture: true });
                     lastPointerX = -1; lastPointerY = -1;
                     observer.disconnect();
                 }

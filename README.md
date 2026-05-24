@@ -47,7 +47,7 @@ tabsman（**tabs man**ager -> 管理器）：用于在右侧栏为每个面板�
    <img width="650" height="117" alt="image" src="https://github.com/user-attachments/assets/58c5abdc-cf96-4306-89e1-cc404f8c7d9e" />
 
 - 插件命令   
-   <img width="622" height="220" alt="PixPin_2026-03-09_17-07-08" src="https://github.com/user-attachments/assets/bed046a7-5236-4a67-ada5-fc650d7b7513" />
+   <img width="665" height="352" alt="image" src="https://github.com/user-attachments/assets/7e08f47f-22ab-4f57-bed4-c9656221fd15" />
 
 
 

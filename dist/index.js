@@ -115,12 +115,12 @@ function registerTabsmanCommand(){
         },
         {
             name: 'tabsman.createBackgroundTab',
-            fn: window.pluginTabsman.createBackgroundTab,
+            fn: TabsmanCore.createBackgroundTab,
             description: '[tabsman] 创建后台标签页（基于光标所在块）'
         },
         {
             name: 'tabsman.createForegroundTab',
-            fn: window.pluginTabsman.createForegroundTab,
+            fn: TabsmanCore.createForegroundTab,
             description: '[tabsman] 创建前台标签页（基于光标所在块）'
         }
     ]

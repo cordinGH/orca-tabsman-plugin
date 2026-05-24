@@ -1392,17 +1392,12 @@ async function __getQuickNoteBlockId(){
  * @param {*} viewArgs - 视图参数，结构随view而变
  * @param {string} panelId - 目标面板ID
  */
-function createBackgroundTab(view, viewArgs, panelId) {
+function __createBackgroundTab(view, viewArgs, panelId) {
     if (!panelId) {
         // panelId定向为当前tabsman侧边栏UI上的activePanelId
         panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
     }
     
-    // 没提供就从S选区或全局搜索获取
-    if (!view || !viewArgs || !panelId) {
-        view = 'block'
-        viewArgs = __resolveViewArgsFromUI()
-    }
     // 根据视图类型确定目标内容ID
     const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
     createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
@@ -1417,16 +1412,9 @@ function createBackgroundTab(view, viewArgs, panelId) {
  * @param {*} viewArgs - 视图参数，结构随view而变
  * @param {string} panelId - 目标面板ID
  */
-function createForegroundTab(view, viewArgs, panelId) {
+function __createForegroundTab(view, viewArgs, panelId) {
     if (!panelId) {
         panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-    }
-
-    // 没提供就从选区获取
-    if (!view || !viewArgs) {
-        view = 'block'
-        panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
-        viewArgs = __resolveViewArgsFromUI()
     }
 
     const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
@@ -1436,16 +1424,34 @@ function createForegroundTab(view, viewArgs, panelId) {
 }
 
 
+function createBackgroundTab() {
+    const view = 'block'
+    const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+    const viewArgs = __resolveViewArgsFromUI()
+
+    __createBackgroundTab(view, viewArgs, panelId)
+}
+
+function createForegroundTab() {
+    const view = 'block'
+    const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+    const viewArgs = __resolveViewArgsFromUI()
+
+    __createForegroundTab(view, viewArgs, panelId)
+}
+
+
 /**
- * 缺少明确参数时，从当前 UI 状态（光标选区 / 鼠标悬停位置）推断出要操作的 block 和 panel。
+ * 外部API，前后台标签页创建命令，需要通过该函数获取光标块，或者是没有光标块时通过pointer悬停找到目标。
  * @returns {object}
  */
 function __resolveViewArgsFromUI() {
     const viewArgs = {}
     const cursorData = orca.utils.getCursorDataFromSelection(window.getSelection());
-    if (cursorData) {
-        viewArgs.blockId = cursorData.focus.blockId;
     
+    // 全局搜索时，前台跳转会使得光标数据给到编辑器上，此时光标数据就过时了，因此只在光标面板和当前面板相同时，才取用光标块。
+    if (cursorData?.panelId === orca.state.activePanel) {
+        viewArgs.blockId = cursorData.focus.blockId;
     } else if (lastPointerX !== -1 && lastPointerY !== -1) {
         // 没有光标，则检查当前pointer是否位于全局搜索
         // 当前是否悬停在条目上，不再则检查是否位于搜索预览上
@@ -1705,11 +1711,11 @@ function setupNavWrappers() {
 
         if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理Ctrl+Click：创建后台标签页
-            createBackgroundTab(view, viewArgs, panelId)
+            __createBackgroundTab(view, viewArgs, panelId)
 
         } else if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
-            createForegroundTab(view, viewArgs, panelId)
+            __createForegroundTab(view, viewArgs, panelId)
         } else {
             // 常规调用原始函数goto
             // 检查panelId是否locked，没锁才算是常规调用，锁了则转应给openInLastPanel，以便记录新面板新tab
@@ -1732,11 +1738,11 @@ function setupNavWrappers() {
         
         if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
-            createForegroundTab(view, viewArgs, panelId)
+            __createForegroundTab(view, viewArgs, panelId)
             
         } else if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Click：创建后台标签页
-            createBackgroundTab(view, viewArgs, panelId)
+            __createBackgroundTab(view, viewArgs, panelId)
 
         } else {
             // 常规调用原始函数打开
@@ -1827,6 +1833,7 @@ async function start(callback = null, pluginName) {
     subscribeSettings(pluginName)
 
     // 暴露 get 函数到全局（调试）
+    window.pluginTabsman = {}
     window.pluginTabsman.getActiveTabs = getActiveTabs;
     window.pluginTabsman.getTabIdSetByPanelId = getTabIdSetByPanelId;
     window.pluginTabsman.getOneSortedTabs = getOneSortedTabs;
@@ -1897,6 +1904,9 @@ function destroy() {
     sortedTabsByPanelId.clear();  // 清理排序缓存
 
     window.removeEventListener('click', captureIntent, true);
+
+    // 清理全局命名空间
+    if (window.pluginTabsman) delete window.pluginTabsman
 }
 
 
@@ -1961,6 +1971,11 @@ export {
     switchToNextTab,
     switchToPreviousTab,
     switchPreviousActiveTab,
+    // 前后台标签页创建命令
+    createForegroundTab,
+    createBackgroundTab,
+    // 外部API，前后台标签页创建命令需要通过该函数确保跳转目标
+    __resolveViewArgsFromUI,
     // 外部API，外部使用它导入tab进Core数据结构
     importTabToActivePanel,
     // 持久化模块需要用该函数处理tab的有效性

@@ -2032,43 +2032,39 @@ function getOneSortedTabs(panelId) {
 export {
     start,
     destroy,
-    // 数据访问函数
+
+    // 数据访问
     getTabIdSetByPanelId,
     getTab,
     getTabs,
     getActiveTabs,
     getOneSortedTabs,
     getAllSortedTabs,
-    // 核心操作函数
-    createTab,
-    deleteTab,
-    switchTab,
-    moveTabToPanel,
-    // Pin功能函数
-    pinTab,
-    unpinTab,
-    // 标签页导航函数
-    switchToNextTab,
-    switchToPreviousTab,
-    switchPreviousActiveTab,
-    // 前后台标签页创建命令
-    createForegroundTab,
-    createBackgroundTab,
-    // 外部API，前后台标签页创建命令需要通过该函数确保跳转目标
-    __resolveViewArgsFromUI,
-    // 外部API，外部使用它导入tab进Core数据结构
+    getAllWorkspace,
+
+    // 对外API，外部使用它导入tab进Core数据结构
     importTabToActivePanel,
-    // 持久化模块需要用该函数处理tab的有效性
+    // 内部API，对外的持久化模块也需要用该函数处理tab的有效性
     __handleTabValidStatus,
     __generateTabNameAndIcon,
     __getBlockIdByViewAndViewArgs,
 
-    // 工作区
-    getAllWorkspace,
-    deleteWorkspace,
-    deleteAllWorkspace,
+    // 用户功能（标签页操作）
+    createTab,
+    deleteTab,
+    switchTab,
+    moveTabToPanel,
+    pinTab,
+    unpinTab,
+    switchToNextTab,
+    switchToPreviousTab,
+    switchPreviousActiveTab,
+    createBackgroundTab,
+    createForegroundTab,
+    // 用户功能（工作区操作）
     saveWorkspace,
+    deleteWorkspace,
     openWorkspace,
     exitWorkspace,
-    renameWorkspace
+    renameWorkspace,
 };

@@ -638,27 +638,20 @@ const checkPluginDockpanelReady = Utils.debounce(__checkPluginDockpanelReady, 10
  * 检查停靠面板插件
  */ 
 function __checkPluginDockpanelReady() {
+    if (!dockpanelInfo) {
+        for (const pluginInfo of Object.values(orca.state.plugins)) {
 
-    // 扫描
-    const pluginInfoArray = Object.values(orca.state.plugins)
-    for (const pluginInfo of pluginInfoArray) {
+            if (!pluginInfo.enabled || !pluginInfo.schema?.pluginDockPanelDefaultBlockId) continue;
 
-        // 如果记录了启用的目标插件，则只处理目标插件的关闭变更        
-        if (dockpanelInfo && pluginInfo !== dockpanelInfo) continue;
-
-        // 不存在该shcema说明本次不是目标插件（前提是插件关闭不清空设置）
-        if (!pluginInfo.schema?.pluginDockPanelDefaultBlockId) continue;
-        
-        // 但用户可能不止安装了一个版本，因此有必要保存一下启用的插件。
-        if (!dockpanelInfo && pluginInfo?.enabled) {
-            dockpanelInfo = pluginInfo;
+            dockpanelInfo = pluginInfo
             setSyncDockPanelId()
             break;
-        } else if (dockpanelInfo && !dockpanelInfo.enabled) {
-            closeSyncDockpanelId()
-            dockpanelInfo = null
-            break;
         }
+
+    } else if (!dockpanelInfo.enabled) {
+        // 存在，则只处理处理关闭
+        closeSyncDockpanelId()
+        dockpanelInfo = null
     }
 }
 

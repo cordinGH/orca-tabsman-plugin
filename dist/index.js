@@ -109,10 +109,10 @@ function registerTabsmanCommand(){
             description: '[tabsman] 在今日日志中快速记录（聚焦打开新Tab）'
         },
         {
-            name: 'tabsman.reopenClosedTabsInOrder',
-            fn: window.pluginTabsman.reopenClosedTabsInOrder,
-            description: '[tabsman] 重新打开刚才关闭的标签页（按照关闭顺序）'
-        }
+            name: 'tabsman.refreshCurrentEditor',
+            fn: window.pluginTabsman.refreshCurrentEditor,
+            description: '[tabsman] 重新打开当前面板的当前编辑器'
+        },
     ]
 
     commands.forEach(({name,fn,description}) => orca.commands.registerCommand(name, fn, description))
@@ -137,7 +137,6 @@ function registerTabsmanCommand(){
                 clearAllData,
                 "[tabsman]清空持久化数据"
             );
-            // orca.notify("success", "[tabsman] 清空持久化数据命令已启用");
         }
     });
 }

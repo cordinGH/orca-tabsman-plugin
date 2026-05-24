@@ -288,7 +288,7 @@ export function getPanelIdsInOrder() {
 }
 
 
-// ————————————————————————————————————————————封装防抖函数，复用————————————————————————————————————————————————————
+// ————————————————————————————————————————————防抖和节流包装函数————————————————————————————————————————————————————
 export function debounce(fn, delay = 0) {
     let timer = null;
     return (...args) => {
@@ -300,6 +300,16 @@ export function debounce(fn, delay = 0) {
     }
 }
 
+export function throttle(fn, interval = 0) {
+    let last = 0;
+    return (...args) => {
+        const now = Date.now();
+        if (now - last >= interval) {
+            last = now;
+            fn(...args);
+        }
+    };
+}
 
 /* ——————————————————————————————————————— FLIP 动画过渡 ————————————————————————————————————— */
 

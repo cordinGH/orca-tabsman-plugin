@@ -364,3 +364,16 @@
 :is(.plugin-tabsman-panel-group, .plugin-tabsman-tab-item).leaving {
     animation: plugin-tabsman-tab-item-leave .1s ease-in;
 }
+
+/* —————————————————————————————————— 命令样式：刷新当前编辑器 ———————————————————————————————————————— */
+@keyframes __tabsman-probe {
+    from {}
+    to {}
+}
+.tabsman-refresh .orca-panel.active>.orca-popup>.orca-recents-menu {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    & .orca-recents-menu-item:nth-child(1 of .orca-menu-item) .orca-recents-menu-close{
+        animation: __tabsman-probe 1ms
+    }
+}

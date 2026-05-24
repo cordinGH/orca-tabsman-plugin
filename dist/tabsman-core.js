@@ -1405,6 +1405,94 @@ async function __getQuickNoteBlockId(){
     return {quickNoteBlockId, isNewBlock: true}
 }
 
+// 刷新当前编辑器
+const refreshCurrentEditor = Utils.throttle(__refreshCurrentEditor, 300)
+let refreshing = false
+async function __refreshCurrentEditor() {
+    
+    // 如果当前不在未等级的面板或上一次的刷新的兜底清理还没结束，则不执行
+    if (!activeTabs[orca.state.activePanel] || refreshing) return
+
+    // 当前访问
+    const panel = orca.nav.findViewPanel(orca.state.activePanel, orca.state.panels)
+    const {id, view, viewArgs} = panel
+    
+    // 编辑器最大缓存限制
+    const cachedEditorNum = orca.state.settings[13]
+    if (cachedEditorNum === 1) {
+        // 编辑器最大缓存限制为1，则replace一个孤岛块，然后重新打开即可完成，无需任何刷新样式
+        await __replaceWithOrphanBlock()
+        orca.nav.replace(view, viewArgs)
+
+    } else {
+        // 刷新样式：隐藏最近关闭弹窗以及关闭按钮的探针动画
+        refreshing = true
+        document.body.classList.add('tabsman-refresh')
+        
+        if (!document.querySelector('.orca-panel.active >.orca-hideable.orca-hideable-hidden')) {
+            // 不存在其他缓存，则replace一个孤岛块并重新打开，确保具备关闭按钮
+            await __replaceWithOrphanBlock()
+            orca.nav.replace(view, viewArgs)
+        }
+        
+
+        const cleanup = () => {
+            document.removeEventListener("animationstart", handler, { capture: true })
+            setTimeout(()=>document.body.classList.remove('tabsman-refresh'),200)
+            refreshing = false
+        }
+
+        // 预防样式没触发，导致class常驻
+        const timer = setTimeout(cleanup, 1000)
+
+        // 最近关闭弹窗中关闭按钮的探针动画触发回调（模拟切出最近关闭再重新打开）
+        const handler = (e) => {
+            if (e.animationName !== "__tabsman-probe") return
+            clearTimeout(timer)
+            document.removeEventListener("animationstart", handler, { capture: true })
+            e.target.click()
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                orca.nav.replace(view, viewArgs)
+                cleanup();
+            }))
+        }
+
+        document.addEventListener("animationstart", handler, { capture: true })
+
+        await orca.commands.invokeCommand("core.panel.showRecents")
+    }
+}
+
+// 获取无子级的日志块临时跳转
+async function __replaceWithOrphanBlock() {
+    const ids = await orca.invokeBackend("query", {
+        q: {
+            kind: 100,   // v2版本的query self-AND，让 v2 字段生效
+            conditions: [
+                {
+                    kind: 9,
+                    types: { op: 5, value: ["text"] },
+                    hasParent: false,
+                    hasChild: false,
+                    hasTags: false,
+                    hasAliases: false,
+                    hasContent: false, // 无内容（自然也无出链）
+                    backRefs: { op: 1, value: 0 }, // （无反链）
+                },
+            ],
+        },
+        pageSize: 1,
+    })
+    if (ids.length === 0) {
+        // 没有任何纯孤岛块，就新开
+        await orca.commands.invokeCommand("core.editor.createAndGoEmptyBlock")
+    } else {
+        orca.nav.replace("block", { blockId: ids[0] }) 
+    }
+    await new Promise(r => requestAnimationFrame(r))
+    await new Promise(r => requestAnimationFrame(r))
+}
+
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
 
 
@@ -1680,6 +1768,7 @@ async function start(callback = null, pluginName) {
     window.pluginTabsman.archiveWorkspace = TabsmanPersistence.archiveWorkspace
     window.pluginTabsman.getArchivedWorkspaceNames = TabsmanPersistence.getArchivedWorkspaceNames
     window.pluginTabsman.unarchiveWorkspace = TabsmanPersistence.unarchiveWorkspace
+    window.pluginTabsman.refreshCurrentEditor = refreshCurrentEditor
 
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点

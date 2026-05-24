@@ -675,7 +675,7 @@ function setSyncDockPanelId() {
             newTargetIcon.classList.add('ti-picture-in-picture-top-filled')
             newTargetIcon.style.color = "var(--orca-color-primary-5)"
             newTargetTitle.style.color = "var(--orca-color-primary-5)"
-        }, 0) 
+        }, 100)  // 防止面板还没创建完毕。
     )
 }
 

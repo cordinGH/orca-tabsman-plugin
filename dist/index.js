@@ -1,7 +1,7 @@
 // Orca Tabsman Plugin - 插件入口
 // 负责启动核心功能和UI注入
 
-import { start, destroy, switchToNextTab, switchToPreviousTab, switchPreviousActiveTab, openWorkspace } from './tabsman-core.js';
+import * as TabsmanCore from './tabsman-core.js';
 import { startTabsRender, stopTabsRender, renderTabsByPanel } from './tabsman-ui-render.js';
 import { startRecentlyClosed, stopRecentlyClosed } from './tabsman-recently-closed.js';
 import { startbackforwardbutton, stopbackforwardbutton } from './tabsman-backforward-button.js';
@@ -58,18 +58,18 @@ function registerTabsmanCommand(){
     commands = [
         {
             name: "tabsman.switchToPreviousTab",
-            fn: switchToPreviousTab,
+            fn: TabsmanCore.switchToPreviousTab,
             description: '[tabsman] 切换到上一个标签页'
         },
         {
             name: "tabsman.switchToNextTab",
-            fn: switchToNextTab,
+            fn: TabsmanCore.switchToNextTab,
             description: '[tabsman] 切换到下一个标签页'
         },
         {
             name: 'tabsman.switchPreviousActiveTab',
             async fn() {
-                const success = await switchPreviousActiveTab(orca.state.activePanel)
+                const success = await TabsmanCore.switchPreviousActiveTab(orca.state.activePanel)
                 if (!success) orca.notify("info", "[tabsman] 当前还没有访问过其他标签页")   
             },
             description: '[tabsman] 切换到上一次访问的标签页'
@@ -96,7 +96,7 @@ function registerTabsmanCommand(){
             name: 'tabsman.createTodayJournalTab',
             fn () {
                 const activePanel = document.querySelector('.plugin-tabsman-panel-group-active');
-                window.pluginTabsman.createTodayJournalTab(activePanel.dataset.tabsmanPanelId)
+                TabsmanCore.createTodayJournalTab(activePanel.dataset.tabsmanPanelId)
             },
             description: '[tabsman] 在新标签页打开今日日志'
         },
@@ -104,13 +104,13 @@ function registerTabsmanCommand(){
             name: 'tabsman.quickNoteByFoucs',
             fn () {
                 const activePanel = document.querySelector('.plugin-tabsman-panel-group-active');
-                window.pluginTabsman.createQuickNoteTab(activePanel.dataset.tabsmanPanelId)
+                TabsmanCore.createQuickNoteTab(activePanel.dataset.tabsmanPanelId)
             },
             description: '[tabsman] 在今日日志中快速记录（聚焦打开新Tab）'
         },
         {
             name: 'tabsman.refreshCurrentEditor',
-            fn: window.pluginTabsman.refreshCurrentEditor,
+            fn: TabsmanCore.refreshCurrentEditor,
             description: '[tabsman] 重新打开当前面板的当前编辑器'
         },
         {
@@ -230,7 +230,6 @@ function stopActivePanelUpdateHandle() {
  * @returns {Promise<void>}
  */
 async function load(name) {
-    window.pluginTabsman = {}
 
     pluginName = name;
 
@@ -293,7 +292,7 @@ async function load(name) {
     // 启动标签页渲染    
     startTabsRender(pluginName);
     // 启动标签页系统，传递UI更新回调
-    await start(renderTabsByPanel, pluginName);
+    await TabsmanCore.start(renderTabsByPanel, pluginName);
     
     // 插件启动完成后，主动触发一次渲染通知
     renderTabsByPanel();
@@ -341,15 +340,12 @@ async function unload() {
     clearBindHtmlElement()
 
     // 清理Core
-    destroy();
+    TabsmanCore.destroy();
     
     // 停止UI渲染
     stopTabsRender();
 
     orca.themes.removeCSSResources(pluginName);
-    
-    // 清理全局命名空间
-    if (window.pluginTabsman) delete window.pluginTabsman
 
     console.log(`${pluginName} 已卸载`);
 }

@@ -113,6 +113,16 @@ function registerTabsmanCommand(){
             fn: window.pluginTabsman.refreshCurrentEditor,
             description: '[tabsman] 重新打开当前面板的当前编辑器'
         },
+        {
+            name: 'tabsman.createBackgroundTab',
+            fn: window.pluginTabsman.createBackgroundTab,
+            description: '[tabsman] 创建后台标签页（基于光标所在块）'
+        },
+        {
+            name: 'tabsman.createForegroundTab',
+            fn: window.pluginTabsman.createForegroundTab,
+            description: '[tabsman] 创建前台标签页（基于光标所在块）'
+        }
     ]
 
     commands.forEach(({name,fn,description}) => orca.commands.registerCommand(name, fn, description))

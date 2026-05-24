@@ -1383,6 +1383,55 @@ async function __getQuickNoteBlockId(){
     return {quickNoteBlockId, isNewBlock: true}
 }
 
+
+// 根据光标所在块打开前后台标签页
+/**
+ * 创建后台标签页：在指定面板里建一个新tab，不切换焦点过去（用户当前看的页面不变）。
+ * 用于 Ctrl+Click 这种"先开着，待会儿再看"的场景。
+ * @param {string} view - Orca视图类型（如 "block" / "journal" 等）
+ * @param {*} viewArgs - 视图参数，结构随view而变
+ * @param {string} panelId - 目标面板ID
+ */
+function createBackgroundTab(view, viewArgs, panelId) {
+    // 没提供就从选区获取
+    if (!view || !viewArgs || !panelId) {
+        const cursorData = orca.utils.getCursorDataFromSelection(window.getSelection());
+        if (!cursorData) return
+        panelId = cursorData.panelId
+        view = 'block'
+        viewArgs = {blockId: cursorData.focus.blockId}
+    }
+    // 根据视图类型确定目标内容ID
+    const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
+    createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
+    .then(() => orca.notify("success", "[tabsman] 已创建后台标签页"))
+}
+
+
+/**
+ * 创建前台标签页：在指定面板里建一个新tab，会自动切换焦点过去。
+ * 用于 Ctrl+Shift+Click 这种"开了就要看"的场景
+ * @param {string} view - Orca视图类型（如 "block" / "journal" 等）
+ * @param {*} viewArgs - 视图参数，结构随view而变
+ * @param {string} panelId - 目标面板ID
+ */
+function createForegroundTab(view, viewArgs, panelId) {
+    // 没提供就从选区获取
+    if (!view || !viewArgs || !panelId) {
+        const cursorData = orca.utils.getCursorDataFromSelection(window.getSelection());
+        if (!cursorData) return
+        panelId = cursorData.panelId
+        view = 'block'
+        viewArgs = {blockId: cursorData.focus.blockId}
+    }
+
+    const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
+    createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
+    .then(newTab => switchTab(newTab.id))
+    .then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
+}
+
+
 // 刷新当前编辑器
 const refreshCurrentEditor = Utils.throttle(__refreshCurrentEditor, 300)
 let refreshing = false
@@ -1579,11 +1628,11 @@ function setupNavWrappers() {
 
         if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理Ctrl+Click：创建后台标签页
-            __createBackgroundTab(view, viewArgs, panelId)
+            createBackgroundTab(view, viewArgs, panelId)
 
         } else if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
-            __createForegroundTab(view, viewArgs, panelId)
+            createForegroundTab(view, viewArgs, panelId)
         } else {
             // 常规调用原始函数goto
             // 检查panelId是否locked，没锁才算是常规调用，锁了则转应给openInLastPanel，以便记录新面板新tab
@@ -1606,11 +1655,11 @@ function setupNavWrappers() {
         
         if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
-            __createForegroundTab(view, viewArgs, panelId)
+            createForegroundTab(view, viewArgs, panelId)
             
         } else if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Click：创建后台标签页
-            __createBackgroundTab(view, viewArgs, panelId)
+            createBackgroundTab(view, viewArgs, panelId)
 
         } else {
             // 常规调用原始函数打开
@@ -1658,35 +1707,6 @@ function cleanNavWrappers() {
     })
 
     navOriginals = null
-}
-
-/**
- * 创建后台标签页：在指定面板里建一个新tab，不切换焦点过去（用户当前看的页面不变）。
- * 用于 Ctrl+Click 这种"先开着，待会儿再看"的场景。
- * @param {string} view - Orca视图类型（如 "block" / "journal" 等）
- * @param {*} viewArgs - 视图参数，结构随view而变
- * @param {string} panelId - 目标面板ID
- */
-function __createBackgroundTab(view, viewArgs, panelId) {
-    // 根据视图类型确定目标内容ID
-    const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
-    createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
-    .then(() => orca.notify("success", "[tabsman] 已创建后台标签页"))
-}
-
-
-/**
- * 创建前台标签页：在指定面板里建一个新tab，会自动切换焦点过去。
- * 用于 Ctrl+Shift+Click 这种"开了就要看"的场景
- * @param {string} view - Orca视图类型（如 "block" / "journal" 等）
- * @param {*} viewArgs - 视图参数，结构随view而变
- * @param {string} panelId - 目标面板ID
- */
-function __createForegroundTab(view, viewArgs, panelId) {
-    const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
-    createTab({ currentBlockId: targetBlockId, panelId, initHistoryInfo: { view, viewArgs } })
-    .then(newTab => switchTab(newTab.id))
-    .then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
 }
 
 
@@ -1747,6 +1767,8 @@ async function start(callback = null, pluginName) {
     window.pluginTabsman.getArchivedWorkspaceNames = TabsmanPersistence.getArchivedWorkspaceNames
     window.pluginTabsman.unarchiveWorkspace = TabsmanPersistence.unarchiveWorkspace
     window.pluginTabsman.refreshCurrentEditor = refreshCurrentEditor
+    window.pluginTabsman.createBackgroundTab = createBackgroundTab
+    window.pluginTabsman.createForegroundTab = createForegroundTab
 
     /* —————————————————————————————————————————-工作区————————————————————————————————————————————————— */
     // 每次启动时先重置退出点

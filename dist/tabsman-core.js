@@ -683,7 +683,7 @@ async function switchTab(tabId, needRender = true, needSwitchPanel = true) {
     // 不存在tab，不处理
     if (!tab) return
 
-    const activePanelId = orca.state.activePanel
+    const activePanelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
     const currentTab = activeTabs[activePanelId]
 
     // tab就是当前面板的当前tab，则无需其他处理
@@ -1393,13 +1393,15 @@ async function __getQuickNoteBlockId(){
  * @param {string} panelId - 目标面板ID
  */
 function createBackgroundTab(view, viewArgs, panelId) {
-    // 没提供就从选区获取
+    if (!panelId) {
+        // panelId定向为当前tabsman侧边栏UI上的activePanelId
+        panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+    }
+    
+    // 没提供就从S选区或全局搜索获取
     if (!view || !viewArgs || !panelId) {
-        const cursorData = orca.utils.getCursorDataFromSelection(window.getSelection());
-        if (!cursorData) return
-        panelId = cursorData.panelId
         view = 'block'
-        viewArgs = {blockId: cursorData.focus.blockId}
+        viewArgs = __resolveViewArgsFromUI()
     }
     // 根据视图类型确定目标内容ID
     const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
@@ -1416,13 +1418,15 @@ function createBackgroundTab(view, viewArgs, panelId) {
  * @param {string} panelId - 目标面板ID
  */
 function createForegroundTab(view, viewArgs, panelId) {
+    if (!panelId) {
+        panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+    }
+
     // 没提供就从选区获取
-    if (!view || !viewArgs || !panelId) {
-        const cursorData = orca.utils.getCursorDataFromSelection(window.getSelection());
-        if (!cursorData) return
-        panelId = cursorData.panelId
+    if (!view || !viewArgs) {
         view = 'block'
-        viewArgs = {blockId: cursorData.focus.blockId}
+        panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+        viewArgs = __resolveViewArgsFromUI()
     }
 
     const targetBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs);
@@ -1430,6 +1434,78 @@ function createForegroundTab(view, viewArgs, panelId) {
     .then(newTab => switchTab(newTab.id))
     .then(() => orca.notify("success", "[tabsman] 已创建前台标签页"))
 }
+
+
+/**
+ * 缺少明确参数时，从当前 UI 状态（光标选区 / 鼠标悬停位置）推断出要操作的 block 和 panel。
+ * @returns {object}
+ */
+function __resolveViewArgsFromUI() {
+    const viewArgs = {}
+    const cursorData = orca.utils.getCursorDataFromSelection(window.getSelection());
+    if (cursorData) {
+        viewArgs.blockId = cursorData.focus.blockId;
+    
+    } else if (lastPointerX !== -1 && lastPointerY !== -1) {
+        // 没有光标，则检查当前pointer是否位于全局搜索
+        // 当前是否悬停在条目上，不再则检查是否位于搜索预览上
+        const pointerEl = document.elementFromPoint(lastPointerX, lastPointerY)
+        const searchItem = pointerEl.closest('.orca-search-modal-block-item[data-block-id]')
+        if (searchItem) {
+            viewArgs.blockId = parseInt(searchItem.dataset.blockId)
+        } else {
+            const blockEditor = pointerEl.closest('.orca-search-modal-result-preview>.orca-panel[data-panel-id="_globalSearch"]>.orca-hideable>.orca-block-editor')
+            if (!blockEditor) return;
+            viewArgs.blockId = parseInt(blockEditor.dataset.blockId);
+        }
+    }
+
+    return viewArgs
+}
+
+
+/**
+ * 设置全局搜索窗口的afterHook，使得可以悬停在搜索结果上创建标签页
+ */
+let lastPointerX = -1, lastPointerY = -1;
+let unregisterAfterOpenSearch;
+function setAfterOpenSearch() {
+    /**
+     * 记录鼠标移动
+     * @param {PointerEvent} e 
+    */
+    const recordMove = (e) => {
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+    }
+
+    const afterOpenSearch = (e) => {
+        document.addEventListener('pointermove', recordMove, { passive: true, capture: true });
+    
+        // 记录body直接子元素的移除事件（搜索窗口）
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.removedNodes.length === 0) continue;
+                
+                for (const el of [...mutation.removedNodes]) {
+                    el.classList.contains('orca-modal-overlay');
+                    if (!el.querySelector('.orca-menu.orca-search-modal')) continue;
+                    // 是搜索窗关闭，则移除move监听和observer
+                    document.removeEventListener('pointermove', recordMove, { passive: true, capture: true });
+                    lastPointerX = -1; lastPointerY = -1;
+                    observer.disconnect();
+                }
+            }
+        });
+        observer.observe(document.body, { childList: true });
+    
+        return true;
+    }
+    orca.commands.registerAfterCommand("core.openSearch", afterOpenSearch)
+    
+    return () => orca.commands.unregisterAfterCommand("core.openSearch", afterOpenSearch);
+}
+
 
 
 // 刷新当前编辑器
@@ -1591,6 +1667,7 @@ function cleanCommandInterception(){
     Object.keys(beforeCommandHooks).forEach(name => orca.commands.unregisterBeforeCommand(`core.${name}`, beforeCommandHooks[name]))
     Object.keys(afterCommandHooks).forEach(name=>orca.commands.unregisterAfterCommand(`core.${name}`, afterCommandHooks[name]))
 
+    unregisterAfterOpenSearch()
     beforeCommandHooks = null
     afterCommandHooks = null
 }
@@ -1777,8 +1854,10 @@ async function start(callback = null, pluginName) {
     // if (n) lastWorkspaceName = JSON.parse(n)
     // WorkspaceRender.startWSRender(lastWorkspaceName)
     /* ————————————————————————————————————————————————————————————————————————————————————————————————— */
-    // 捕获一次性鼠标事件，用于处理后台和前台标签页的创建
+    // 捕获一次性鼠标事件，用于点击方式的前后台标签页的创建
     window.addEventListener('click', captureIntent, true);
+    // 处理全局搜索视图下的前后台标签页快捷键创建
+    unregisterAfterOpenSearch = setAfterOpenSearch()
 }
 
 /**

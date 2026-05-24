@@ -1310,42 +1310,20 @@ async function createQuickNoteTab(panelId) {
                 false,
             )
 
-            setTimeout((length = prefix.length) => {
-                const cursorData = __getCursorData(quickNoteBlockId, panelId)
-                // 光标给到日期前缀末尾
-                cursorData.anchor.offset = length
-                cursorData.focus.offset = length
-                orca.utils.setSelectionFromCursorData(cursorData);
-            }, 0);
+            // 100ms后光标移动到末尾
+            setTimeout(() => {
+                const sel = window.getSelection()
+                const range = sel.getRangeAt(0)
+                range.selectNodeContents(range.endContainer);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }, 100);
         }
 
         // 保存快速记录块id，以便下次创建快速记录时进行自动折叠处理（根据用户设置决定是否启用自动折叠）
         lastQuickNoteBlockId = quickNoteBlockId;
     })
-}
-
-
-// 辅助函数，获取有效的cursorData，如果无法获取，则使用预设数据替代（预设数据的块id和面板id会被替换成当前快速记录块和面板）
-function __getCursorData(quickNoteBlockId, panelId) {
-    // 用于在无法获取cursorData时，直接生成cursorData。典型的无法获取场景就是白板中创建快速记录tab。
-    const cursorDataTemplate = {  
-        anchor: {blockId: 20260416, isInline: true, index: 0, offset: 0},
-        focus: {blockId: 20260416, isInline: true, index: 0, offset: 0},
-        isForward: true,
-        panelId: "当前虎鲸版本1.72.0",
-        rootBlockId: 20260416
-    };
-    const selection = window.getSelection();
-    let cursorData = orca.utils.getCursorDataFromSelection(selection);
-    if (!cursorData) {
-        cursorData = cursorDataTemplate
-        cursorData.anchor.blockId = quickNoteBlockId
-        cursorData.focus.blockId = quickNoteBlockId
-        cursorData.panelId = panelId
-        cursorData.rootBlockId = quickNoteBlockId
-        console.log("[tabsman] 无法获取cursorData，已使用预设数据替代，可能会导致光标位置不准确", cursorData);
-    }
-    return cursorData;
 }
 
 

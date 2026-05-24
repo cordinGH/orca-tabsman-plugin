@@ -102,7 +102,7 @@ function HeadbarButtonMenu() {
                 : archivedNames.map(wsName => 
                     c(WorkspaceItem, {
                         key: wsName, 
-                        name: new Date(parseInt(wsName)).toLocaleDateString() +' | '+ wsName.slice(wsName.indexOf('_') + 1), 
+                        name: formatDate(parseInt(wsName)) +' | '+ wsName.slice(wsName.indexOf('_') + 1), 
                         onClick: async () => {
                             await Workspace.insertWSItem(wsName)
                             // 数据层面的删除应当在UI发生后执行。
@@ -110,10 +110,22 @@ function HeadbarButtonMenu() {
                             setArchivedNames([...TabsmanPersistence.getArchivedWorkspaceNames()]);
                         }
                     })
-                )
+                ).reverse()
             )
         ),
     ];
+}
+
+/**
+ * 将时间戳转为为目标格式日期文本
+ * @param {number} timestamp - 时间戳
+ */
+function formatDate(timestamp) {
+    const date = new Date(timestamp);
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return y + '/' + m + '/' + d
 }
 
 

@@ -2068,6 +2068,7 @@ export {
     refreshCurrentEditor,
     createQuickNoteTab,
     createTodayJournalTab,
+    reopenClosedTabsInOrder,
     // 用户功能（工作区操作）
     saveWorkspace,
     deleteWorkspace,

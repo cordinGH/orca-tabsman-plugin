@@ -54,14 +54,18 @@ let afterCommandHooks = null
 
 // ==================== 状态管理变量 ====================
 
-/** @type {boolean} 标记是否启用快速笔记前缀 */
-let enableQuickNotePrefix = false
-/** @type {boolean} 标记是否启用快速笔记自动折叠 */
-let enableAutoFoldQuickNotes = false
 /** @type {number} 存储上一个快速笔记的blockId */
 let lastQuickNoteBlockId = null;
-/** @type {string} 快速笔记前缀字符串 */
-let prefixString = "date"
+
+/** @type {Object} 存储设置项当前值的配置对象 */
+let settings = {
+    /** @type {boolean} 标记是否启用快速笔记前缀 */
+    enableQuickNotePrefix: false,
+    /** @type {boolean} 标记是否启用快速笔记自动折叠 */
+    enableAutoFoldQuickNotes: false,
+    /** @type {string} 快速笔记前缀字符串 */
+    prefixString: "date"
+}
 
 /** @type {boolean} 标记当前正存在该插件命令在执行 */
 let commandDoing = false
@@ -433,21 +437,24 @@ function updateSortedTabsCache(panelId) {
 function subscribeSettings(pluginName) {
     const pluginSettings = orca.state.plugins[pluginName]?.settings;
 
-    enableQuickNotePrefix = pluginSettings.enableQuickNotePrefix
-    enableAutoFoldQuickNotes = pluginSettings.enableAutoFoldQuickNotes
-    prefixString = pluginSettings.prefixString.trim()
+    // 重建 settings 对象（destroy 时会置为 null，避免禁用再启用时对 null 赋值）
+    settings = {
+        enableQuickNotePrefix: pluginSettings.enableQuickNotePrefix,
+        enableAutoFoldQuickNotes: pluginSettings.enableAutoFoldQuickNotes,
+        prefixString: pluginSettings.prefixString.trim()
+    }
     TabsmanPersistence.setMaxRecentlyClosedTabs(pluginSettings.maxRecentlyClosedTabs)
 
     unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
-        const settings = orca.state.plugins[pluginName]?.settings;
+        const  updatedSettings = orca.state.plugins[pluginName]?.settings
         if (!settings) {
             console.log("[tabsman] 设置选项加载失败")
             return
         }
-        enableQuickNotePrefix = settings.enableQuickNotePrefix
-        enableAutoFoldQuickNotes = settings.enableAutoFoldQuickNotes
-        prefixString = settings.prefixString.trim()
-        TabsmanPersistence.setMaxRecentlyClosedTabs(settings.maxRecentlyClosedTabs)
+        settings.enableQuickNotePrefix = updatedSettings.enableQuickNotePrefix
+        settings.enableAutoFoldQuickNotes = updatedSettings.enableAutoFoldQuickNotes
+        settings.prefixString = updatedSettings.prefixString.trim()
+        TabsmanPersistence.setMaxRecentlyClosedTabs(updatedSettings.maxRecentlyClosedTabs)
     }
   )
 }
@@ -1290,17 +1297,17 @@ async function createQuickNoteTab(panelId) {
         await switchTab(newTab.id)
 
         // 根据用户设置决定是否启用自动折叠上一个快速记录块的功能（如果存在上一个快速记录块）
-        if (enableAutoFoldQuickNotes && lastQuickNoteBlockId) {
+        if (settings.enableAutoFoldQuickNotes && lastQuickNoteBlockId) {
             orca.commands.invokeEditorCommand("core.editor.foldBlock", null, lastQuickNoteBlockId);
         }
 
         // 根据用户设置决定是否启用快速记录块前缀功能，如果启用则在新建的快速记录块内添加日期前缀，并将光标移动到前缀后面
-        if (enableQuickNotePrefix) {
+        if (settings.enableQuickNotePrefix) {
             const date = new Date();
             const y = date.getFullYear() - 2000
             const m = String(date.getMonth() + 1).padStart(2, '0')
             const d = String(date.getDate()).padStart(2, '0')
-            const prefix = prefixString + y + m + d
+            const prefix = settings.prefixString + y + m + d
 
             const updates = [{ id: quickNoteBlockId, content: [{ t: "t", v: prefix }] }]
             await orca.commands.invokeEditorCommand(
@@ -1781,17 +1788,17 @@ function setupNavWrappers() {
     navOriginals.method.goTo = orca.nav.goTo
     orca.nav.goTo = function(view, viewArgs, panelId) {
 
-        // 取出本次的一次性点击事件
-        const clickIntent = consumeClickIntent()
-
-        // 如果没传panelId，或者传了个未被记录的panelId，则panelId定向为当前UI上的activePanelId
+        // 前置工作1：如果没传panelId，或者传了个未被记录的panelId，则取当前UI上的activePanelId为panelId
         if (!panelId || !Object.hasOwn(activeTabs, panelId)) {
             panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
         }
 
-        // activePanel切换到panelId上，以便在插件或官方黑盒中调用到orca.state.activePanel的地方可以正确跳转和填充历史。  
+        // 前置工作2：activePanel切换到panelId上，以便在插件或官方黑盒中调用到orca.state.activePanel的地方可以正确跳转和填充历史。  
         // 典型场景：官方在全局搜索视图中打开预览编辑，在里面跳转将会无效。下方switch之后，就可以正常跳转。
         if (orca.state.activePanel !== panelId) orca.nav.switchFocusTo(panelId);
+
+        // 取出本次的一次性点击事件
+        const clickIntent = consumeClickIntent()
 
         if (clickIntent?.ctrlKey && !clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理Ctrl+Click：创建后台标签页
@@ -1814,11 +1821,11 @@ function setupNavWrappers() {
     navOriginals.method.openInLastPanel = orca.nav.openInLastPanel;
     orca.nav.openInLastPanel = function(view, viewArgs) {
         
+        // 前置工作1：取当前UI上的activePanelId，作为新标签页的目标面板
+        const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
+        
         // 取出本次的一次性点击事件
         const clickIntent = consumeClickIntent()
-
-        // 新标签页的目标面板取当前UI上的activePanelId
-        const panelId = document.querySelector('.plugin-tabsman-panel-group.plugin-tabsman-panel-group-active').dataset.tabsmanPanelId;
         
         if (clickIntent?.ctrlKey && clickIntent.shiftKey && clickIntent.button === 0) {
             // 处理 Ctrl+Shift+Click：创建前台标签页
@@ -1972,10 +1979,9 @@ function destroy() {
     WorkspaceRender.stopWSRender()
 
     // 清理选项状态以及工作区状态
-    enableQuickNotePrefix = false
-    enableAutoFoldQuickNotes = false
+    settings = null
+    
     lastQuickNoteBlockId = null;
-    prefixString = "date"
     commandDoing = false
     workspaceNow = ""
     workspaceSwitching = false

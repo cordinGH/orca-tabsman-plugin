@@ -44,9 +44,8 @@ let renderTabsByPanel = null
 // 原始的navAPI函数
 let navOriginals = null
 
-// 订阅取消函数
-let unsubscribePanelBackHistory = null
-let unsubscribeSettings = null
+/** @type {Array<Function>} 存储所有需要取消的订阅函数 */
+let unsubscribeList = []
 
 // 拦截器函数引用
 let beforeCommandHooks = null
@@ -57,15 +56,15 @@ let afterCommandHooks = null
 /** @type {number} 存储上一个快速笔记的blockId */
 let lastQuickNoteBlockId = null;
 
-/** @type {Object} 存储设置项当前值的配置对象 */
-let settings = {
-    /** @type {boolean} 标记是否启用快速笔记前缀 */
-    enableQuickNotePrefix: false,
-    /** @type {boolean} 标记是否启用快速笔记自动折叠 */
-    enableAutoFoldQuickNotes: false,
-    /** @type {string} 快速笔记前缀字符串 */
-    prefixString: "date"
-}
+/**
+ * 存储设置项当前值的配置对象
+ * @type {{
+ *   enableQuickNotePrefix: boolean,
+ *   enableAutoFoldQuickNotes: boolean,
+ *   prefixString: string,
+ * }}
+ */
+let settings = {};
 
 /** @type {boolean} 标记当前正存在该插件命令在执行 */
 let commandDoing = false
@@ -435,49 +434,35 @@ function updateSortedTabsCache(panelId) {
  * 设置设置变更监听器
  */
 function subscribeSettings(pluginName) {
-    const pluginSettings = orca.state.plugins[pluginName]?.settings;
-
-    // 重建 settings 对象（destroy 时会置为 null，避免禁用再启用时对 null 赋值）
-    settings = {
-        enableQuickNotePrefix: pluginSettings.enableQuickNotePrefix,
-        enableAutoFoldQuickNotes: pluginSettings.enableAutoFoldQuickNotes,
-        prefixString: pluginSettings.prefixString.trim()
-    }
-    TabsmanPersistence.setMaxRecentlyClosedTabs(pluginSettings.maxRecentlyClosedTabs)
-
-    unsubscribeSettings = window.Valtio.subscribe(orca.state.plugins[pluginName], () => {
-        const  updatedSettings = orca.state.plugins[pluginName]?.settings
-        if (!settings) {
+    // 缓存设置数据到本地变量，并提供默认值。
+    const updateSettings = () => {
+        const pluginSettings = orca.state.plugins[pluginName]?.settings
+        if (!pluginSettings) {
             console.log("[tabsman] 设置选项加载失败")
             return
         }
-        settings.enableQuickNotePrefix = updatedSettings.enableQuickNotePrefix
-        settings.enableAutoFoldQuickNotes = updatedSettings.enableAutoFoldQuickNotes
-        settings.prefixString = updatedSettings.prefixString.trim()
-        TabsmanPersistence.setMaxRecentlyClosedTabs(updatedSettings.maxRecentlyClosedTabs)
+
+        if (!settings) settings = {};
+
+        settings.enableQuickNotePrefix = pluginSettings.enableQuickNotePrefix;
+        settings.enableAutoFoldQuickNotes = pluginSettings.enableAutoFoldQuickNotes;
+        settings.prefixString = pluginSettings.prefixString.trim();
+        
+        TabsmanPersistence.setMaxRecentlyClosedTabs(pluginSettings.maxRecentlyClosedTabs)
     }
-  )
+
+    updateSettings()
+    unsubscribeList.push(window.Valtio.subscribe(orca.state.plugins[pluginName], updateSettings))
 }
 
 // ==================== 标签页历史记录管理 ====================
-
-function unsubscribeAll() {
-    if (unsubscribeSettings) {
-        unsubscribeSettings();
-        unsubscribeSettings = null;
-    } 
-    if (unsubscribePanelBackHistory) {
-        unsubscribePanelBackHistory();
-        unsubscribePanelBackHistory = null;
-    }
-}
 
 /**
  * 订阅orca后退历史变化，用于填充历史并更新当前tab对象的信息。已拦截了前进后退命令统一为了Goto，以确保后退历史始终是增长的。
  */
 function subscribePanelBackHistory() {
     let lastHistoryLength = orca.state.panelBackHistory.length;
-    unsubscribePanelBackHistory = window.Valtio.subscribe(orca.state.panelBackHistory, async () => {
+    unsubscribeList.push(window.Valtio.subscribe(orca.state.panelBackHistory, async () => {
         // 切换工作区期间，只重置lastHistoryLength，不做其他处理。
         if (workspaceSwitching) {
             lastHistoryLength = 0
@@ -493,7 +478,7 @@ function subscribePanelBackHistory() {
         
         // 更新最后一次历史长度
         lastHistoryLength = currentLength;
-    });
+    }));
 }
 
 
@@ -1964,7 +1949,8 @@ async function start(callback = null, pluginName) {
  */
 function destroy() {
     // 清理订阅
-    unsubscribeAll()
+    unsubscribeList.forEach(unsub => unsub())
+    unsubscribeList = []
 
     // 清理navAPI的包装
     cleanNavWrappers()

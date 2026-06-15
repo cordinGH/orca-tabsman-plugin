@@ -106,7 +106,7 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
 
         const targetBlockId = await __getBlockId(tab)
         if (targetBlockId === -1) {
-            orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块');
+            orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块或块不存在');
             return;
         }
 
@@ -130,10 +130,10 @@ export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, 
 
         // 选择器会在class加入后立刻生效，而不会等待执行栈清空，因此class先add进去
         document.body.classList.add('plugin-tabsman-preview')
-        orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, true);
-        
-        // 下一次事件循环再处理class移除，即 忽略本次pointerdown，防止秒开秒关
-        setTimeout(()=> {
+
+        // 宏任务中打开，强制略过本次的pointerdowns事件，防止事件触发虎鲸对预览窗口的关闭监听，从而秒开秒关
+        setTimeout(() => {
+            orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, true)
             document.addEventListener('pointerdown', removeEditPreview)
             document.addEventListener('keydown', removeEditPreview)
         }, 0)
@@ -216,7 +216,7 @@ async function __getBlockId(tab) {
         targetBlockId = journalBlock.id;
     } else if (Number.isInteger(Number(blockId))) {
         // block
-        targetBlockId = blockId
+        targetBlockId = await orca.invokeBackend("get-block", blockId) ? blockId : -1
     } else {
         targetBlockId = -1
     }

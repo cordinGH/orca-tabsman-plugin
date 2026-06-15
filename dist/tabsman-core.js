@@ -62,9 +62,13 @@ let lastQuickNoteBlockId = null;
  *   enableQuickNotePrefix: boolean,
  *   enableAutoFoldQuickNotes: boolean,
  *   prefixString: string,
+ *   enableCalendarPreview: boolean,
  * }}
  */
 let settings = {};
+
+// 终止日历预览的清理函数
+let turnOffCalendarPreview = null;
 
 /** @type {boolean} 标记当前正存在该插件命令在执行 */
 let commandDoing = false
@@ -447,6 +451,14 @@ function subscribeSettings(pluginName) {
         settings.enableQuickNotePrefix = pluginSettings.enableQuickNotePrefix;
         settings.enableAutoFoldQuickNotes = pluginSettings.enableAutoFoldQuickNotes;
         settings.prefixString = pluginSettings.prefixString.trim();
+
+        // 开关日历日格预览
+        const newValue = pluginSettings.enableCalendarPreview;
+        const oldValue = settings.enableCalendarPreview
+        // 旧值false或不存在，且新值true，才需要加载功能，反之，旧值true 新值false，才需要卸载
+        if (!oldValue && newValue) turnOffCalendarPreview = turnOnCalendarPreview();
+        else if (oldValue && !newValue) turnOffCalendarPreview();
+        settings.enableCalendarPreview = newValue;
         
         TabsmanPersistence.setMaxRecentlyClosedTabs(pluginSettings.maxRecentlyClosedTabs)
     }
@@ -1678,6 +1690,56 @@ async function __replaceWithOrphanBlock() {
     await new Promise(r => requestAnimationFrame(r))
 }
 
+
+
+// 启用左侧边栏日历日格的预览功能
+let orcaCalendar = null;
+function turnOnCalendarPreview() {
+    orcaCalendar = document.querySelector('#sidebar>.orca-calendar')
+    orcaCalendar.addEventListener('pointerdown', __handleCalendarPreview)
+
+    return () => {
+        orcaCalendar.removeEventListener('pointerdown', __handleCalendarPreview)
+        orcaCalendar = null
+        turnOffCalendarPreview = null
+    }
+}
+
+/**
+ * 中键日格，或alt + 右键日格时，解析日格日期并打开预览窗口。
+ * @param {PointerEvent} e 
+ */
+async function __handleCalendarPreview(e) {
+    if (e.button ===1 || (e.altKey && e.button === 2)) {
+        e.preventDefault();
+        const target = e.target;
+        if (!__checkDayEl(target)) return;
+        const date = __resolveDate(target);
+        if (!date) return
+
+        const journalBlock = await orca.invokeBackend("get-journal-block", date);
+        if (!journalBlock) return;
+        setTimeout(()=>orca.utils.showBlockPreview(journalBlock.id, target, undefined, true), 0);
+    }
+}
+
+function __checkDayEl(target) {
+    if (!(target instanceof HTMLElement)) return false;
+    if (!target.classList.contains('day')) return false;
+    return true;
+}
+
+function __resolveDate(dayEl) {
+    const year = parseInt(orcaCalendar.querySelector(".choosen-year")?.textContent)
+    const month = parseInt(orcaCalendar.querySelector(".choosen-month")?.textContent)
+    const day = parseInt(dayEl.textContent)
+
+    if ([year, month, day].some(Number.isNaN)) return null
+
+    return new Date(year, month - 1, day);
+}
+
+
 /* —————————————————————————————————————————————————————————————————————————————————————————————————— */
 
 
@@ -1951,6 +2013,9 @@ function destroy() {
     // 清理订阅
     unsubscribeList.forEach(unsub => unsub())
     unsubscribeList = []
+
+    // 关闭日历日格预览功能
+    turnOffCalendarPreview?.();
 
     // 清理navAPI的包装
     cleanNavWrappers()

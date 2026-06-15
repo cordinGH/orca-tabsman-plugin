@@ -285,6 +285,12 @@ async function load(name) {
             type: "boolean",
             defaultValue: true
         },
+        enableCalendarPreview: {
+            label: "左侧边栏的日历日格支持预览打开",
+            description: "启用后，中键日格 或者 Alt + 右键日格，可打开预览窗口",
+            type: "boolean",
+            defaultValue: true
+        },
         restoreLastWorkspace: {
             label: "启动时自动恢复上次工作区",
             description: "启用后，每当进入该库时，将自动打开上次关闭前所在的工作区。若上次未进入任何工作区，则不做处理。",

@@ -88,117 +88,168 @@ export function hideTooltip() {
 }
 
 
-/**
- * 启用悬浮预览
- * @param {HTMLElement} tabElement - 标签页元素
- * @param {Object} tab - tab对象
- * @returns 
- */
-let previewClose;
-let previewTimer;
-export async function enableBlockPreview(/** @type {HTMLElement} */ tabElement, tab) {
-
-    // 中键直接打开编辑预览，不考虑防抖，因为防抖有响应延迟
-    // 也无需节流防止连点，因为第一次中键时官方会立刻加上orca-popup-pointer-logic禁止点击事件，所以第二次点击根本无效
-    tabElement.onpointerdown = async (e) => {
-        // 非中键
-        if (e.button !== 1) return;
-
-        const targetBlockId = await __getBlockId(tab)
-        if (targetBlockId === -1) {
-            orca.notify("info", '[tabsman] 无法触发悬停预览，因为非块或块不存在');
-            return;
-        }
-
-        // 滞后移除class，滞后过程中触发新预览打开则无需执行
-        if (removeTimer) {
-            clearTimeout(removeTimer)
-            removeTimer = null
-        }
-
-        // 存在悬停预览时，官方原生就支持中键进入编辑模式，无需重复打开。
-        if (previewClose) return;
-
-        const tabRect = tabElement.getBoundingClientRect();
-        const { top, right, height } = tabRect
-        const fakeRect = new DOMRect(
-            right, // 矩形区域的x偏移
-            top + height * 0.5, // 矩形区域的y偏移
-            0, // 矩形的x宽度
-            0 // 矩形的y高度
-        );
-
-        // 选择器会在class加入后立刻生效，而不会等待执行栈清空，因此class先add进去
-        document.body.classList.add('plugin-tabsman-preview')
-
-        // 宏任务中打开，强制略过本次的pointerdowns事件，防止事件触发虎鲸对预览窗口的关闭监听，从而秒开秒关
-        setTimeout(() => {
-            orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, true)
-            document.addEventListener('pointerdown', removeEditPreview)
-            document.addEventListener('keydown', removeEditPreview)
-        }, 0)
-    }
+/* ———————————————————————————————————————————————————— 标签页预览 —————————————————————————————————————————————————————————— */
 
 
-    // alt + hover，打开悬停预览
-    tabElement.onmouseenter = async (e) => {
-        if (!e.altKey) return
-
-        const targetBlockId = await __getBlockId(tab)
-        if (targetBlockId === -1) {
-            orca.notify("info", '[tabsman] 无法触发预览，因为非块');
-            return;
-        }
-
-        // 滞后移除class，滞后过程中触发新预览打开则无需执行
-        if (removeTimer) {
-            clearTimeout(removeTimer)
-            removeTimer = null
-        }
-
-        previewTimer = setTimeout(()=>{
-            const tabRect = tabElement.getBoundingClientRect();
-            const { top, bottom, right, left, width, height } = tabRect
-            const fakeRect = new DOMRect(
-                right, // 矩形区域的x偏移
-                top + height * 0.5, // 矩形区域的y偏移
-                0, // 矩形的x宽度
-                0 // 矩形的y高度
-            );
-
-            // 选择器会在class加入后立刻生效，而不会等待执行栈清空，因此class先add进去
-            document.body.classList.add('plugin-tabsman-preview')
-            previewClose = orca.utils.showBlockPreview(targetBlockId, undefined, fakeRect, false);
-            previewTimer = null
-        }, 200) // 200ms防抖
-    }
-
+// 块预览的所有相关逻辑，全部闭包进blockPreview中，外部只通过 enableBlockPreview 绑定事件
+const blockPreview = (() => {
+    // 悬停预览的一次打开代号，await RPC后打开预览之前，需要检查代号是否过时，过时应当中止打开。
+    let hoverGen = 0
+    // 悬停预览防抖
+    let openTimer = null
+    // 悬停预览的关闭函数
+    let close = null
+    // 位移class移除的滞后计时器
+    let classHideTimer = null
     
-    // 悬停预览转为编辑预览后，官方会自动加入orca-popup-pointer-logic（用于禁止外部点击），因此光标离开时如果是编辑态，则无需关闭窗口。
-    // 官方的ctrl e 或者中键，都会触发光标离开
-    tabElement.onmouseleave = (e) => {
-        // 当前还没打开则直接关闭并结束
-        if (previewTimer) {
-            clearTimeout(previewTimer)
-            previewTimer = null
-            return
-        }
-
-        // 本没有预览则无需处理
-        if (!previewClose) return
-        
-        // 官方的ctrl e 或官方中键进入编辑模式，无需处理，且则应当绑定handler处理class的移除
-        const isEditing = document.body.classList.contains('orca-popup-pointer-logic')
-        if (isEditing) {
-            document.addEventListener('pointerdown', removeEditPreview)
-            document.addEventListener('keydown', removeEditPreview)
-            
-            return
-        }
-        
-        // 关闭预览
-        removePreview();
+    // 排一个延迟500ms后再移除class的计时器，留足时间盖过官方关闭动画，防止位移闪烁
+    function scheduleHideClass() {
+        // 取消旧计时器
+        cancelScheduledHide()
+        classHideTimer = setTimeout(() => document.body.classList.remove('plugin-tabsman-preview'), 500)
     }
+    // 取消任何“待移除”的位移 class，每次打开预览时都应当调用，防止位移闪烁。
+    function cancelScheduledHide() {
+        clearTimeout(classHideTimer)
+        classHideTimer = null
+    }
+    
+    // 取消“尚未弹出”的悬停打开，每次有新的预览/移除时，都应当调用，防止双预览
+    function cancelPendingOpen() {
+        // 一次预览打开的代号，每次有新的预览/移除事件发生时，代号都会自增，当await RPC发现代号过时，届时会中止预览打开。
+        hoverGen++
+        clearTimeout(openTimer)
+        openTimer = null
+    }
+
+    function armOutsideClose() {
+        document.addEventListener('pointerdown', onOutsideClose)
+        document.addEventListener('keydown', onOutsideClose)
+    }
+    function disarmOutsideClose() {
+        document.removeEventListener('pointerdown', onOutsideClose)
+        document.removeEventListener('keydown', onOutsideClose)
+    }
+
+    // handler：编辑态预览关闭后，滞后移除位移class，并清理监听器
+    function onOutsideClose(e) {
+        // 非关闭动作则不处理
+        const isEsc = e.type === 'keydown' && e.key === 'Escape'
+        const isClick = e.type === 'pointerdown'
+        if (!isEsc && !isClick) return;
+        if (e.target.closest('.orca-popup.orca-block-preview-popup')) return;
+
+        // 关闭动作，排期移除位移class，并清理状态
+        scheduleHideClass()
+        disarmOutsideClose()
+        close = null
+    }
+
+    // 获取预览窗口显示位置的参考锚点
+    function __getAnchorRect(tabElement) {
+        const { top, right, height } = tabElement.getBoundingClientRect();
+        // 参考点坐标取标签页的右边缘垂直中点
+        const x = right
+        const y = top + height * 0.5
+        return new DOMRect(x, y, 0, 0);
+    }
+
+
+    // 共用：捕获代号 → await → 代号过期/非块就收尾返回 null
+    // 【为什么需要 hoverGen —— 双预览bug】
+    // 预览的「开」动作openTimer，被内部的await切成了两段执行
+    //  - 「开」的第1段：防抖结束执行openTimer => await提前返回 => 本次 openTimer 执行完毕
+    //  - 「开」的第2段：等到await的promise敲定后，await回调（预览打开）才加入微任务队列（自动）
+    // 由于openTimer在第1段已执行完毕，所以如果在第2段之前派发了新onLeave/openHover/openEdit，那其内部cancelPendingOpen实际上是无效的；
+    // 这就导致了本该被cancel的预览，被继续打开了，但close变量只有一个，导致另一个预览窗口常驻屏幕。
+    // 
+    // 【修复】
+    //  - await 前记下本次 hover 代号 startGen，任何更晚的开/关事件，都会在 cancelPendingOpen 里推进 hoverGen；
+    //  - await后（打开预览之前）如果代号变了，则直接return中止预览打开，以弥补 cancelPendingOpen 漏洞。
+    async function __resolveBlockIdForPreview(tab) {
+        const startGen = hoverGen
+        const blockId = await __getBlockId(tab)
+        if (startGen !== hoverGen) return null
+        if (blockId === -1) {
+            orca.notify("info", '[tabsman] 无法触发预览，因为非块')
+            // 没开成预览则把开头 cancelScheduledHide 取消掉的那次 class 移除补排回来。
+            scheduleHideClass()
+            return null
+        }
+        return blockId
+    }
+
+    return {
+        // alt + 悬停：带 200ms 防抖的悬停打开
+        openHover(tab, el) {
+            // 取消任何“尚未弹出”的悬停打开，避免双预览
+            cancelPendingOpen()
+            // 取消任何“待移除”的位移 class，避免位移闪烁
+            cancelScheduledHide()
+
+            openTimer = setTimeout(async () => {
+
+                const blockId = await __resolveBlockIdForPreview(tab)
+                if (blockId === null) return;
+
+                // css规则的生效不是js线程，因此会在class加入后立刻生效（不会等待执行栈清空）
+                document.body.classList.add('plugin-tabsman-preview')
+                close = orca.utils.showBlockPreview(blockId, undefined, __getAnchorRect(el))
+            }, 200)
+        },
+
+
+        // 中键标签页的事件处理器，用于打开一个编辑预览
+        openEdit(tab, el) {
+            cancelPendingOpen()
+            cancelScheduledHide()
+
+            // 已有悬停预览则先关闭
+            if (close) { close(); close = null }
+            
+            // 推迟到下一轮事件循环：避免本次 pointerdown 冒泡触发官方关闭监听导致秒开秒关
+            setTimeout(async () => {
+                const blockId = await __resolveBlockIdForPreview(tab)
+                if (blockId === null) return
+                
+                document.body.classList.add('plugin-tabsman-preview')
+                orca.utils.showBlockPreview(blockId, undefined, __getAnchorRect(el), true)
+                armOutsideClose()
+            }, 0)
+        },
+
+
+        // 鼠标离开的事件处理器，用于中止预览，并重置class状态
+        onLeave() {
+            // 取消尚未弹出的悬停打开
+            cancelPendingOpen()
+
+            // case1: 如果已通过虎鲸官方快捷键（ctrl+e）转为编辑态，则无需处理预览关闭（官方会接管outsideClose），只需安排关闭监听以处理位移class的移除。
+            if (document.body.classList.contains('orca-popup-pointer-logic')) {
+                close = null
+                // 当中键转换时，openEdit事件task率先执行，随后才是onLeave事件task，
+                // 而onLeave可能会在openEdit内部计时器回调之前执行，但不影响，因为addEventListener不会重复挂载，
+                armOutsideClose()
+                return
+            }
+
+            // case2: 正常的悬停预览，则关闭预览，并滞后移除位移 class
+            if (close) { close(); close = null }
+            scheduleHideClass()
+        },
+    }
+})()
+
+
+/**
+ * 启用标签页的块预览：alt+悬停弹出悬停预览，中键弹出编辑态预览。
+ * @param {HTMLElement} tabElement - 标签页元素
+ * @param {Object} tab - tab 对象
+ */
+export function enableBlockPreview(tabElement, tab) {
+    tabElement.onpointerdown = (e) => { if (e.button === 1) blockPreview.openEdit(tab, tabElement) }
+    tabElement.onmouseenter = (e) => { if (e.altKey) blockPreview.openHover(tab, tabElement) }
+    tabElement.onmouseleave = () => blockPreview.onLeave()
 }
 
 
@@ -225,48 +276,7 @@ async function __getBlockId(tab) {
 }
 
 
-// 移除预览及其辅助位移的class
-let removeTimer;
-function removePreview() {
-    // 官方的api关闭
-    previewClose()
-    previewClose = null
-    
-    // 滞后300ms关闭
-    removeTimer = setTimeout(()=> {
-        document.body.classList.remove('plugin-tabsman-preview')
-        removeTimer = null
-    }, 300) // 同removeEditPreview为300ms
-}
-
-
-/**
- * 处理编辑预览中的plugin-tabsman-preview的class移除，该class用于对预览窗口平移。绑在document确保能够接收事件。
- * 虎鲸的编辑预览会在点击外部区域后自动关闭预览，关闭后应当撤销对预览窗口的平移class，并null掉暂存的close变量
- * @param {Event} e 
- */
-function removeEditPreview(e) {
-    // 只处理esc和click
-    const isEscClose = e.type === 'keydown' && e.key === 'Escape'
-    const isClickClose = e.type === 'pointerdown'
-    if (!isEscClose && !isClickClose) return
-
-    setTimeout(()=>{
-        // 点击内部不移除
-        if (e.target.closest('.orca-popup.orca-block-preview-popup')) return
-        
-        // 用户连续中键(如双击中键)，第一次中键触发了tabsman的中键预览并注册了本handler。
-        // 理想情况是，第二次中键时触发官方的关闭预览（移除logic class），然后本处理器setTimeout滞后移除class
-        // 但事实是官方会忽略第二次中键（不会关闭预览），因此需要本handler自行处理该情况下的class维持（不清理class）
-        if (document.body.classList.contains('orca-popup-pointer-logic')) return
-
-        document.body.classList.remove('plugin-tabsman-preview')
-        document.removeEventListener('pointerdown', removeEditPreview)
-        document.removeEventListener('keydown', removeEditPreview)
-        previewClose = null
-    }, 300) // 晚移除，确保在下次打开前移除
-}
-
+/* ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
 
 /**
  * 根据orca.state.panels的中的后代结构，获取一个有序的面板Id数组。

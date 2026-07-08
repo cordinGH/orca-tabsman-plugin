@@ -200,22 +200,22 @@ const blockPreview = (() => {
 
 
         // 中键标签页的事件处理器，用于打开一个编辑预览
-        openEdit(tab, el) {
+        async openEdit(event, tab, el) {
             cancelPendingOpen()
             cancelScheduledHide()
 
             // 已有悬停预览则先关闭
             if (close) { close(); close = null }
-            
-            // 推迟到下一轮事件循环：避免本次 pointerdown 冒泡触发官方关闭监听导致秒开秒关
-            setTimeout(async () => {
-                const blockId = await __resolveBlockIdForPreview(tab)
-                if (blockId === null) return
-                
-                document.body.classList.add('plugin-tabsman-preview')
-                orca.utils.showBlockPreview(blockId, undefined, __getAnchorRect(el), true)
-                armOutsideClose()
-            }, 0)
+
+            event.preventDefault()
+            // 停止传播，从而防止本次 pointerdown 冒泡到官方挂在上层的移除预览监听器（会有可能导致秒开秒关）。
+            event.stopImmediatePropagation()
+            const blockId = await __resolveBlockIdForPreview(tab)
+            if (blockId === null) return
+
+            document.body.classList.add('plugin-tabsman-preview')
+            orca.utils.showBlockPreview(blockId, undefined, __getAnchorRect(el), true)
+            armOutsideClose()
         },
 
 
@@ -247,7 +247,7 @@ const blockPreview = (() => {
  * @param {Object} tab - tab 对象
  */
 export function enableBlockPreview(tabElement, tab) {
-    tabElement.onpointerdown = (e) => { if (e.button === 1) blockPreview.openEdit(tab, tabElement) }
+    tabElement.onpointerdown = (e) => { if (e.button === 1) blockPreview.openEdit(e, tab, tabElement) }
     tabElement.onmouseenter = (e) => { if (e.altKey) blockPreview.openHover(tab, tabElement) }
     tabElement.onmouseleave = () => blockPreview.onLeave()
 }

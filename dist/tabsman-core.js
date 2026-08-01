@@ -345,8 +345,8 @@ async function __updateTabInfoByPage() {
     const {id, view, viewArgs} = orca.nav.findViewPanel(activePanelId, orca.state.panels)
     const currentBlockId = __getBlockIdByViewAndViewArgs(view, viewArgs)
     const {name, icon} = await __generateTabNameAndIcon(currentBlockId);
-    // 对于非官方视图，或者当前填充发生在置顶tab内（所以后退栈至少为2==>当前+新入），新建一个tab跳转
-    if (!OFFICIAL_VIEW_LIST.includes(view) || (activeTab.isPinned && activeTab.backStack.length >= 2)) {
+    // 对于非官方视图，或者当前填充发生在置顶tab内，则新建一个tab跳转
+    if (!OFFICIAL_VIEW_LIST.includes(view) || activeTab.isPinned) {
         const newTab = await createTab({ currentBlockId, panelId: activePanelId, initHistoryInfo: {view, viewArgs} });
         await switchTab(newTab.id);
     } else {
@@ -1314,7 +1314,6 @@ async function createQuickNoteTab(panelId) {
                 false,
             )
 
-            // 100ms后光标移动到末尾
             setTimeout(() => {
                 const sel = window.getSelection()
                 const range = sel.getRangeAt(0)
@@ -1322,7 +1321,7 @@ async function createQuickNoteTab(panelId) {
                 range.collapse(false);
                 sel.removeAllRanges();
                 sel.addRange(range);
-            }, 100);
+            }, 150); // 150ms后光标移动到末尾
         }
 
         // 保存快速记录块id，以便下次创建快速记录时进行自动折叠处理（根据用户设置决定是否启用自动折叠）

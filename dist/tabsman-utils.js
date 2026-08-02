@@ -194,7 +194,7 @@ const blockPreview = (() => {
 
                 // css规则的生效不是js线程，因此会在class加入后立刻生效（不会等待执行栈清空）
                 document.body.classList.add('plugin-tabsman-preview')
-                close = orca.utils.showBlockPreview(blockId, undefined, __getAnchorRect(el))
+                close = orca.utils.showBlockPreview(blockId, undefined, __getAnchorRect(el), false, true)
             }, 200)
         },
 
